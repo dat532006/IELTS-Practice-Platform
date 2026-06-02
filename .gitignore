@@ -13,3 +13,6 @@ next-env.d.ts
 docs/
 TASKBRIEF_PROMPT.md
 IELTS_Platform_Project_Plan.md
+tmp-next-smoke*.log
+supabase/.temp/
+supabase/.branches/

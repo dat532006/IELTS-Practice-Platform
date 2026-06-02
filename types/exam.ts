@@ -1,0 +1,51 @@
+// W4 Exam/Test DTO — docs/TaskBrief/BackendEngineer/phase1/w4.md Task 4.3/4.4.
+// LUẬT THÉP #2/#3: payload chỉ trả sau guard; KHÔNG bao giờ kèm answer_keys.
+
+// Một test luôn có type cụ thể (KHÁC catalog Skill có thêm 'mixed' cho product gộp).
+export type ExamSkill = 'reading' | 'listening' | 'writing'
+
+// Payload đề thi — CHỈ trả khi guard pass (is_free | test_unlocks). KHÔNG có answer_keys.
+export type ExamPayload = {
+  test: { id: string; title: string; skill: ExamSkill; is_free: boolean }
+  passages: unknown
+  questions: unknown
+  audio_url: string | null // signed URL Listening, chỉ sinh sau guard (R2 chưa wired → null)
+}
+
+// Metadata an toàn cho pre-exam page /tests/[id] — KHÔNG có passages/questions/audio.
+export type TestMeta = {
+  id: string
+  title: string
+  skill: ExamSkill
+  duration_sec: number
+  is_free: boolean
+  difficulty: number | null
+  source: string | null
+  question_types: string[]
+  locked: boolean
+}
+
+// W5 — Attempt lifecycle (M05). Timer neo server; client KHÔNG gửi thời gian tin cậy.
+export type AttemptStatus = 'in_progress' | 'submitted' | 'expired'
+
+export type AttemptDTO = {
+  attempt_id: string
+  test_id: string
+  status: AttemptStatus
+  started_at: string // ISO, server (DB default now())
+  duration_sec: number // snapshot từ tests.duration_sec lúc tạo
+  time_remaining_sec: number // server-computed = max(0, duration - elapsed)
+  server_now: string // ISO server — client tính countdown chính xác
+}
+
+// W6 submit — scoring server-side. KHÔNG bao giờ kèm answer_keys/correct answers (LUẬT THÉP #2).
+export type SubmitResult = {
+  attempt_id: string
+  status: 'submitted' | 'expired'
+  time_spent: number // server-computed
+  submitted_at: string // ISO server
+  scored: boolean // W6: true nếu đã chấm theo answer_keys; false nếu thiếu answer_keys
+  raw_score: number | null // Σ points câu đúng (null khi chưa/không chấm được)
+  band: number | null // score_bands theo test type; null + warning nếu thiếu/không map
+  max_score?: number | null // Σ points tối đa (an toàn hiển thị X/N; KHÔNG lộ đáp án)
+}
