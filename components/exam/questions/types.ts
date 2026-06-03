@@ -14,10 +14,15 @@ export type ExamQuestion = {
   type?: string
   instruction?: string
   passage_id?: string
+  section_id?: string // Listening: section chứa câu hỏi
   prompt?: string // câu/đoạn có chỗ trống, hoặc statement
   statement?: string // alias cho tf/yn
   options?: QOption[] // mcq / matching bank
   select_count?: number // gợi ý số lựa chọn mcq_multi (chỉ hiển thị)
+  // W7 Listening diagram/map: nền + vị trí input overlay theo % (tùy chọn).
+  image?: string // URL/data-URI nền diagram/map (render-only)
+  x?: number // vị trí input overlay theo % (0..100) khi có image
+  y?: number
 }
 
 export type QuestionComponentProps = {
@@ -29,7 +34,16 @@ export type QuestionComponentProps = {
 }
 
 // Chuẩn hóa type payload → nhóm renderer. Unknown → 'fallback' (an toàn).
-export type RenderKind = 'gap' | 'mcq_single' | 'mcq_multi' | 'tfng' | 'ynng' | 'matching' | 'fallback'
+export type RenderKind =
+  | 'gap'
+  | 'mcq_single'
+  | 'mcq_multi'
+  | 'tfng'
+  | 'ynng'
+  | 'matching'
+  | 'diagram'
+  | 'map'
+  | 'fallback'
 
 const GAP = new Set([
   'gap',
@@ -40,6 +54,9 @@ const GAP = new Set([
   'short_answer',
   'note_completion',
   'table_completion',
+  // W7 Listening — form/flow-chart completion là text gap (khớp BE ALLOWED_KEY_TYPES).
+  'form_completion',
+  'flowchart_completion',
 ])
 const MCQ_SINGLE = new Set(['mcq', 'mcq_single'])
 const TFNG = new Set(['tfng', 'tf_ng', 'true_false_notgiven'])
@@ -51,6 +68,9 @@ const MATCHING = new Set([
   'matching_features',
   'matching_endings',
 ])
+// W7 Listening — nhãn trên sơ đồ / bản đồ-mặt bằng.
+const DIAGRAM = new Set(['diagram_label', 'diagram'])
+const MAP = new Set(['map_labelling', 'plan_map_diagram', 'map', 'plan'])
 
 export function renderKindOf(type: string | undefined): RenderKind {
   const t = (type ?? '').toLowerCase().trim()
@@ -59,6 +79,8 @@ export function renderKindOf(type: string | undefined): RenderKind {
   if (TFNG.has(t)) return 'tfng'
   if (YNNG.has(t)) return 'ynng'
   if (MATCHING.has(t)) return 'matching'
+  if (DIAGRAM.has(t)) return 'diagram'
+  if (MAP.has(t)) return 'map'
   if (GAP.has(t)) return 'gap'
   return 'fallback'
 }

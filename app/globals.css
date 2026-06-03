@@ -7,3 +7,7 @@
 html {
   scroll-behavior: smooth;
 }
+
+/* W8 — Highlight đoạn văn: rule `::highlight(exam-highlight)` được inject lúc runtime
+   trong lib/exam/highlight-anchor.ts (chỉ ở browser hỗ trợ CSS Custom Highlight API),
+   tránh build CSS optimizer cảnh báo pseudo-element không nhận diện. */

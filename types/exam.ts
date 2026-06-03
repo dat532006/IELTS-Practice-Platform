@@ -36,6 +36,33 @@ export type AttemptDTO = {
   duration_sec: number // snapshot từ tests.duration_sec lúc tạo
   time_remaining_sec: number // server-computed = max(0, duration - elapsed)
   server_now: string // ISO server — client tính countdown chính xác
+  highlights: unknown // W8: annotation owner (restore qua reload); shape = HighlightAnchor[]
+  bookmarked_qs: string[] // W8: câu đã bookmark trong attempt
+}
+
+// W8 result review — CHỈ owner + status submitted|expired (LUẬT THÉP #4).
+// Review item là DTO SANITIZE: KHÔNG bao giờ kèm raw answer_keys/points/match (LUẬT THÉP #2).
+export type ReviewItem = {
+  question_id: string
+  number?: number
+  type?: string
+  user_answer: string | string[] | null // từ attempt.answers[qid]; thiếu → null
+  correct_answers: string[] // đáp án chấp nhận (hiển thị); chỉ owner + terminal mới nhận
+  is_correct: boolean
+}
+
+export type ResultDTO = {
+  attempt_id: string
+  test: { id: string; title: string; skill: ExamSkill }
+  status: 'submitted' | 'expired'
+  submitted_at: string | null
+  time_spent: number | null
+  raw_score: number | null
+  max_score: number | null
+  band: number | null
+  review: ReviewItem[]
+  highlights: unknown // echo annotation của owner
+  bookmarked_qs: string[] // echo câu đã bookmark trong attempt
 }
 
 // W6 submit — scoring server-side. KHÔNG bao giờ kèm answer_keys/correct answers (LUẬT THÉP #2).

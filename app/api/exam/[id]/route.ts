@@ -8,7 +8,8 @@ import type { ExamPayload, ExamSkill } from '@/types/exam'
 // Metadata đủ để guard — cột public (RLS published-only). KHÔNG có passages/questions ở bước này.
 type TestMetaRow = { id: string; title: string; type: ExamSkill; is_free: boolean }
 // Premium payload — đọc bằng service_role CHỈ SAU khi guard pass (giảm blast radius).
-type TestPayloadRow = { passages: unknown; questions: unknown }
+// audio_key = raw R2 object key (server-only) → chỉ dùng để ký signed URL, KHÔNG trả client.
+type TestPayloadRow = { passages: unknown; questions: unknown; audio_key: string | null }
 
 // GET /api/exam/[id] — EXAM PAYLOAD GATE (M05/M03).
 // LUẬT THÉP #3: chỉ trả passages/questions/audio khi is_free HOẶC user có test_unlocks.
@@ -39,25 +40,30 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       return fail('EXAM_LOCKED', 'Đề thi này cần được mở khóa trước khi làm bài', { status: 403 })
     }
 
-    // 3) CHỈ SAU khi guard pass mới đọc premium payload bằng service_role.
+    // 3) CHỈ SAU khi guard pass mới đọc premium payload bằng service_role (gồm audio_key server-only).
     const admin = createAdminClient()
     const { data: payloadData, error: pErr } = await admin
       .from('tests')
-      .select('passages, questions')
+      .select('passages, questions, audio_key')
       .eq('id', test.id)
       .maybeSingle()
     if (pErr) throw new Error(pErr.message)
     const payloadRow = (payloadData ?? {}) as unknown as TestPayloadRow
 
-    // Audio Listening: signed URL chỉ sinh trong nhánh đã pass guard (R2 chưa wired → null).
-    const audio_url = test.type === 'listening' ? getSignedAudioUrl(test) : null
+    // Audio Listening: ký signed URL trong nhánh đã pass guard. audio_key KHÔNG ra client.
+    // Thiếu R2 env / thiếu key → audio_url=null + warning (exam vẫn chạy; FE xử lý null).
+    const { url: audio_url, warning: audioWarning } = getSignedAudioUrl({
+      type: test.type,
+      audio_key: payloadRow.audio_key ?? null,
+    })
+    const warnings = audioWarning ? [audioWarning] : []
     const payload: ExamPayload = {
       test: { id: test.id, title: test.title, skill: test.type, is_free: test.is_free },
       passages: payloadRow.passages,
       questions: payloadRow.questions,
       audio_url,
     }
-    return ok(payload)
+    return ok(payload, { warnings })
   } catch {
     return fail('INTERNAL', 'Không tải được đề thi', { status: 500 })
   }

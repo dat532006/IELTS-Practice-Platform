@@ -7,16 +7,9 @@
 -- ============================================================
 
 -- score_bands:
---   • READING = bảng IELTS Academic chuẩn, đặt ở migration `20260602000300` (delete-insert scoped,
---     hội tụ idempotent) — KHÔNG seed reading ở đây nữa (tránh "not exists toàn bảng" che mất cập nhật).
---   • LISTENING = mẫu (W7 hoàn thiện); idempotent SCOPED theo test_type (không phụ thuộc bảng trống).
-insert into public.score_bands (test_type, raw_min, raw_max, band)
-select * from (values
-  ('listening'::public.score_band_type_t, 39, 40, 9.0),
-  ('listening', 35, 36, 8.0),
-  ('listening', 30, 32, 7.0)
-) as v(test_type, raw_min, raw_max, band)
-where not exists (select 1 from public.score_bands where test_type = 'listening');
+--   • READING   = IELTS Academic chuẩn, ở migration `20260602000300` (delete-insert scoped, hội tụ).
+--   • LISTENING = IELTS Academic chuẩn, ở migration `20260603000200` (W7, delete-insert scoped, hội tụ).
+--   KHÔNG seed score_bands ở đây nữa (tránh "not exists toàn bảng" che mất cập nhật bảng chuẩn).
 
 -- Tests: 1 free + 1 premium (passages/questions KHÔNG chứa đáp án)
 insert into public.tests (id, slug, title, type, source, is_free, difficulty, question_types, duration_sec, status, passages, questions) values
@@ -51,6 +44,34 @@ on conflict (id) do update set
   passages = excluded.passages,
   questions = excluded.questions;
 
+-- W7 Listening fixtures: free + premium (audio_key = R2 object key, SERVER-ONLY — KHÔNG grant client).
+--   passages = thông tin section (KHÔNG transcript/đáp án); questions = gap/form/label/map/matching/mcq.
+--   Upsert theo id cố định (an toàn với attempts đã trỏ vào). duration_sec 1800 (30').
+insert into public.tests (id, slug, title, type, source, is_free, difficulty, question_types, duration_sec, status, passages, questions, audio_key) values
+  ('77777777-7777-7777-7777-777777777777', 'listening-free-1', '[W7 Smoke] Listening Free 1', 'listening', 'Dev fixture', true, 2,
+   '{form_completion,gap_filling,diagram_label,map_labelling,matching_features,mcq}', 1800, 'published',
+   '[{"id":"s1","number":1,"title":"Section 1 — Enquiry call","content":"Nghe đoạn hội thoại và trả lời câu hỏi 1-3."},{"id":"s2","number":2,"title":"Section 2 — Tour & diagram","content":"Nghe và trả lời câu hỏi 4-5 (sơ đồ/bản đồ)."},{"id":"s3","number":3,"title":"Section 3 — Discussion","content":"Nghe thảo luận và trả lời câu hỏi 6-7."},{"id":"s4","number":4,"title":"Section 4 — Lecture","content":"Nghe bài giảng và trả lời câu hỏi 8-10."}]'::jsonb,
+   '[{"id":"q1","section_id":"s1","number":1,"type":"form_completion","instruction":"Write ONE WORD ONLY.","prompt":"The caller wants to join the local _____."},{"id":"q2","section_id":"s1","number":2,"type":"form_completion","instruction":"Write the surname.","prompt":"Surname:"},{"id":"q3","section_id":"s1","number":3,"type":"gap_filling","instruction":"Write the time.","prompt":"The first class starts at _____."},{"id":"q4","section_id":"s2","number":4,"type":"diagram_label","instruction":"Label the diagram. Write ONE WORD ONLY.","prompt":"Part X of the device is the _____.","image":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAzMjAgMTgwJz48cmVjdCB3aWR0aD0nMzIwJyBoZWlnaHQ9JzE4MCcgZmlsbD0nI2YxZjVmOScvPjxyZWN0IHg9Jzk1JyB5PSc1NScgd2lkdGg9JzEzMCcgaGVpZ2h0PSc3MCcgZmlsbD0nI2NiZDVlMScgc3Ryb2tlPScjNDc1NTY5JyBzdHJva2Utd2lkdGg9JzInLz48Y2lyY2xlIGN4PScxNjAnIGN5PSc0NScgcj0nOScgZmlsbD0nIzk0YTNiOCcgc3Ryb2tlPScjNDc1NTY5Jy8+PHRleHQgeD0nMTYwJyB5PScxNjUnIGZvbnQtc2l6ZT0nMTMnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGZpbGw9JyMzMzQxNTUnPkRldmljZSBjcm9zcy1zZWN0aW9uPC90ZXh0Pjwvc3ZnPg==","x":50,"y":25},{"id":"q5","section_id":"s2","number":5,"type":"map_labelling","instruction":"Choose the correct letter A-D on the map.","prompt":"Where is the reception desk?","options":[{"key":"A","text":"North wing"},{"key":"B","text":"East wing"},{"key":"C","text":"South wing"},{"key":"D","text":"West wing"}]},{"id":"q6","section_id":"s3","number":6,"type":"matching_features","instruction":"Match the speaker to the opinion. Choose A-D.","prompt":"Speaker 1","options":[{"key":"A","text":"Strongly agrees"},{"key":"B","text":"Disagrees"},{"key":"C","text":"Is unsure"},{"key":"D","text":"Has no opinion"}]},{"id":"q7","section_id":"s3","number":7,"type":"matching_features","instruction":"Match the speaker to the opinion. Choose A-D.","prompt":"Speaker 2","options":[{"key":"A","text":"Strongly agrees"},{"key":"B","text":"Disagrees"},{"key":"C","text":"Is unsure"},{"key":"D","text":"Has no opinion"}]},{"id":"q8","section_id":"s4","number":8,"type":"mcq","instruction":"Choose the correct answer.","prompt":"What is the lecture mainly about?","options":[{"key":"A","text":"Ancient history"},{"key":"B","text":"Marine biology"},{"key":"C","text":"Economics"},{"key":"D","text":"Physics"}]},{"id":"q9","section_id":"s4","number":9,"type":"gap_filling","instruction":"Write ONE WORD ONLY.","prompt":"The next session will be held on _____."},{"id":"q10","section_id":"s4","number":10,"type":"mcq","instruction":"Choose the correct answer.","prompt":"How many students attended the seminar?","options":[{"key":"A","text":"10"},{"key":"B","text":"20"},{"key":"C","text":"30"},{"key":"D","text":"40"}]}]'::jsonb,
+   'listening/free-sample-1.mp3'),
+  ('88888888-8888-8888-8888-888888888888', 'listening-premium-1', '[W7 Smoke] Listening Premium 1', 'listening', 'Dev fixture', false, 3,
+   '{form_completion,gap_filling,matching_features,mcq}', 1800, 'published',
+   '[{"id":"s1","number":1,"title":"Section 1","content":"Nội dung trả phí — chỉ trả khi unlock."}]'::jsonb,
+   '[{"id":"q1","section_id":"s1","number":1,"type":"form_completion","instruction":"Write ONE WORD ONLY.","prompt":"Premium listening gap 1:"},{"id":"q2","section_id":"s1","number":2,"type":"mcq","instruction":"Choose the correct answer.","prompt":"Premium listening MCQ:","options":[{"key":"A","text":"Option A"},{"key":"B","text":"Option B"},{"key":"C","text":"Option C"}]}]'::jsonb,
+   'listening/premium-1.mp3')
+on conflict (id) do update set
+  slug = excluded.slug,
+  title = excluded.title,
+  type = excluded.type,
+  source = excluded.source,
+  is_free = excluded.is_free,
+  difficulty = excluded.difficulty,
+  question_types = excluded.question_types,
+  duration_sec = excluded.duration_sec,
+  status = excluded.status,
+  passages = excluded.passages,
+  questions = excluded.questions,
+  audio_key = excluded.audio_key;
+
 -- answer_keys: W1-W2 fixtures (do nothing, stable); W6 fixture upsert để hội tụ khi keys đổi.
 insert into public.answer_keys (test_id, keys) values
   ('11111111-1111-1111-1111-111111111111', '{"q1":{"answers":["sample"],"match":"ci"}}'::jsonb),
@@ -62,14 +83,23 @@ insert into public.answer_keys (test_id, keys) values
 on conflict (test_id) do update set
   keys = excluded.keys;
 
+-- W7 Listening answer_keys (gap/form/label/map/matching/mcq) — all-correct raw=10 → band 4.0 (listening table).
+insert into public.answer_keys (test_id, keys) values
+  ('77777777-7777-7777-7777-777777777777', '{"q1":{"type":"form_completion","answers":["library"],"match":"ci"},"q2":{"type":"form_completion","answers":["Smith"],"match":"ci"},"q3":{"type":"gap_filling","answers":["9:30","9.30","9 30"],"match":"ci"},"q4":{"type":"diagram_label","answers":["valve"],"match":"ci"},"q5":{"type":"map_labelling","answers":["B"],"match":"ci"},"q6":{"type":"matching_features","answers":["A"],"match":"ci"},"q7":{"type":"matching_features","answers":["C"],"match":"ci"},"q8":{"type":"mcq_single","answers":["B"],"match":"ci"},"q9":{"type":"gap_filling","answers":["Tuesday"],"match":"ci"},"q10":{"type":"mcq_single","answers":["C"],"match":"ci"}}'::jsonb),
+  ('88888888-8888-8888-8888-888888888888', '{"q1":{"type":"form_completion","answers":["premium"],"match":"ci"},"q2":{"type":"mcq_single","answers":["B"],"match":"ci"}}'::jsonb)
+on conflict (test_id) do update set
+  keys = excluded.keys;
+
 -- Product bundle (published) chứa premium test
 insert into public.products (id, slug, title, description, kind, price_coins, status, sort_order) values
-  ('33333333-3333-3333-3333-333333333333', 'reading-vol-1', 'READING VOL 1', 'Bộ đề Reading tự soạn', 'bundle', 100, 'published', 1)
+  ('33333333-3333-3333-3333-333333333333', 'reading-vol-1', 'READING VOL 1', 'Bộ đề Reading tự soạn', 'bundle', 100, 'published', 1),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'listening-vol-1', 'LISTENING VOL 1', 'Bộ đề Listening tự soạn', 'bundle', 100, 'published', 2)
 on conflict (slug) do nothing;
 
 insert into public.collection_tests (product_id, test_id, position) values
   ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222', 1),
-  ('33333333-3333-3333-3333-333333333333', '66666666-6666-6666-6666-666666666666', 2)
+  ('33333333-3333-3333-3333-333333333333', '66666666-6666-6666-6666-666666666666', 2),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '88888888-8888-8888-8888-888888888888', 1)
 on conflict (product_id, test_id) do update set
   position = excluded.position;
 

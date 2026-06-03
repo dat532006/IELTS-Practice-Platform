@@ -25,6 +25,8 @@ export const ALLOWED_KEY_TYPES = [
   'short_answer',
   'note_completion',
   'table_completion',
+  'form_completion',
+  'flowchart_completion',
   'mcq',
   'mcq_single',
   'mcq_multi',
@@ -39,9 +41,13 @@ export const ALLOWED_KEY_TYPES = [
   'matching_information',
   'matching_features',
   'matching_endings',
+  // W7 — Listening label/diagram answer shapes (single-value; reuse W6 scoring, additive).
+  'diagram_label',
+  'map_labelling',
+  'plan_map_diagram',
 ] as const
 
-const AnswerKeyEntrySchema = z.object({
+export const AnswerKeyEntrySchema = z.object({
   type: z.enum(ALLOWED_KEY_TYPES).optional(),
   answers: z.array(z.string().min(1).max(200)).min(1).max(20),
   match: z.enum(['ci', 'exact']).optional(),

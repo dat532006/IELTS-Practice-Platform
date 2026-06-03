@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { signR2GetUrl } from '@/lib/storage/r2'
 
 // ============================================================
 // W4 — Access boundary helpers (M05/M03).
@@ -64,7 +65,16 @@ export async function hasProductUnlock(
 }
 
 // 🔐 Audio Listening: signed URL CHỈ cấp SAU khi guard pass (M03 / LUẬT THÉP #3).
-// R2 chưa wired ở W4 → trả null (placeholder). Khi M03 đủ: sinh signed URL từ R2 tại đây.
-export function getSignedAudioUrl(_test: { id: string; type: string }): string | null {
-  return null
+// W7: ký SigV4 từ R2 object key (tests.audio_key — server-only). Caller PHẢI đã pass guard
+//   (is_free | test_unlocks) trước khi gọi. Trả { url, warning }:
+//   - type != 'listening' → { null, null } (reading/writing không có audio)
+//   - thiếu audio_key      → { null, 'AUDIO_KEY_MISSING' }
+//   - thiếu R2 env         → { null, 'R2_NOT_CONFIGURED' } (fallback rõ — exam KHÔNG crash)
+//   - đủ                   → { signed URL TTL ngắn, null }
+// audio_key (raw object key) là SERVER-ONLY: chỉ dùng ở đây, KHÔNG trả ra client.
+export type AudioUrlResult = { url: string | null; warning: string | null }
+export function getSignedAudioUrl(test: { type: string; audio_key: string | null }): AudioUrlResult {
+  if (test.type !== 'listening') return { url: null, warning: null }
+  if (!test.audio_key) return { url: null, warning: 'AUDIO_KEY_MISSING' }
+  return signR2GetUrl(test.audio_key)
 }

@@ -6,7 +6,16 @@ import { useRouter } from 'next/navigation'
 import type { AttemptDTO, ExamPayload, SubmitResult } from '@/types/exam'
 import { SKILL_LABEL } from '@/lib/products/access-state'
 import { QuestionRenderer } from '@/components/exam/questions/QuestionRenderer'
+import { ListeningAudioPlayer } from '@/components/exam/ListeningAudioPlayer'
 import { isAnswered, type AnswerValue, type ExamQuestion } from '@/components/exam/questions/types'
+import {
+  anchorFromRange,
+  applyHighlights,
+  clearHighlights,
+  newAnchorId,
+  rangeWithinRoot,
+  type HighlightAnchor,
+} from '@/lib/exam/highlight-anchor'
 
 // Shape payload (BE trả `unknown` → cast + guard). KHÔNG có đáp án đúng (guard server).
 type Passage = { id: string; number?: number; title?: string; content?: string }
@@ -34,11 +43,16 @@ export function ExamRunner({ testId }: { testId: string }) {
   const [showPassage, setShowPassage] = useState(true)
   const [contrast, setContrast] = useState(false)
   const [textSize, setTextSize] = useState<TextSize>('base')
+  // W8 annotation: highlights (node-path anchor) + bookmark câu hỏi.
+  const [highlights, setHighlights] = useState<HighlightAnchor[]>([])
+  const [bookmarkedQs, setBookmarkedQs] = useState<string[]>([])
+  const [hlPopup, setHlPopup] = useState<{ x: number; y: number; anchor: HighlightAnchor } | null>(null)
 
   const baseRemainingRef = useRef<number>(-1) // -1 = không giới hạn
   const loadAtRef = useRef<number>(0)
   const submittingRef = useRef(false)
   const autoSubmittedRef = useRef(false)
+  const passageRootRef = useRef<HTMLDivElement | null>(null)
 
   const passages = (Array.isArray(payload?.passages) ? payload?.passages : []) as Passage[]
   const questions = (Array.isArray(payload?.questions) ? payload?.questions : []) as ExamQuestion[]
@@ -90,6 +104,9 @@ export function ExamRunner({ testId }: { testId: string }) {
 
         const att = sb.data as AttemptDTO
         setAttempt(att)
+        // W8: seed annotation từ server (restore qua reload).
+        setHighlights(Array.isArray(att.highlights) ? (att.highlights as HighlightAnchor[]) : [])
+        setBookmarkedQs(Array.isArray(att.bookmarked_qs) ? att.bookmarked_qs : [])
         if (att.status !== 'in_progress') {
           // Đã nộp/hết hạn trước đó → không mở lại.
           // Attempt đã terminal trước đó — DTO start không kèm điểm; xem lại điểm/đáp án ở /result (W8–9).
@@ -132,6 +149,78 @@ export function ExamRunner({ testId }: { testId: string }) {
     const t = setInterval(tick, 1000)
     return () => clearInterval(t)
   }, [phase, doSubmit])
+
+  // --- W8 annotation persistence (optimistic + rollback). POST /api/attempts/[id]/annotations. ---
+  const persistAnnotations = useCallback(
+    async (patch: { highlights?: HighlightAnchor[]; bookmarked_qs?: string[] }, rollback: () => void) => {
+      if (!attempt) return
+      try {
+        const r = await fetch(`/api/attempts/${attempt.attempt_id}/annotations`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(patch),
+        })
+        if (!r.ok) rollback()
+      } catch {
+        rollback()
+      }
+    },
+    [attempt],
+  )
+
+  // Selection trong passage → popup tạo highlight. Selection ngoài/empty → ẩn popup.
+  const onPassageMouseUp = useCallback(() => {
+    const root = passageRootRef.current
+    if (!root) return
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return setHlPopup(null)
+    const range = sel.getRangeAt(0)
+    if (!rangeWithinRoot(root, range)) return setHlPopup(null)
+    const anchor = anchorFromRange(root, range)
+    if (!anchor) return setHlPopup(null)
+    const rect = range.getBoundingClientRect()
+    setHlPopup({ x: rect.left + rect.width / 2, y: rect.bottom, anchor })
+  }, [])
+
+  const addHighlight = useCallback(
+    (note?: string) => {
+      if (!hlPopup) return
+      const a: HighlightAnchor = { ...hlPopup.anchor, id: newAnchorId(), createdAt: new Date().toISOString() }
+      if (note && note.trim()) a.note = note.trim().slice(0, 2000)
+      const prev = highlights
+      const next = [...highlights, a]
+      setHighlights(next)
+      setHlPopup(null)
+      window.getSelection()?.removeAllRanges()
+      void persistAnnotations({ highlights: next }, () => setHighlights(prev))
+    },
+    [hlPopup, highlights, persistAnnotations],
+  )
+
+  const clearAllHighlights = useCallback(() => {
+    const prev = highlights
+    setHighlights([])
+    void persistAnnotations({ highlights: [] }, () => setHighlights(prev))
+  }, [highlights, persistAnnotations])
+
+  const toggleQuestionBookmark = useCallback(
+    (qid: string) => {
+      const prev = bookmarkedQs
+      const next = prev.includes(qid) ? prev.filter((x) => x !== qid) : [...prev, qid]
+      setBookmarkedQs(next)
+      void persistAnnotations({ bookmarked_qs: next }, () => setBookmarkedQs(prev))
+    },
+    [bookmarkedQs, persistAnnotations],
+  )
+
+  // Render highlight bằng CSS Highlight API (rebuild range mỗi lần DOM passage đổi → bền re-render).
+  useEffect(() => {
+    if (phase !== 'active') return
+    const root = passageRootRef.current
+    if (!root) return
+    applyHighlights(root, highlights)
+    return () => clearHighlights()
+  }, [highlights, showPassage, textSize, contrast, phase, payload])
 
   const sizeCls = textSize === 'sm' ? 'text-sm' : textSize === 'lg' ? 'text-lg' : 'text-base'
   const rootCls = contrast ? 'bg-black text-white' : 'bg-slate-50 text-slate-900'
@@ -185,10 +274,19 @@ export function ExamRunner({ testId }: { testId: string }) {
             {result.band != null ? ` · Band ${result.band}` : ''}
           </p>
         )}
-        <p className="mt-1 text-sm text-slate-400">Xem lại đáp án chi tiết sẽ có ở giai đoạn sau (W8–9 review).</p>
-        <Link href="/products" className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white">
-          Về danh sách bộ đề
-        </Link>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          {(result?.attempt_id || attempt?.attempt_id) && (
+            <Link
+              href={`/result/${result?.attempt_id ?? attempt?.attempt_id}`}
+              className="inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white"
+            >
+              Xem kết quả chi tiết
+            </Link>
+          )}
+          <Link href="/products" className="inline-block rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">
+            Về danh sách bộ đề
+          </Link>
+        </div>
       </Shell>
     )
 
@@ -258,20 +356,35 @@ export function ExamRunner({ testId }: { testId: string }) {
 
       {errorMsg && <p className="mx-auto max-w-6xl px-4 pt-2 text-sm text-red-600">{errorMsg}</p>}
 
+      {/* Listening: audio player (signed URL sau guard). Reading/Writing → không render. */}
+      {payload?.test.skill === 'listening' && (
+        <div className="mx-auto w-full max-w-6xl px-4 pt-3">
+          <ListeningAudioPlayer audioUrl={payload.audio_url} />
+        </div>
+      )}
+
       {/* 2 cột: Passage | Questions (mobile: stacked) */}
       <main className={`mx-auto grid w-full max-w-6xl flex-1 gap-6 px-4 py-5 ${showPassage ? 'lg:grid-cols-2' : ''} ${sizeCls}`}>
         {showPassage && (
           <section className={`rounded-lg border p-4 ${contrast ? 'border-slate-700' : 'border-slate-200 bg-white'} lg:max-h-[calc(100vh-9rem)] lg:overflow-auto`}>
-            {passages.length === 0 ? (
-              <p className="text-slate-400">Đề này không có đoạn văn.</p>
-            ) : (
-              passages.map((p) => (
-                <article key={p.id} className="mb-6 last:mb-0">
-                  {p.title && <h2 className="mb-2 font-semibold">{p.title}</h2>}
-                  <p className="whitespace-pre-line leading-relaxed">{p.content}</p>
-                </article>
-              ))
+            {highlights.length > 0 && (
+              <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+                <span>✏️ {highlights.length} đoạn tô sáng</span>
+                <button onClick={clearAllHighlights} className="underline">Xóa tô sáng</button>
+              </div>
             )}
+            <div ref={passageRootRef} onMouseUp={onPassageMouseUp} onTouchEnd={onPassageMouseUp}>
+              {passages.length === 0 ? (
+                <p className="text-slate-400">Đề này không có đoạn văn.</p>
+              ) : (
+                passages.map((p) => (
+                  <article key={p.id} className="mb-6 last:mb-0">
+                    {p.title && <h2 className="mb-2 font-semibold">{p.title}</h2>}
+                    <p className="whitespace-pre-line leading-relaxed">{p.content}</p>
+                  </article>
+                ))
+              )}
+            </div>
           </section>
         )}
 
@@ -285,6 +398,16 @@ export function ExamRunner({ testId }: { testId: string }) {
                   <div className="flex items-baseline gap-2">
                     <span className="font-semibold">{q.number ?? i + 1}.</span>
                     {q.type && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">{q.type}</span>}
+                    <button
+                      type="button"
+                      onClick={() => toggleQuestionBookmark(q.id)}
+                      aria-pressed={bookmarkedQs.includes(q.id)}
+                      aria-label={bookmarkedQs.includes(q.id) ? 'Bỏ đánh dấu câu' : 'Đánh dấu câu'}
+                      title="Đánh dấu câu để xem lại"
+                      className={`ml-auto text-sm ${bookmarkedQs.includes(q.id) ? 'text-amber-500' : 'text-slate-300 hover:text-slate-400'}`}
+                    >
+                      {bookmarkedQs.includes(q.id) ? '★' : '☆'}
+                    </button>
                   </div>
                   {q.instruction && <p className="mt-1 text-slate-700">{q.instruction}</p>}
                   <div className="mt-2">
@@ -301,6 +424,16 @@ export function ExamRunner({ testId }: { testId: string }) {
           )}
         </section>
       </main>
+
+      {/* W8 Highlight popup (selection trong passage) */}
+      {hlPopup && (
+        <HighlightPopup
+          x={hlPopup.x}
+          y={hlPopup.y}
+          onHighlight={(note) => addHighlight(note)}
+          onCancel={() => setHlPopup(null)}
+        />
+      )}
 
       {/* Submit modal 2 bước */}
       {modalStep > 0 && (
@@ -349,6 +482,48 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div data-testid="exam-runner" className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="max-w-md text-center">{children}</div>
+    </div>
+  )
+}
+
+// W8 — popup tạo highlight/note tại vị trí selection (viewport coords).
+function HighlightPopup({
+  x,
+  y,
+  onHighlight,
+  onCancel,
+}: {
+  x: number
+  y: number
+  onHighlight: (note?: string) => void
+  onCancel: () => void
+}) {
+  const [note, setNote] = useState('')
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 360
+  const left = Math.min(Math.max(8, x - 112), vw - 232)
+  return (
+    <div
+      className="fixed z-40 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-xl"
+      style={{ left, top: y + 6 }}
+      role="dialog"
+      aria-label="Tạo tô sáng"
+    >
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Ghi chú (tùy chọn)…"
+        rows={2}
+        maxLength={2000}
+        className="w-full resize-none rounded border border-slate-200 p-1.5 text-sm outline-none focus:border-teal-500"
+      />
+      <div className="mt-1.5 flex justify-end gap-2">
+        <button onClick={onCancel} className="rounded px-2 py-1 text-xs text-slate-500">
+          Hủy
+        </button>
+        <button onClick={() => onHighlight(note)} className="rounded bg-amber-400 px-2 py-1 text-xs font-medium text-amber-950">
+          Tô sáng
+        </button>
+      </div>
     </div>
   )
 }
