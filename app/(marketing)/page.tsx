@@ -5,16 +5,16 @@ import type { ProductCardData } from '@/types/product'
 // ⚠️ W1+2 shell: dữ liệu mẫu tĩnh (chưa nối API). Catalog thật ở W3 qua /api/products
 //    (chỉ metadata public — KHÔNG gọi premium payload).
 const HOT: ProductCardData[] = [
-  { slug: 'reading-vol-1-9', title: 'READING VOL 1–9', priceCoins: 200, skills: ['reading'], attemptsTotal: 1240, state: 'locked' },
-  { slug: 'listening-starter', title: 'LISTENING Starter', priceCoins: 0, skills: ['listening'], attemptsTotal: 980, state: 'free' },
-  { slug: 'writing-task2-pack', title: 'WRITING Task 2 Pack', priceCoins: 150, skills: ['writing'], attemptsTotal: 540, state: 'locked' },
+  { slug: 'reading-vol-1', title: 'READING VOL 1', priceCoins: 100, skills: ['reading'], attemptsTotal: 1240, state: 'locked' },
+  { slug: 'listening-vol-1', title: 'LISTENING VOL 1', priceCoins: 100, skills: ['listening'], attemptsTotal: 980, state: 'locked' },
+  { slug: 'writing-task2-pack', title: 'WRITING Task 2 Pack', priceCoins: 150, skills: ['writing'], attemptsTotal: 540, state: 'coming_soon' },
 ]
 const FREE: ProductCardData[] = [
-  { slug: 'reading-free-1', title: 'Reading Test Free 1', priceCoins: 0, skills: ['reading'], attemptsTotal: 3200, state: 'free' },
-  { slug: 'listening-free-1', title: 'Listening Test Free 1', priceCoins: 0, skills: ['listening'], attemptsTotal: 2100, state: 'free' },
+  { slug: 'reading-free-1', href: '/tests/11111111-1111-1111-1111-111111111111', title: 'Reading Test Free 1', priceCoins: 0, skills: ['reading'], attemptsTotal: 3200, state: 'free' },
+  { slug: 'listening-free-1', href: '/tests/77777777-7777-7777-7777-777777777777', title: 'Listening Test Free 1', priceCoins: 0, skills: ['listening'], attemptsTotal: 2100, state: 'free' },
 ]
 const PREDICTION: ProductCardData[] = [
-  { slug: 'prediction-2026-q3', title: 'Prediction 2026 Q3', priceCoins: 120, skills: ['reading', 'listening'], attemptsTotal: 410, state: 'locked' },
+  { slug: 'prediction-2026-q3', title: 'Prediction 2026 Q3', priceCoins: 120, skills: ['reading', 'listening'], attemptsTotal: 410, state: 'coming_soon' },
 ]
 
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {

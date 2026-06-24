@@ -372,4 +372,46 @@ begin
   raise notice 'PASS check19: converge idempotent (xóa reading cũ + insert Academic) trên DB bẩn';
 end $$;
 
+-- ============================================================
+-- W7 — Listening audio key (server-only) + listening band table.
+-- Map docs/ContractForAI/.../W7 + migrations 20260603000100 / 20260603000200.
+-- ============================================================
+
+-- ---------- Check 20: client KHÔNG đọc cột tests.audio_key (raw R2 object key, server-only) ----------
+do $$
+declare meta_cnt int;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated;
+  -- metadata vẫn đọc được (cột đã grant)
+  select count(*) into meta_cnt from public.tests where status = 'published';
+  if meta_cnt < 1 then raise exception 'FAIL check20a: không đọc được metadata tests published'; end if;
+  -- nhưng audio_key bị từ chối (KHÔNG column-grant) — giống passages/questions
+  begin
+    perform audio_key from public.tests limit 1;
+    raise exception 'FAIL check20b: client đọc được tests.audio_key (raw R2 object key — vi phạm LUẬT THÉP #3)';
+  exception when insufficient_privilege then
+    raise notice 'PASS check20: tests.audio_key denied to client (server-only, sign sau guard)';
+  end;
+end $$;
+
+-- ---------- Check 21: listening score_bands = IELTS Academic (boundary phân biệt bảng đúng/sai) ----------
+do $$
+declare cnt int; b numeric;
+begin
+  select count(*) into cnt from public.score_bands where test_type = 'listening';
+  if cnt <> 14 then raise exception 'FAIL check21: listening bands có % dòng (kỳ vọng 14 Academic)', cnt; end if;
+  select band into b from public.score_bands where test_type='listening' and 10 between raw_min and raw_max;
+  if b is distinct from 4.0 then raise exception 'FAIL check21: raw 10 → % (kỳ vọng 4.0)', b; end if;
+  select band into b from public.score_bands where test_type='listening' and 40 between raw_min and raw_max;
+  if b is distinct from 9.0 then raise exception 'FAIL check21: raw 40 → % (kỳ vọng 9.0)', b; end if;
+  select band into b from public.score_bands where test_type='listening' and 18 between raw_min and raw_max;
+  if b is distinct from 5.5 then raise exception 'FAIL check21: raw 18 → % (kỳ vọng 5.5)', b; end if;
+  select band into b from public.score_bands where test_type='listening' and 23 between raw_min and raw_max;
+  if b is distinct from 6.0 then raise exception 'FAIL check21: raw 23 → % (kỳ vọng 6.0)', b; end if;
+  perform 1 from public.score_bands where test_type='listening' and 2 between raw_min and raw_max;
+  if found then raise exception 'FAIL check21: raw 2 không nên map (kỳ vọng unmapped, raw<3)'; end if;
+  raise notice 'PASS check21: listening bands = IELTS Academic (raw 10→4.0, 18→5.5, 23→6.0, 40→9.0, raw<3 unmapped)';
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;

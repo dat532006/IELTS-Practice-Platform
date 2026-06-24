@@ -5,6 +5,8 @@ import { GapFillQuestion } from './GapFillQuestion'
 import { ChoiceQuestion } from './ChoiceQuestion'
 import { TrueFalseQuestion } from './TrueFalseQuestion'
 import { MatchingQuestion } from './MatchingQuestion'
+import { DiagramLabel } from './DiagramLabel'
+import { MapLabel } from './MapLabel'
 import { FallbackQuestion } from './FallbackQuestion'
 
 export function QuestionRenderer(props: QuestionComponentProps) {
@@ -22,6 +24,10 @@ export function QuestionRenderer(props: QuestionComponentProps) {
       return <TrueFalseQuestion {...props} variant="ynng" />
     case 'matching':
       return <MatchingQuestion {...props} />
+    case 'diagram':
+      return <DiagramLabel {...props} />
+    case 'map':
+      return <MapLabel {...props} />
     default:
       return <FallbackQuestion {...props} />
   }

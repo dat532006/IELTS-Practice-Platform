@@ -2,7 +2,7 @@
 // answer = string (option KEY). KHÔNG biết đáp án.
 import type { QuestionComponentProps } from './types'
 
-export function MatchingQuestion({ question, value, onChange, disabled, contrast }: QuestionComponentProps) {
+export function MatchingQuestion({ question, value, onChange, disabled, contrast, hideStatement }: QuestionComponentProps) {
   const v = typeof value === 'string' ? value : ''
   const options = Array.isArray(question.options) ? question.options : []
   const selectId = `q-input-${question.id}`
@@ -14,7 +14,7 @@ export function MatchingQuestion({ question, value, onChange, disabled, contrast
 
   return (
     <div className="space-y-2">
-      {statement && <p className="leading-relaxed">{statement}</p>}
+      {!hideStatement && statement && <p className="font-semibold leading-snug">{statement}</p>}
       <select
         id={selectId}
         value={v}

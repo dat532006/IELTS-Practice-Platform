@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getTestMeta } from '@/lib/exam/meta'
 import { scoreReading, type AnswerKeys } from '@/lib/scoring/score-reading'
 import { convertToBand } from '@/lib/scoring/band-convert'
+import { sanitizeHighlights } from '@/lib/exam/highlights'
+import { sanitizeAnswers } from '@/lib/exam/answers'
 import type { AttemptDTO, SubmitResult } from '@/types/exam'
 
 // ============================================================
@@ -27,6 +29,9 @@ type AttemptRow = {
   submitted_at: string | null
   raw_score: number | null
   band: number | string | null
+  highlights: unknown
+  bookmarked_qs: unknown
+  answers: unknown
 }
 
 const nowSec = () => Math.floor(Date.now() / 1000)
@@ -43,11 +48,17 @@ function toAttemptDTO(a: AttemptRow): AttemptDTO {
     duration_sec: duration,
     time_remaining_sec: duration > 0 ? Math.max(0, duration - elapsed) : 0,
     server_now: new Date().toISOString(),
+    // W8 (FIX Leader P2): sanitize qua strict anchor schema giống getResult → start DTO KHÔNG bao giờ
+    //   echo key lạ (answer_keys/points/match...) kể cả dữ liệu highlights cũ/bẩn trước khi có strict schema.
+    highlights: sanitizeHighlights(a.highlights),
+    bookmarked_qs: Array.isArray(a.bookmarked_qs) ? (a.bookmarked_qs as string[]) : [],
+    // W9: seed draft answers (chống mất bài khi reload). Sanitize → DTO KHÔNG echo shape lạ.
+    answers: sanitizeAnswers(a.answers),
   }
 }
 
 const ATTEMPT_COLS =
-  'id, user_id, test_id, status, started_at, duration_sec, time_spent, submitted_at, raw_score, band'
+  'id, user_id, test_id, status, started_at, duration_sec, time_spent, submitted_at, raw_score, band, highlights, bookmarked_qs, answers'
 
 export type StartResult = { ok: true; attempt: AttemptDTO } | { ok: false; code: 'NOT_FOUND' | 'EXAM_LOCKED' }
 

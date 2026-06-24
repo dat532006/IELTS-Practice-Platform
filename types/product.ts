@@ -5,6 +5,7 @@ export type ProductState = 'free' | 'locked' | 'owned' | 'already_owned' | 'comi
 // Chỉ metadata PUBLIC — không bao giờ chứa passages/questions/audio premium.
 export type ProductCardData = {
   slug: string
+  href?: `/products/${string}` | `/tests/${string}`
   title: string
   thumbnail?: string | null
   priceCoins: number

@@ -1,0 +1,80 @@
+import 'server-only'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { scoreReading, type AnswerKeys } from '@/lib/scoring/score-reading'
+import { buildReviewItems } from '@/lib/exam/review'
+import { sanitizeHighlights } from '@/lib/exam/highlights'
+import type { ResultDTO, ExamSkill } from '@/types/exam'
+
+// ============================================================
+// W8 — Result review (M05). CHỈ owner + status submitted|expired (LUẬT THÉP #4).
+// Đọc answer_keys (service_role) CHỈ SAU guard; review item sanitize (KHÔNG raw answer_keys — #2).
+// KHÔNG chấm lại điểm: raw_score/band lấy từ attempt đã ghi ở submit (W6).
+// ============================================================
+
+type AttemptRow = {
+  id: string
+  user_id: string
+  test_id: string
+  status: string
+  submitted_at: string | null
+  time_spent: number | null
+  raw_score: number | null
+  band: number | string | null
+  answers: Record<string, unknown> | null
+  highlights: unknown
+  bookmarked_qs: unknown
+}
+
+const RESULT_COLS =
+  'id, user_id, test_id, status, submitted_at, time_spent, raw_score, band, answers, highlights, bookmarked_qs'
+
+export type ResultOutcome =
+  | { ok: true; result: ResultDTO }
+  | { ok: false; code: 'NOT_FOUND' | 'RESULT_NOT_READY' }
+
+const toNum = (b: number | string | null): number | null => (b == null ? null : Number(b))
+const toIdArray = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+
+// admin = service_role. Guard owner + terminal status TRƯỚC khi đọc answer_keys.
+export async function getResult(admin: SupabaseClient, attemptId: string, userId: string): Promise<ResultOutcome> {
+  const { data, error } = await admin.from('attempts').select(RESULT_COLS).eq('id', attemptId).maybeSingle()
+  if (error) throw new Error(error.message)
+  const a = data as AttemptRow | null
+  // Không lộ tồn tại attempt người khác.
+  if (!a || a.user_id !== userId) return { ok: false, code: 'NOT_FOUND' }
+  // Chưa terminal → KHÔNG trả review/đáp án.
+  if (a.status !== 'submitted' && a.status !== 'expired') return { ok: false, code: 'RESULT_NOT_READY' }
+
+  // ---- CHỈ TỪ ĐÂY: owner + terminal đã xác nhận → đọc answer_keys + questions (service_role) ----
+  const [{ data: akData, error: akErr }, { data: tData, error: tErr }] = await Promise.all([
+    admin.from('answer_keys').select('keys').eq('test_id', a.test_id).maybeSingle(),
+    admin.from('tests').select('title, type, questions').eq('id', a.test_id).maybeSingle(),
+  ])
+  if (akErr) throw new Error(akErr.message)
+  if (tErr) throw new Error(tErr.message)
+
+  const keys = (akData?.keys ?? {}) as AnswerKeys
+  const testRow = (tData ?? {}) as { title?: string; type?: string; questions?: unknown }
+
+  const review = buildReviewItems(a.answers, keys as Record<string, unknown>, testRow.questions)
+  // max_score nhất quán với scoring W6 (Σ points key hợp lệ). KHÔNG lộ map từng câu.
+  const { max_score } = scoreReading(a.answers ?? {}, keys)
+
+  const result: ResultDTO = {
+    attempt_id: a.id,
+    test: { id: a.test_id, title: testRow.title ?? '', skill: (testRow.type ?? 'reading') as ExamSkill },
+    status: a.status as 'submitted' | 'expired',
+    submitted_at: a.submitted_at,
+    time_spent: a.time_spent,
+    raw_score: a.raw_score,
+    max_score: review.length > 0 ? max_score : null,
+    band: toNum(a.band),
+    review,
+    // Defense-in-depth (P1): sanitize về đúng anchor shape → result KHÔNG bao giờ echo key lạ
+    // (answer_keys/points/match...) kể cả nếu dữ liệu highlights cũ/bất thường.
+    highlights: sanitizeHighlights(a.highlights),
+    bookmarked_qs: toIdArray(a.bookmarked_qs),
+  }
+  return { ok: true, result }
+}

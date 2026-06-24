@@ -2,8 +2,8 @@ import { ProductCard } from '@/components/product/ProductCard'
 import type { ProductCardData } from '@/types/product'
 
 const PREDICTION: ProductCardData[] = [
-  { slug: 'prediction-2026-q3', title: 'Prediction 2026 Q3', priceCoins: 120, skills: ['reading', 'listening'], attemptsTotal: 410, state: 'locked' },
-  { slug: 'prediction-writing-2026', title: 'Writing Prediction 2026', priceCoins: 90, skills: ['writing'], attemptsTotal: 230, state: 'locked' },
+  { slug: 'prediction-2026-q3', title: 'Prediction 2026 Q3', priceCoins: 120, skills: ['reading', 'listening'], attemptsTotal: 410, state: 'coming_soon' },
+  { slug: 'prediction-writing-2026', title: 'Writing Prediction 2026', priceCoins: 90, skills: ['writing'], attemptsTotal: 230, state: 'coming_soon' },
 ]
 
 export default function PredictionPage() {
