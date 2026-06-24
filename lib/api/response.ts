@@ -26,6 +26,8 @@ export const ERROR_CODES = {
   EXAM_LOCKED: 'EXAM_LOCKED', // W4: premium payload chưa unlock (is_free=false & không có test_unlocks)
   RESULT_NOT_READY: 'RESULT_NOT_READY', // W8: attempt còn in_progress → chưa trả review/đáp án
   ATTEMPT_TERMINAL: 'ATTEMPT_TERMINAL', // W9: attempt đã nộp → không autosave đáp án nữa
+  AI_UNAVAILABLE: 'AI_UNAVAILABLE', // W10: AI grader lỗi/refusal/invalid output → không lưu (502)
+  WORD_COUNT_TOO_LOW: 'WORD_COUNT_TOO_LOW', // W10: Task 1 < 150 hoặc Task 2 < 250 từ (server đếm)
   NOT_FOUND: 'NOT_FOUND',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   RATE_LIMITED: 'RATE_LIMITED',
