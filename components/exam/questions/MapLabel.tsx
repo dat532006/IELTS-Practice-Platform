@@ -10,8 +10,8 @@ export function MapLabel({ question, value, onChange, disabled, contrast }: Ques
   const options = Array.isArray(question.options) ? question.options : []
   const fieldCls = `min-w-0 rounded-md border px-3 py-1.5 outline-none ${
     contrast
-      ? 'border-slate-600 bg-black text-white focus:border-teal-400'
-      : 'border-slate-300 bg-white text-slate-900 focus:border-teal-600'
+      ? 'border-slate-500 bg-black text-white placeholder:text-slate-400 focus:border-amber-400'
+      : 'border-slate-400 bg-white text-slate-900 placeholder:text-slate-400 focus:border-amber-500'
   }`
 
   // --- Mode 1: chọn vị trí theo letter (options) — phổ biến với map IELTS ---
@@ -54,7 +54,7 @@ export function MapLabel({ question, value, onChange, disabled, contrast }: Ques
             disabled={disabled}
             value={v}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="…"
+            placeholder={question.number != null ? String(question.number) : '…'}
             aria-label={question.instruction || `Nhãn câu ${question.number ?? ''}`}
             style={overlayStyle(question.x, question.y)}
             className={`absolute w-20 max-w-[40%] text-center text-sm shadow ${fieldCls}`}

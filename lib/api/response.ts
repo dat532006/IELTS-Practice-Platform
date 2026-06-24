@@ -25,6 +25,7 @@ export const ERROR_CODES = {
   FORBIDDEN: 'FORBIDDEN',
   EXAM_LOCKED: 'EXAM_LOCKED', // W4: premium payload chưa unlock (is_free=false & không có test_unlocks)
   RESULT_NOT_READY: 'RESULT_NOT_READY', // W8: attempt còn in_progress → chưa trả review/đáp án
+  ATTEMPT_TERMINAL: 'ATTEMPT_TERMINAL', // W9: attempt đã nộp → không autosave đáp án nữa
   NOT_FOUND: 'NOT_FOUND',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   RATE_LIMITED: 'RATE_LIMITED',

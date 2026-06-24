@@ -11,3 +11,22 @@ html {
 /* W8 — Highlight đoạn văn: rule `::highlight(exam-highlight)` được inject lúc runtime
    trong lib/exam/highlight-anchor.ts (chỉ ở browser hỗ trợ CSS Custom Highlight API),
    tránh build CSS optimizer cảnh báo pseudo-element không nhận diện. */
+
+/* W9 parity (capture): bôi chọn trong passage = nền cam chữ trắng như reference. */
+.exam-passage ::selection,
+.exam-passage::selection {
+  background: #f2a93b;
+  color: #fff;
+}
+
+/* W9 parity (capture): scrollbar cột passage/questions mảnh, thumb cam. */
+.exam-col-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.exam-col-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.exam-col-scroll::-webkit-scrollbar-thumb {
+  background: #f2a93b;
+  border-radius: 3px;
+}

@@ -2,9 +2,9 @@ import { ProductCard } from '@/components/product/ProductCard'
 import type { ProductCardData } from '@/types/product'
 
 const FREE: ProductCardData[] = [
-  { slug: 'reading-free-1', title: 'Reading Test Free 1', priceCoins: 0, skills: ['reading'], attemptsTotal: 3200, state: 'free' },
-  { slug: 'listening-free-1', title: 'Listening Test Free 1', priceCoins: 0, skills: ['listening'], attemptsTotal: 2100, state: 'free' },
-  { slug: 'writing-free-1', title: 'Writing Task 1 Free', priceCoins: 0, skills: ['writing'], attemptsTotal: 870, state: 'free' },
+  { slug: 'reading-free-1', href: '/tests/11111111-1111-1111-1111-111111111111', title: 'Reading Test Free 1', priceCoins: 0, skills: ['reading'], attemptsTotal: 3200, state: 'free' },
+  { slug: 'listening-free-1', href: '/tests/77777777-7777-7777-7777-777777777777', title: 'Listening Test Free 1', priceCoins: 0, skills: ['listening'], attemptsTotal: 2100, state: 'free' },
+  { slug: 'writing-free-1', title: 'Writing Task 1 Free', priceCoins: 0, skills: ['writing'], attemptsTotal: 870, state: 'coming_soon' },
 ]
 
 export default function FreePage() {

@@ -31,6 +31,8 @@ export type QuestionComponentProps = {
   onChange: (value: AnswerValue) => void
   disabled?: boolean
   contrast?: boolean
+  // W9 parity (capture): statement/prompt đã render INLINE cạnh số câu ở ExamRunner → component bỏ qua.
+  hideStatement?: boolean
 }
 
 // Chuẩn hóa type payload → nhóm renderer. Unknown → 'fallback' (an toàn).

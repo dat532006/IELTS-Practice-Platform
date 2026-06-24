@@ -1,5 +1,10 @@
-// W8 — Review list (M05/M06). Render từ sanitized ReviewItem (API đã guard).
+'use client'
+
+// W8 — Review list (M05/M06) — W9 parity (capture tiep_tuc.png "Danh sách câu hỏi"):
+// lưới 2 cột, mỗi dòng "Câu số N: <đáp án đúng (đỏ đậm)>" + chip trạng thái + câu trả lời của bạn.
+// Chip: ✓ xanh (đúng) / ✕ đỏ (sai) / ⇥ cam (bỏ qua → hiển thị "..."). Có thu gọn (−/+).
 // LUẬT THÉP #2/#12: KHÔNG import scoring; KHÔNG tự chấm; chỉ hiển thị is_correct từ API.
+import { useState } from 'react'
 import type { ReviewItem } from '@/types/exam'
 
 function fmtAnswer(v: ReviewItem['user_answer']): string {
@@ -7,43 +12,62 @@ function fmtAnswer(v: ReviewItem['user_answer']): string {
   return Array.isArray(v) ? v.join(', ') : v
 }
 
+function StatusChip({ status }: { status: 'correct' | 'wrong' | 'skipped' }) {
+  const bg = status === 'correct' ? 'bg-[#34A853]' : status === 'wrong' ? 'bg-[#EA4335]' : 'bg-[#F0623C]'
+  return (
+    <span className={`flex h-7 w-8 shrink-0 items-center justify-center rounded-md text-white ${bg}`} aria-hidden>
+      {status === 'correct' && (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+      )}
+      {status === 'wrong' && (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      )}
+      {status === 'skipped' && (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12h12M12 6l6 6-6 6" /><path d="M20 5v14" /></svg>
+      )}
+    </span>
+  )
+}
+
 export function ReviewList({ review }: { review: ReviewItem[] }) {
+  const [open, setOpen] = useState(true)
   if (!review || review.length === 0) {
     return <p className="text-slate-500">Không có dữ liệu review cho bài này.</p>
   }
-  const correct = review.filter((r) => r.is_correct).length
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-slate-500">
-        Đúng <b className="text-teal-700">{correct}</b>/{review.length} câu
-      </p>
-      <ol className="space-y-2">
-        {review.map((r) => {
-          const user = fmtAnswer(r.user_answer)
-          return (
-            <li
-              key={r.question_id}
-              className={`rounded-lg border p-3 ${r.is_correct ? 'border-teal-200 bg-teal-50/50' : 'border-rose-200 bg-rose-50/50'}`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">{r.number ?? '•'}.</span>
-                <span
-                  className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${r.is_correct ? 'bg-teal-600 text-white' : 'bg-rose-600 text-white'}`}
-                >
-                  {r.is_correct ? 'Đúng' : 'Sai'}
+    <section className="rounded-xl border border-slate-200 bg-white px-5 py-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-extrabold uppercase">Tất cả câu hỏi</h3>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={open ? 'Thu gọn danh sách' : 'Mở danh sách'}
+          className="px-2 text-xl font-bold text-slate-600"
+        >
+          {open ? '−' : '+'}
+        </button>
+      </div>
+      {open && (
+        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 md:gap-x-10">
+          {review.map((r) => {
+            const user = fmtAnswer(r.user_answer)
+            const skipped = user.trim() === ''
+            const status: 'correct' | 'wrong' | 'skipped' = r.is_correct ? 'correct' : skipped ? 'skipped' : 'wrong'
+            return (
+              <div key={r.question_id} className="flex items-center gap-3 border-b border-slate-100 py-3 last:border-b-0">
+                <span className="shrink-0 text-sm text-slate-700">Câu số {r.number ?? '•'}:</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-bold text-[#D93025]" title={r.correct_answers.join(', ')}>
+                  {r.correct_answers.join(', ')}
                 </span>
-                {r.type && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">{r.type}</span>}
+                <StatusChip status={status} />
+                <span className={`w-20 shrink-0 truncate text-sm ${skipped ? 'text-slate-400' : 'font-semibold text-slate-800'}`} title={user || undefined}>
+                  {skipped ? '...' : user}
+                </span>
               </div>
-              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                <dt className="text-slate-500">Bạn trả lời</dt>
-                <dd className={user ? '' : 'italic text-slate-400'}>{user || '(bỏ trống)'}</dd>
-                <dt className="text-slate-500">Đáp án đúng</dt>
-                <dd className="font-medium text-slate-800">{r.correct_answers.join(', ')}</dd>
-              </dl>
-            </li>
-          )
-        })}
-      </ol>
-    </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }

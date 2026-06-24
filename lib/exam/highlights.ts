@@ -20,6 +20,7 @@ export const HighlightAnchorSchema = z
     quote: z.string().max(2000).optional(),
     color: z.string().max(32).optional(),
     note: z.string().max(2000).optional(),
+    passageId: z.string().max(64).optional(), // W9: scope highlight theo passage (đa passage / switching)
     createdAt: z.union([z.string().max(40), z.number()]).optional(),
   })
   .strict() // ⛔ reject key ngoài whitelist (vd answer_keys/points/match)

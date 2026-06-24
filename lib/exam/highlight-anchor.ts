@@ -11,6 +11,7 @@ export type HighlightAnchor = {
   quote?: string
   color?: string
   note?: string
+  passageId?: string // W9: scope theo passage (đa passage / switching). Khớp BE strict schema.
   createdAt?: string
 }
 
@@ -96,7 +97,9 @@ function ensureHighlightStyle(): void {
   if (typeof document === 'undefined' || document.getElementById('exam-hl-style')) return
   const style = document.createElement('style')
   style.id = 'exam-hl-style'
-  style.textContent = '::highlight(exam-highlight){background-color:#fde68a;color:inherit;}'
+  // W9 parity (T1.1): nền maroon + chữ trắng (khớp reference realieltsexams.com) → tương phản ≥7:1
+  //   ở cả 3 contrast (bw/wb/yb). Trước đây amber nhạt + inherit gây chữ chìm ở dark mode.
+  style.textContent = '::highlight(exam-highlight){background-color:#7b1e1e;color:#ffffff;}'
   document.head.appendChild(style)
 }
 
@@ -124,4 +127,58 @@ export function clearHighlights(): void {
 
 export function newAnchorId(): string {
   return 'hl_' + Math.random().toString(36).slice(2, 10)
+}
+
+// W9 (F-c): hit-test — click trong passage rơi vào highlight nào? (KHÔNG bọc <mark> → giữ độ bền anchor).
+//   Dùng caret position tại điểm click → so với từng anchor range. Ưu tiên highlight tạo SAU (chồng lên trên).
+export function highlightAtPoint(root: Node, anchors: HighlightAnchor[], x: number, y: number): HighlightAnchor | null {
+  const doc = (root.ownerDocument || (typeof document !== 'undefined' ? document : null)) as Document | null
+  if (!doc) return null
+  const d = doc as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+  }
+  let node: Node | null = null
+  let off = 0
+  if (typeof d.caretRangeFromPoint === 'function') {
+    const c = d.caretRangeFromPoint(x, y)
+    if (c) {
+      node = c.startContainer
+      off = c.startOffset
+    }
+  } else if (typeof d.caretPositionFromPoint === 'function') {
+    const p = d.caretPositionFromPoint(x, y)
+    if (p) {
+      node = p.offsetNode
+      off = p.offset
+    }
+  }
+  if (!node || !root.contains(node)) return null
+  for (let i = anchors.length - 1; i >= 0; i--) {
+    const r = rangeFromAnchor(root, anchors[i])
+    if (!r) continue
+    try {
+      if (r.comparePoint(node, off) === 0) return anchors[i]
+    } catch {
+      /* node ngoài range → bỏ qua */
+    }
+  }
+  return null
+}
+
+// W9 parity (T2.3): vị trí icon note (bong bóng) cho highlight CÓ note — đặt cuối range.
+//   Toạ độ TƯƠNG ĐỐI so với `root` (đã trừ rootRect) → render marker absolute là con của root → cuộn cùng nội dung.
+export function noteMarkerPositions(root: HTMLElement, anchors: HighlightAnchor[]): { id: string; left: number; top: number }[] {
+  const rootRect = root.getBoundingClientRect()
+  const out: { id: string; left: number; top: number }[] = []
+  for (const a of anchors) {
+    if (!a.id || !a.note) continue
+    const r = rangeFromAnchor(root, a)
+    if (!r) continue
+    const rects = r.getClientRects()
+    const last = rects[rects.length - 1]
+    if (!last) continue
+    out.push({ id: a.id, left: last.right - rootRect.left, top: last.top - rootRect.top })
+  }
+  return out
 }

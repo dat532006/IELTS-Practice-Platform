@@ -64,7 +64,7 @@ export function ProductCard({ p }: { p: ProductCardData }) {
     return <div aria-disabled="true">{card}</div>
   }
   return (
-    <Link href={`/products/${p.slug}`} className="block h-full">
+    <Link href={p.href ?? `/products/${p.slug}`} className="block h-full">
       {card}
     </Link>
   )

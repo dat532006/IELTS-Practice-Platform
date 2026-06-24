@@ -38,6 +38,7 @@ export type AttemptDTO = {
   server_now: string // ISO server — client tính countdown chính xác
   highlights: unknown // W8: annotation owner (restore qua reload); shape = HighlightAnchor[]
   bookmarked_qs: string[] // W8: câu đã bookmark trong attempt
+  answers?: Record<string, string | string[]> // W9: draft answers (autosave) — restore qua reload; KHÔNG đáp án đúng
 }
 
 // W8 result review — CHỈ owner + status submitted|expired (LUẬT THÉP #4).

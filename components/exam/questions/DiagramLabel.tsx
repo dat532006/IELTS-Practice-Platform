@@ -10,8 +10,8 @@ export function DiagramLabel({ question, value, onChange, disabled, contrast }: 
   const inputId = `q-input-${question.id}`
   const inputCls = `min-w-0 rounded-md border px-3 py-1.5 outline-none ${
     contrast
-      ? 'border-slate-600 bg-black text-white focus:border-teal-400'
-      : 'border-slate-300 bg-white text-slate-900 focus:border-teal-600'
+      ? 'border-slate-500 bg-black text-white placeholder:text-slate-400 focus:border-amber-400'
+      : 'border-slate-400 bg-white text-slate-900 placeholder:text-slate-400 focus:border-amber-500'
   }`
 
   // --- Mode 1: overlay trên ảnh (neo % toạ độ, transform biên-aware chống cắt) ---
@@ -29,7 +29,7 @@ export function DiagramLabel({ question, value, onChange, disabled, contrast }: 
             disabled={disabled}
             value={v}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="…"
+            placeholder={question.number != null ? String(question.number) : '…'}
             aria-label={question.instruction || `Nhãn câu ${question.number ?? ''}`}
             style={overlayStyle(question.x, question.y)}
             className={`absolute w-20 max-w-[40%] text-center text-sm shadow sm:w-24 ${inputCls}`}
@@ -39,21 +39,25 @@ export function DiagramLabel({ question, value, onChange, disabled, contrast }: 
     )
   }
 
-  // --- Mode 2: degrade về text input (không có ảnh) ---
+  // --- Mode 2 (capture parity): dotted list "N ........ [input]" — số + dòng chấm + ô nhập ---
   return (
     <div className="space-y-2">
       {question.prompt && <p className="whitespace-pre-line leading-relaxed">{question.prompt}</p>}
-      <input
-        id={inputId}
-        type="text"
-        autoComplete="off"
-        disabled={disabled}
-        value={v}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Nhập nhãn…"
-        aria-label={question.instruction || `Nhãn câu ${question.number ?? ''}`}
-        className={`w-full ${inputCls}`}
-      />
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 font-bold">{question.number ?? ''}</span>
+        <span aria-hidden className={`min-w-6 flex-1 border-b-2 border-dotted ${contrast ? 'border-slate-500' : 'border-slate-400'}`} />
+        <input
+          id={inputId}
+          type="text"
+          autoComplete="off"
+          disabled={disabled}
+          value={v}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={question.number != null ? String(question.number) : ''}
+          aria-label={question.instruction || `Nhãn câu ${question.number ?? ''}`}
+          className={`w-44 text-center font-semibold placeholder:font-semibold ${inputCls}`}
+        />
+      </div>
     </div>
   )
 }
