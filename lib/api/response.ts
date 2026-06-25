@@ -31,6 +31,7 @@ export const ERROR_CODES = {
   NOT_FOUND: 'NOT_FOUND',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   RATE_LIMITED: 'RATE_LIMITED',
+  STORAGE_NOT_CONFIGURED: 'STORAGE_NOT_CONFIGURED', // W12: Supabase Storage bucket / R2 PUT creds chưa cấu hình
   INTERNAL: 'INTERNAL',
 } as const
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]
