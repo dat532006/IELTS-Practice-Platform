@@ -5,10 +5,10 @@ import { computeOverallBand } from '@/lib/scoring/writing-band'
 import type { WritingGradeResult } from '@/types/exam'
 
 // ============================================================
-// W10 — Writing grading orchestration (M07). SERVER-ONLY.
-// Boundary order (TaskBrief): owner guard → word-count → rate-limit reserve (RPC) → grade → server overall → persist.
+// W10/W11 — Writing grading orchestration (M07). SERVER-ONLY.
+// Boundary order: owner guard → word-count → writing type guard → IP/user rate reserve → grade → server overall → persist.
 //   Write writing_submissions = service_role (RLS deny client write). overall_band server-compute (KHÔNG tin AI).
-//   Free 1 lần/ngày qua reserve_ai_grade; Pro bypass; refund nếu AI fail.
+//   W11 adds hashed IP/day limit in addition to per-user ai_grade_usage.
 // ============================================================
 
 const T1_MIN_WORDS = 150
@@ -24,6 +24,14 @@ export type WritingOutcome =
 type AttemptRow = { id: string; user_id: string; test_id: string; status: string }
 type Passage = { id?: string; number?: number; title?: string; content?: string }
 
+type SubmitWritingBody = {
+  attempt_id: string
+  task1_text: string
+  task2_text: string
+  ip_hash: string
+  ip_daily_limit: number
+}
+
 function extractPrompts(passages: unknown): { task1: string; task2: string } {
   const arr = Array.isArray(passages) ? (passages as Passage[]) : []
   const pick = (i: number, id: string) =>
@@ -31,10 +39,15 @@ function extractPrompts(passages: unknown): { task1: string; task2: string } {
   return { task1: pick(0, 'task1'), task2: pick(1, 'task2') }
 }
 
+async function refundReservations(admin: SupabaseClient, userId: string, ipHash: string, userReserved: boolean, ipReserved: boolean) {
+  if (userReserved) await admin.rpc('refund_ai_grade', { p_user_id: userId })
+  if (ipReserved) await admin.rpc('refund_ai_grade_ip', { p_ip_hash: ipHash })
+}
+
 export async function submitWritingGrade(
   admin: SupabaseClient,
   userId: string,
-  body: { attempt_id: string; task1_text: string; task2_text: string },
+  body: SubmitWritingBody,
 ): Promise<WritingOutcome> {
   // 1) Owner guard — KHÔNG lộ tồn tại attempt người khác.
   const { data: aData, error: aErr } = await admin
@@ -64,7 +77,17 @@ export async function submitWritingGrade(
   if ((testRow.type ?? '') !== 'writing') return { ok: false, code: 'NOT_FOUND' }
   const prompts = extractPrompts(testRow.passages)
 
-  // 4) Rate limit — đọc plan; free → reserve atomic (RPC). Pro bypass.
+  // 4) Rate limit — IP/day atomic first, then per-user free quota. Pro bypasses per-user, not IP anti-abuse.
+  let ipReserved = false
+  let userReserved = false
+  const { data: ipCount, error: ipErr } = await admin.rpc('reserve_ai_grade_ip', {
+    p_ip_hash: body.ip_hash,
+    p_limit: body.ip_daily_limit,
+  })
+  if (ipErr) throw new Error(ipErr.message)
+  ipReserved = typeof ipCount === 'number' && ipCount <= body.ip_daily_limit
+  if (!ipReserved) return { ok: false, code: 'RATE_LIMITED' }
+
   const { data: pData, error: pErr } = await admin
     .from('profiles')
     .select('plan')
@@ -72,12 +95,14 @@ export async function submitWritingGrade(
     .maybeSingle()
   if (pErr) throw new Error(pErr.message)
   const plan = ((pData as { plan?: string } | null)?.plan ?? 'free') as string
-  let reserved = false
   if (plan !== 'pro') {
     const { data: rc, error: rErr } = await admin.rpc('reserve_ai_grade', { p_user_id: userId })
     if (rErr) throw new Error(rErr.message)
-    reserved = true
-    if (typeof rc === 'number' && rc > FREE_DAILY_LIMIT) return { ok: false, code: 'RATE_LIMITED' }
+    userReserved = true
+    if (typeof rc === 'number' && rc > FREE_DAILY_LIMIT) {
+      await refundReservations(admin, userId, body.ip_hash, false, ipReserved)
+      return { ok: false, code: 'RATE_LIMITED' }
+    }
   }
 
   // 5) Grade (Claude/mock). 6) AI fail → refund quota → AI_UNAVAILABLE.
@@ -88,7 +113,7 @@ export async function submitWritingGrade(
     task2_text: body.task2_text,
   })
   if (!outcome.ok) {
-    if (reserved) await admin.rpc('refund_ai_grade', { p_user_id: userId }) // {data,error}; refund best-effort
+    await refundReservations(admin, userId, body.ip_hash, userReserved, ipReserved)
     return { ok: false, code: 'AI_UNAVAILABLE' }
   }
 

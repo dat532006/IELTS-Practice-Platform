@@ -68,11 +68,17 @@ export type ResultDTO = {
 
 // W10 Writing AI grade — M07. KHÔNG bao giờ kèm system prompt / API key / raw provider response.
 //   overall_band do SERVER tính (T1×1/3 + T2×2/3, round 0.5) — KHÔNG tin AI overall.
+export type WritingErrorHighlight = {
+  quote: string
+  type: 'task_response' | 'coherence_cohesion' | 'lexical_resource' | 'grammar'
+  suggestion: string
+}
 export type WritingTaskGrade = {
   band: number // 0..9, bước 0.5
   criteria: { task_response: number; coherence_cohesion: number; lexical_resource: number; grammar: number }
   feedback: string
   suggestions: string[]
+  error_highlights?: WritingErrorHighlight[] // W11: optional, đã Zod-validate và giới hạn trước khi lưu/trả
 }
 export type WritingGradeResult = {
   attempt_id: string
@@ -96,3 +102,4 @@ export type SubmitResult = {
   band: number | null // score_bands theo test type; null + warning nếu thiếu/không map
   max_score?: number | null // Σ points tối đa (an toàn hiển thị X/N; KHÔNG lộ đáp án)
 }
+

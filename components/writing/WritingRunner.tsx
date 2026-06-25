@@ -143,7 +143,7 @@ export function WritingRunner({ testId }: { testId: string }) {
 
       {phase === 'result' && result ? (
         <main className="mx-auto max-w-6xl px-4 py-6">
-          <WritingResultView result={result} />
+          <WritingResultView result={result} essays={{ task1, task2 }} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"

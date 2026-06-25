@@ -1,7 +1,9 @@
 import type { WritingGradeResult, WritingTaskGrade } from '@/types/exam'
+import { WritingErrorHighlights } from '@/components/writing/WritingErrorHighlights'
 
-// W10 — presentational result panel (M07). Dùng chung cho inline (WritingRunner) + trang /writing-result/[id].
+// W10/W11 — presentational result panel (M07). Dùng chung cho inline (WritingRunner) + trang /writing-result/[id].
 // overall_band = giá trị SERVER (DTO). KHÔNG tính lại ở client.
+// W11: per-task error highlights (DTO whitelist). essay (nếu có) cho annotate inline; thiếu → list degrade.
 const CRITERIA_LABELS: Record<string, string> = {
   task_response: 'Task Response / Achievement',
   coherence_cohesion: 'Coherence & Cohesion',
@@ -9,7 +11,7 @@ const CRITERIA_LABELS: Record<string, string> = {
   grammar: 'Grammatical Range & Accuracy',
 }
 
-function TaskResult({ n, grade }: { n: number; grade: WritingTaskGrade }) {
+function TaskResult({ n, grade, essay }: { n: number; grade: WritingTaskGrade; essay?: string }) {
   return (
     <div className="rounded-lg border border-slate-200 p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -32,11 +34,20 @@ function TaskResult({ n, grade }: { n: number; grade: WritingTaskGrade }) {
           ))}
         </ul>
       )}
+      {grade.error_highlights && grade.error_highlights.length > 0 && (
+        <WritingErrorHighlights highlights={grade.error_highlights} essay={essay} />
+      )}
     </div>
   )
 }
 
-export function WritingResultView({ result }: { result: WritingGradeResult }) {
+export function WritingResultView({
+  result,
+  essays,
+}: {
+  result: WritingGradeResult
+  essays?: { task1: string; task2: string }
+}) {
   return (
     <div>
       <div className="mb-5 rounded-lg border border-teal-200 bg-teal-50 p-5 text-center">
@@ -50,8 +61,8 @@ export function WritingResultView({ result }: { result: WritingGradeResult }) {
         </p>
       )}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <TaskResult n={1} grade={result.task1} />
-        <TaskResult n={2} grade={result.task2} />
+        <TaskResult n={1} grade={result.task1} essay={essays?.task1} />
+        <TaskResult n={2} grade={result.task2} essay={essays?.task2} />
       </div>
       <p className="mt-4 text-xs text-slate-500">
         Điểm AI chỉ mang tính tham khảo. Task 1: {result.task1_wc} từ · Task 2: {result.task2_wc} từ.
