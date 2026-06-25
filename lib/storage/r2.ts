@@ -81,9 +81,10 @@ function clampTtl(ttlSec?: number): number {
   return Math.min(MAX_TTL_SEC, Math.max(MIN_TTL_SEC, Math.floor(base)))
 }
 
-// SigV4 query-presigned GET (path-style: https://host/bucket/key?X-Amz-...).
+// SigV4 query-presigned URL (path-style: https://host/bucket/key?X-Amz-...). method = GET | PUT.
 // ttlSec optional: bỏ trống → clampTtl ưu tiên env R2_URL_TTL_SEC rồi mới DEFAULT_TTL_SEC.
-export function signR2GetUrl(objectKey: string, ttlSec?: number): SignResult {
+// W12: thêm method param để dùng cho PUT presign (audio upload) — GET output KHÔNG đổi.
+function signR2Url(method: 'GET' | 'PUT', objectKey: string, ttlSec?: number): SignResult {
   const cfg = readConfig()
   if (!cfg) return { url: null, warning: 'R2_NOT_CONFIGURED' }
   if (!objectKey) return { url: null, warning: 'R2_NOT_CONFIGURED' }
@@ -118,7 +119,7 @@ export function signR2GetUrl(objectKey: string, ttlSec?: number): SignResult {
   const signedHeaders = 'host'
   const payloadHash = 'UNSIGNED-PAYLOAD'
   const canonicalRequest = [
-    'GET',
+    method,
     canonicalUri,
     canonicalQueryString,
     canonicalHeaders,
@@ -137,4 +138,15 @@ export function signR2GetUrl(objectKey: string, ttlSec?: number): SignResult {
 
   const url = `https://${host}${canonicalUri}?${canonicalQueryString}&X-Amz-Signature=${signature}`
   return { url, warning: null }
+}
+
+// W7 — GET presign (signed audio playback URL). Behavior không đổi (wrapper quanh signR2Url).
+export function signR2GetUrl(objectKey: string, ttlSec?: number): SignResult {
+  return signR2Url('GET', objectKey, ttlSec)
+}
+
+// W12 — PUT presign (admin audio upload). Caller PUT trực tiếp lên URL (UNSIGNED-PAYLOAD, SignedHeaders=host).
+//   Secret CHỈ dùng để ký; KHÔNG nhúng secret vào URL. Thiếu R2 env → { url: null, warning: 'R2_NOT_CONFIGURED' }.
+export function signR2PutUrl(objectKey: string, ttlSec?: number): SignResult {
+  return signR2Url('PUT', objectKey, ttlSec)
 }
