@@ -11,6 +11,7 @@
     "db:verify": "powershell -ExecutionPolicy Bypass -File scripts/verify-db.ps1"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "clsx": "^2.1.1",

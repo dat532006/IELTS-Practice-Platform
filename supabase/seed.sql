@@ -72,6 +72,26 @@ on conflict (id) do update set
   questions = excluded.questions,
   audio_key = excluded.audio_key;
 
+-- W10 Writing fixture (AI-graded; KHÔNG answer_keys). passages = 2 task prompts (task1/task2).
+--   type='writing'; free để smoke/dev chấm được. duration 3600 (60').
+insert into public.tests (id, slug, title, type, source, is_free, difficulty, question_types, duration_sec, status, passages, questions) values
+  ('99999999-9999-9999-9999-999999999999', 'writing-task12-free', '[W10] Writing Task 1+2 Free', 'writing', 'Dev fixture', true, 3,
+   '{writing_task1,writing_task2}', 3600, 'published',
+   '[{"id":"task1","number":1,"title":"Writing Task 1","content":"The chart below shows the percentage of households in owned and rented accommodation in England and Wales between 1918 and 2011. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. Write at least 150 words."},{"id":"task2","number":2,"title":"Writing Task 2","content":"Some people believe that universities should focus on providing academic skills, while others think they should prepare students for the workplace. Discuss both views and give your own opinion. Write at least 250 words."}]'::jsonb,
+   '[]'::jsonb)
+on conflict (id) do update set
+  slug = excluded.slug,
+  title = excluded.title,
+  type = excluded.type,
+  source = excluded.source,
+  is_free = excluded.is_free,
+  difficulty = excluded.difficulty,
+  question_types = excluded.question_types,
+  duration_sec = excluded.duration_sec,
+  status = excluded.status,
+  passages = excluded.passages,
+  questions = excluded.questions;
+
 -- answer_keys: W1-W2 fixtures (do nothing, stable); W6 fixture upsert để hội tụ khi keys đổi.
 insert into public.answer_keys (test_id, keys) values
   ('11111111-1111-1111-1111-111111111111', '{"q1":{"answers":["sample"],"match":"ci"}}'::jsonb),

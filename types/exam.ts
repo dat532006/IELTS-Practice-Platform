@@ -66,6 +66,25 @@ export type ResultDTO = {
   bookmarked_qs: string[] // echo câu đã bookmark trong attempt
 }
 
+// W10 Writing AI grade — M07. KHÔNG bao giờ kèm system prompt / API key / raw provider response.
+//   overall_band do SERVER tính (T1×1/3 + T2×2/3, round 0.5) — KHÔNG tin AI overall.
+export type WritingTaskGrade = {
+  band: number // 0..9, bước 0.5
+  criteria: { task_response: number; coherence_cohesion: number; lexical_resource: number; grammar: number }
+  feedback: string
+  suggestions: string[]
+}
+export type WritingGradeResult = {
+  attempt_id: string
+  task1: WritingTaskGrade
+  task2: WritingTaskGrade
+  overall_band: number // server-computed
+  task1_wc: number
+  task2_wc: number
+  graded_at: string
+  mock: boolean // true nếu chấm bằng mock grader (thiếu ANTHROPIC_API_KEY) — KHÔNG claim live
+}
+
 // W6 submit — scoring server-side. KHÔNG bao giờ kèm answer_keys/correct answers (LUẬT THÉP #2).
 export type SubmitResult = {
   attempt_id: string
