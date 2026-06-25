@@ -4,13 +4,16 @@
 //   Grader runs in MOCK (deterministic) because .env.local has no ANTHROPIC_API_KEY → asserts overall server-computed.
 // Usage: SMOKE_BASE=http://127.0.0.1:3100 node supabase/smoke/writing_grading_smoke.mjs
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 
 const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:3100'
 const WRITING = '99999999-9999-9999-9999-999999999999'
-const SECRET = ['ANTHROPIC_API_KEY', 'sk-ant', 'api_key', 'apiKey'] // KHÔNG được lộ
+const SECRET = ['ANTHROPIC_API_KEY', 'sk-ant', 'api_key', 'apiKey', 'ip_hash'] // KHÔNG được lộ
+const SMOKE_IP = '203.0.113.11'
+const LIMITED_IP = '203.0.113.99'
 const roundHalf = (x) => Math.round(x * 2) / 2
 const overallExpect = (t1, t2) => roundHalf(t1 * (1 / 3) + t2 * (2 / 3))
 const words = (n) => Array.from({ length: n }, (_, i) => `word${i % 50}`).join(' ')
@@ -27,10 +30,10 @@ const deepHas = (o, k) => {
 }
 const jsonHas = (o, sub) => JSON.stringify(o ?? '').toLowerCase().includes(sub.toLowerCase())
 
-async function api(method, path, cookie, payload) {
+async function api(method, path, cookie, payload, extraHeaders = {}) {
   const r = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'content-type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+    headers: { 'content-type': 'application/json', 'x-forwarded-for': SMOKE_IP, ...(cookie ? { Cookie: cookie } : {}), ...extraHeaders },
     body: payload === undefined ? undefined : JSON.stringify(payload),
   })
   let body = null
@@ -46,6 +49,15 @@ function loadEnvLocal() {
     }
   } catch { /* optional */ }
 }
+function aiIpLimit() {
+  const raw = Number.parseInt(process.env.AI_GRADE_IP_DAILY_LIMIT || '', 10)
+  return Number.isFinite(raw) && raw > 0 ? Math.min(raw, 500) : 20
+}
+function aiIpHash(ip) {
+  const pepper = process.env.AI_GRADE_IP_RATE_LIMIT_PEPPER || process.env.SUPABASE_SERVICE_ROLE_KEY || 'local-dev-ai-ip-rate-limit'
+  return createHash('sha256').update(`${pepper}:${ip}`).digest('hex')
+}
+function today() { return new Date().toISOString().slice(0, 10) }
 function ssrCookie(url, session) {
   const ref = new URL(url).hostname.split('.')[0]
   const name = `sb-${ref}-auth-token`
@@ -83,9 +95,10 @@ const run = async () => {
 
   // Clean today's quota + old attempts để deterministic.
   for (const U of [A, B]) {
-    await U.admin.from('ai_grade_usage').delete().eq('user_id', U.session.user.id).eq('used_on', new Date().toISOString().slice(0, 10))
+    await U.admin.from('ai_grade_usage').delete().eq('user_id', U.session.user.id).eq('used_on', today())
     await U.admin.from('attempts').delete().eq('test_id', WRITING).eq('user_id', U.session.user.id)
   }
+  await A.admin.from('ai_grade_ip_usage').delete().in('ip_hash', [aiIpHash(SMOKE_IP), aiIpHash(LIMITED_IP)]).eq('used_on', today())
 
   // === 0) Unauth → 401 ===
   {
@@ -114,12 +127,14 @@ const run = async () => {
     check('task1/task2 band hợp lệ (0..9 step .5)', [t1, t2].every((b) => typeof b === 'number' && b >= 0 && b <= 9 && Number.isInteger(b * 2)), `t1=${t1} t2=${t2}`)
     check('overall_band = server compute (T1×1/3+T2×2/3 round .5)', d?.overall_band === overallExpect(t1, t2), `got ${d?.overall_band}, expect ${overallExpect(t1, t2)}`)
     check('có criteria 4 tiêu chí', d?.task1?.criteria && 'task_response' in d.task1.criteria && 'grammar' in d.task1.criteria)
+    check('error_highlights hợp lệ được trả về (W11)', Array.isArray(d?.task1?.error_highlights) && d.task1.error_highlights.length <= 12 && typeof d.task1.error_highlights[0]?.quote === 'string' && typeof d.task1.error_highlights[0]?.suggestion === 'string')
     check('word count server đếm (task1_wc≈160)', d?.task1_wc === 160 && d?.task2_wc === 260, `${d?.task1_wc}/${d?.task2_wc}`)
     for (const k of SECRET) check(`response KHÔNG lộ "${k}"`, !deepHas(r.body, k) && !jsonHas(r.body, k))
     check('response KHÔNG chứa system prompt ("IELTS Writing examiner")', !jsonHas(r.body, 'examiner. Grade Task'))
     // DB: writing_submissions lưu ai_score + overall
     const { data: ws } = await A.admin.from('writing_submissions').select('ai_score, task1_wc').eq('attempt_id', attemptA).maybeSingle()
     check('writing_submissions persisted (ai_score.overall_band)', ws?.ai_score?.overall_band === d?.overall_band)
+    check('writing_submissions persisted error_highlights sanitized', Array.isArray(ws?.ai_score?.task1?.error_highlights) && !deepHas(ws.ai_score.task1.error_highlights, 'answer_keys'))
   }
 
   // === 3) Free 2nd grade same day → 429 (rate limit, không gọi Claude) ===
@@ -137,6 +152,11 @@ const run = async () => {
     const r2 = await api('POST', '/api/grade-writing', B.cookie, { attempt_id: attemptB, task1_text: words(170), task2_text: words(270) })
     check('Pro grade #1 → 200', r1.status === 200, `got ${r1.status}`)
     check('Pro grade #2 (same day) → 200 (bypass rate limit)', r2.status === 200, `got ${r2.status}`)
+    const limit = aiIpLimit()
+    await B.admin.from('ai_grade_ip_usage').upsert({ ip_hash: aiIpHash(LIMITED_IP), used_on: today(), count: limit }, { onConflict: 'ip_hash,used_on' })
+    const limited = await api('POST', '/api/grade-writing', B.cookie, { attempt_id: attemptB, task1_text: words(180), task2_text: words(280) }, { 'x-forwarded-for': LIMITED_IP })
+    check('IP daily limit prefilled → 429', limited.status === 429, `got ${limited.status}`)
+    check('IP limit error_code RATE_LIMITED', limited.body?.meta?.error_code === 'RATE_LIMITED', JSON.stringify(limited.body?.meta))
   }
 
   // === 5) Cross-user attempt → 404 ===
@@ -152,6 +172,8 @@ const run = async () => {
     check('direct client UPDATE writing_submissions → denied', !!wr.error || wr.count === 0, wr.error ? '' : 'LEAK')
     const rpc = await db.rpc('reserve_ai_grade', { p_user_id: A.session.user.id })
     check('direct client RPC reserve_ai_grade → denied', !!rpc.error, 'client gọi được RPC (LEAK)')
+    const ipRpc = await db.rpc('reserve_ai_grade_ip', { p_ip_hash: aiIpHash(SMOKE_IP), p_limit: aiIpLimit() })
+    check('direct client RPC reserve_ai_grade_ip → denied', !!ipRpc.error, 'client gọi được IP RPC (LEAK)')
   }
 
   // === 7) Writing result review (F-B): owner 200 / cross-user 404 / unauth 401 ===
@@ -193,3 +215,7 @@ function finish() {
   process.exitCode = fail === 0 ? 0 : 1
 }
 run().catch((e) => { console.error('SMOKE ERROR:', e); process.exitCode = 2 })
+
+
+
+

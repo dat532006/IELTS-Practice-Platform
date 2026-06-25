@@ -414,4 +414,24 @@ begin
   raise notice 'PASS check21: listening bands = IELTS Academic (raw 10→4.0, 18→5.5, 23→6.0, 40→9.0, raw<3 unmapped)';
 end $$;
 
+-- ---------- Check 22: client KHÔNG đọc/gọi AI IP rate-limit internals ----------
+do $$
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated; -- FIX (Leader W11): thiếu dòng này → SELECT chạy bằng owner, bypass RLS/grant (false FAIL)
+  begin
+    perform 1 from public.ai_grade_ip_usage limit 1;
+    raise exception 'FAIL check22a: authenticated đọc được ai_grade_ip_usage';
+  exception when insufficient_privilege then
+    raise notice 'PASS check22a: ai_grade_ip_usage denied to client';
+  end;
+  begin
+    perform public.reserve_ai_grade_ip(repeat('a', 64), 20);
+    raise exception 'FAIL check22b: authenticated gọi được reserve_ai_grade_ip';
+  exception when insufficient_privilege then
+    raise notice 'PASS check22b: reserve_ai_grade_ip denied to client';
+  end;
+  reset role;
+end $$;
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
+
