@@ -1,6 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
 import { isValidBand, roundHalf } from '@/lib/scoring/writing-band'
+import { WRITING_GRADER_SYSTEM_PROMPT } from '@/lib/ai/ielts-writing-rubric'
 
 // ============================================================
 // W10 — Writing AI grader (M07). SERVER-ONLY.
@@ -70,14 +71,8 @@ export type GradeOutcome =
   | { ok: true; grade: RawAiGrade; mock: boolean }
   | { ok: false; code: 'AI_UNAVAILABLE' | 'AI_INVALID_OUTPUT' }
 
-const SYSTEM_PROMPT = [
-  'You are a certified IELTS Writing examiner. Grade Task 1 and Task 2 separately.',
-  'For EACH task return four criterion bands (task_response, coherence_cohesion, lexical_resource, grammar)',
-  'and an overall band for that task, plus concise feedback and 2–4 actionable suggestions.',
-  'All band scores MUST be in the range 0 to 9 in steps of 0.5 (e.g. 6.0, 6.5).',
-  'Do NOT compute a combined overall across the two tasks — that is done elsewhere.',
-  'Base the grade only on the candidate text provided; never invent content.',
-].join(' ')
+// System prompt = official IELTS band descriptors + scoring rules (lib/ai/ielts-writing-rubric.ts).
+const SYSTEM_PROMPT = WRITING_GRADER_SYSTEM_PROMPT
 
 // Validate + chuẩn hoá band sau khi có RawAiGrade (range + step). Reject nếu sai.
 function bandsValid(g: RawAiGrade): boolean {
