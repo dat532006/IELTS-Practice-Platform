@@ -59,6 +59,9 @@ export async function submitWritingGrade(
     .maybeSingle()
   if (tErr) throw new Error(tErr.message)
   const testRow = (tData ?? {}) as { type?: string; passages?: unknown }
+  // F-C: CHỈ chấm writing test. Chặn finalize sai attempt reading/listening qua route này.
+  //   Đặt TRƯỚC reserve → non-writing KHÔNG tốn quota / KHÔNG gọi AI. KHÔNG lộ tồn tại → NOT_FOUND.
+  if ((testRow.type ?? '') !== 'writing') return { ok: false, code: 'NOT_FOUND' }
   const prompts = extractPrompts(testRow.passages)
 
   // 4) Rate limit — đọc plan; free → reserve atomic (RPC). Pro bypass.

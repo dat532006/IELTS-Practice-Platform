@@ -154,6 +154,35 @@ const run = async () => {
     check('direct client RPC reserve_ai_grade → denied', !!rpc.error, 'client gọi được RPC (LEAK)')
   }
 
+  // === 7) Writing result review (F-B): owner 200 / cross-user 404 / unauth 401 ===
+  {
+    const own = await api('GET', `/api/writing-result/${attemptA}`, A.cookie)
+    check('writing-result owner → 200', own.status === 200, `got ${own.status}`)
+    check('writing-result overall_band khớp (server)', typeof own.body?.data?.overall_band === 'number', JSON.stringify(own.body?.data?.overall_band))
+    check('writing-result có task1/task2', !!own.body?.data?.task1?.band && !!own.body?.data?.task2?.band)
+    for (const k of SECRET) check(`writing-result KHÔNG lộ "${k}"`, !deepHas(own.body, k) && !jsonHas(own.body, k))
+    const cross = await api('GET', `/api/writing-result/${attemptA}`, B.cookie)
+    check('writing-result cross-user → 404', cross.status === 404, `got ${cross.status}`)
+    const guest = await api('GET', `/api/writing-result/${attemptA}`, null)
+    check('writing-result unauth → 401', guest.status === 401, `got ${guest.status}`)
+  }
+
+  // === 8) Test-type guard (F-C): reading attempt → grade-writing 404, KHÔNG finalize, KHÔNG tạo submission ===
+  {
+    const READING = '66666666-6666-6666-6666-666666666666'
+    const sr = await api('POST', `/api/exam/${READING}/start`, A.cookie, {})
+    const ra = sr.body?.data?.attempt_id
+    if (!ra) { check('reading attempt start (fixture 66666666)', false, 'không start được'); }
+    else {
+      const r = await api('POST', '/api/grade-writing', A.cookie, { attempt_id: ra, task1_text: words(160), task2_text: words(260) })
+      check('reading attempt → grade-writing 404 (type guard)', r.status === 404, `got ${r.status}`)
+      const { data: att } = await A.admin.from('attempts').select('status').eq('id', ra).maybeSingle()
+      check('reading attempt KHÔNG bị finalize (vẫn in_progress)', att?.status === 'in_progress', `status=${att?.status}`)
+      const { count } = await A.admin.from('writing_submissions').select('id', { count: 'exact', head: true }).eq('attempt_id', ra)
+      check('reading attempt KHÔNG tạo writing_submissions', count === 0, `count=${count}`)
+    }
+  }
+
   finish()
 }
 
