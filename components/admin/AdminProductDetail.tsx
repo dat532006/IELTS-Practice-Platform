@@ -139,11 +139,14 @@ export function AdminProductDetail({ productId }: { productId: string }) {
   }
 
   // Đổi thứ tự: hoán đổi position với phần tử kề (persist 2 upsert) rồi reload.
+  // Index theo CÙNG thứ tự đã sort như khi render (KHÔNG index vào `tests` thô —
+  //   sai phần tử khi 2 đề trùng position vì sorted dùng tiebreaker test_id).
   async function move(idx: number, dir: -1 | 1) {
+    const ordered = [...tests].sort((a, b) => a.position - b.position || a.test_id.localeCompare(b.test_id))
     const j = idx + dir
-    if (j < 0 || j >= tests.length) return
+    if (j < 0 || j >= ordered.length) return
     setBusy('reorder'); setBindErr('')
-    const a = tests[idx], b = tests[j]
+    const a = ordered[idx], b = ordered[j]
     try {
       await bindTest(a.test_id, b.position)
       await bindTest(b.test_id, a.position)
