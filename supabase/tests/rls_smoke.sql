@@ -433,5 +433,24 @@ begin
   end;
   reset role;
 end $$;
+
+-- ============================================================
+-- W13 — Admin Product/Bundle published-only RLS (products_select_published).
+-- Map docs/ContractForAI/.../W13 + docs/TaskBrief/.../w13.md (draft product KHÔNG lộ client).
+-- ============================================================
+
+-- ---------- Check 23: client thấy published product, KHÔNG thấy draft product ----------
+do $$
+declare pub_seen int; draft_seen int;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated;
+  select count(*) into pub_seen   from public.products where id = '00000000-0000-0000-0000-000000000011'; -- pub-prod (published)
+  select count(*) into draft_seen from public.products where id = '00000000-0000-0000-0000-000000000012'; -- draft-prod (draft)
+  if pub_seen <> 1 then raise exception 'FAIL check23a: client KHÔNG đọc được product published (kỳ vọng 1, got %)', pub_seen; end if;
+  if draft_seen <> 0 then raise exception 'FAIL check23b: LEAK draft product cho client (kỳ vọng 0, got %)', draft_seen; end if;
+  raise notice 'PASS check23: products_select_published — published lộ, draft ẩn với client';
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
 
