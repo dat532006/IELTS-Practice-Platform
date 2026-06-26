@@ -2,7 +2,6 @@
 
 **IELTS Practice Platform** is a web-based examination and learning environment designed to support structured IELTS preparation through secure test delivery, controlled access to practice materials, server-side scoring, and a modular foundation for future analytics and feedback workflows.
 
-The project is built by **Nguyễn Đức Đạt**, a student at the **University of Science, Vietnam National University Ho Chi Minh City (HCMUS)**.
 
 ## Overview
 
