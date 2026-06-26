@@ -21,6 +21,13 @@ export default function AdminDashboard() {
           <div className="font-semibold text-slate-800">📦 Sản phẩm / Bundle</div>
           <div className="mt-1 text-sm text-slate-500">Tạo product/bundle → gắn đề + đặt giá → publish ra catalog.</div>
         </Link>
+        <Link
+          href="/admin/activation-codes"
+          className="rounded-lg border border-slate-200 bg-white p-4 hover:border-teal-400 hover:shadow-sm"
+        >
+          <div className="font-semibold text-slate-800">🎟️ Mã kích hoạt</div>
+          <div className="mt-1 text-sm text-slate-500">Sinh mã (HMAC server) → hiển thị 1 lần + tải CSV. Tiêu mã ở W15.</div>
+        </Link>
       </div>
     </div>
   )
