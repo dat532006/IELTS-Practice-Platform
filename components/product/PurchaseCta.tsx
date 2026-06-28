@@ -1,6 +1,16 @@
-// Panel CTA mua/nhập mã cho product detail. owned → panel sở hữu. KHÔNG link route chưa tồn tại:
-// checkout/redeem thật là M08 (W15–16) → nút placeholder DISABLED + note (tránh affordance giả/404).
-export function PurchaseCta({ priceCoins, owned }: { priceCoins: number; owned: boolean }) {
+import { BuyButtons } from './BuyButtons'
+
+// Panel CTA mua product detail (M08, W16). owned → panel sở hữu; free → panel free; còn lại → Buy-now coin.
+// ⚠️ Normal purchase flow KHÔNG dùng activation code → KHÔNG nút "Nhập mã" ở đây (redeem chỉ cho admin/offline).
+export function PurchaseCta({
+  productId,
+  priceCoins,
+  owned,
+}: {
+  productId: string
+  priceCoins: number
+  owned: boolean
+}) {
   if (owned) {
     return (
       <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
@@ -28,35 +38,8 @@ export function PurchaseCta({ priceCoins, owned }: { priceCoins: number; owned: 
         <span className="text-2xl font-bold text-slate-900">🪙 {priceCoins}</span>
         <span className="text-sm text-slate-500">coins</span>
       </div>
-      <div className="mt-3 flex flex-col gap-2">
-        <button
-          type="button"
-          disabled
-          title="Thanh toán mở ở giai đoạn sau (W15–16)"
-          className="inline-flex items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Mua bằng coin
-        </button>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            disabled
-            title="Giỏ hàng mở ở giai đoạn sau (W15–16)"
-            className="flex-1 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Thêm vào giỏ
-          </button>
-          <button
-            type="button"
-            disabled
-            title="Nhập mã kích hoạt mở ở giai đoạn sau (W15–16)"
-            className="flex-1 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Nhập mã
-          </button>
-        </div>
-      </div>
-      <p className="mt-2 text-xs text-slate-400">Thanh toán & nhập mã sẽ mở ở giai đoạn sau.</p>
+      <BuyButtons productId={productId} priceCoins={priceCoins} />
+      <p className="mt-2 text-xs text-slate-400">Trừ coin trong ví và mở khoá ngay sau khi mua.</p>
     </div>
   )
 }

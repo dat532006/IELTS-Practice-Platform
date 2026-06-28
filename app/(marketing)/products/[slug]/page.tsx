@@ -75,7 +75,7 @@ export default async function ProductDetailPage({
 
           {/* CTA trên mobile (trước mục lục) */}
           <div className="mt-5 lg:hidden">
-            <PurchaseCta priceCoins={detail.price_coins} owned={detail.owned} />
+            <PurchaseCta productId={detail.id} priceCoins={detail.price_coins} owned={detail.owned} />
           </div>
 
           <h2 className="mt-8 text-lg font-semibold text-slate-900">Mục lục đề</h2>
@@ -93,7 +93,7 @@ export default async function ProductDetailPage({
         {/* Aside CTA (sticky desktop) */}
         <aside className="hidden lg:block">
           <div className="sticky top-20">
-            <PurchaseCta priceCoins={detail.price_coins} owned={detail.owned} />
+            <PurchaseCta productId={detail.id} priceCoins={detail.price_coins} owned={detail.owned} />
           </div>
         </aside>
       </div>

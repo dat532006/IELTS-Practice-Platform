@@ -21,6 +21,7 @@ export const ERROR_CODES = {
   CODE_DISABLED: 'CODE_DISABLED',
   CODE_SOLD_OUT: 'CODE_SOLD_OUT',
   PAYMENT_SIGNATURE_INVALID: 'PAYMENT_SIGNATURE_INVALID',
+  PAYMENT_AMOUNT_MISMATCH: 'PAYMENT_AMOUNT_MISMATCH', // W16: paid_vnd != transactions.amount_vnd → KHÔNG credit
   UNAUTHORIZED: 'UNAUTHORIZED',
   FORBIDDEN: 'FORBIDDEN',
   EXAM_LOCKED: 'EXAM_LOCKED', // W4: premium payload chưa unlock (is_free=false & không có test_unlocks)
