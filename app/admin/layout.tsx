@@ -3,31 +3,54 @@ import Link from 'next/link'
 import { requireAdmin } from '@/lib/auth/guards'
 
 // W12 — Admin layout (M11). SERVER gate: requireAdmin() là guard THẬT (UI chỉ tiện ích).
-//   UNAUTHORIZED → /login; FORBIDDEN → 403 UI (không render children). Chrome admin riêng (no marketing).
+//   UNAUTHORIZED → /login; FORBIDDEN → 403 UI (không render children). Chrome admin riêng (design frame 3).
+const navItems = [
+  { href: '/admin', label: 'Dashboard' },
+  { href: '/admin/products', label: 'Sản phẩm' },
+  { href: '/admin/tests/new', label: 'Đề thi' },
+]
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const g = await requireAdmin()
   if (!g.ok) {
     if (g.reason === 'UNAUTHORIZED') redirect('/login?next=/admin')
     return (
-      <div className="grid min-h-screen place-items-center bg-slate-50 px-4 text-center text-slate-700">
+      <div className="grid min-h-screen place-items-center bg-[#FBFBFD] px-4 text-center text-[#564F6B]">
         <div>
-          <p className="mb-2 text-lg font-semibold">403 — Không có quyền</p>
+          <p className="mb-2 text-lg font-bold text-[#2A2740]">403 — Không có quyền</p>
           <p className="mb-3 text-sm">Trang quản trị chỉ dành cho admin.</p>
-          <Link href="/" className="text-teal-700 underline">← Về trang chủ</Link>
+          <Link href="/" className="font-semibold text-[#6A48D6] underline">
+            ← Về trang chủ
+          </Link>
         </div>
       </div>
     )
   }
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white px-4 py-3">
-        <div className="mx-auto flex max-w-5xl items-center gap-3">
-          <span className="grid h-8 w-8 place-items-center rounded bg-slate-900 text-xs font-bold text-white">AD</span>
-          <Link href="/admin" className="font-semibold">Quản trị nội dung</Link>
-          <span className="ml-auto text-xs text-slate-500">Admin · IELTS Platform</span>
+    <div className="min-h-screen bg-[#FBFBFD] text-[#2A2740]">
+      <header className="border-b border-[#EBE8F1] bg-white px-4 py-3.5">
+        <div className="mx-auto flex max-w-6xl items-center gap-3.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-[#2A2740] text-[12px] font-extrabold text-white">
+            AD
+          </span>
+          <Link href="/admin" className="text-[15px] font-extrabold text-[#2A2740]">
+            Quản trị nội dung
+          </Link>
+          <nav className="ml-[18px] flex gap-1.5">
+            {navItems.map((it) => (
+              <Link
+                key={it.href}
+                href={it.href}
+                className="rounded-[9px] px-3 py-[7px] text-[13px] font-semibold text-[#6A6480] transition hover:bg-[#F2EFF7]"
+              >
+                {it.label}
+              </Link>
+            ))}
+          </nav>
+          <span className="ml-auto text-[12.5px] font-semibold text-[#A8A2BA]">Admin · IELTS Platform</span>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   )
 }

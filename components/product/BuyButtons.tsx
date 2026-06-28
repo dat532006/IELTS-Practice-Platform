@@ -1,17 +1,44 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
-// W16 — Buy-now bằng coin (M08). Gọi POST /api/checkout { product_id } → trừ coin atomic ở server,
-//   active ngay. KHÔNG activation code. Thành công → reload để refresh coin balance + trạng thái sở hữu.
+// W16 — Buy-now bằng coin (M08). Đọc số dư coin của user (RLS own-row) để hiện đủ/thiếu coin;
+//   đủ → POST /api/checkout { product_id } (server trừ coin atomic, active ngay) → reload.
+//   Thiếu → CTA "Nạp thêm coin →" /pricing. price_coins server-authoritative (chỉ hiển thị ở đây).
 export function BuyButtons({ productId, priceCoins }: { productId: string; priceCoins: number }) {
-  const [loading, setLoading] = useState(false)
+  const [authed, setAuthed] = useState<boolean | null>(null)
+  const [balance, setBalance] = useState<number | null>(null)
+  const [buying, setBuying] = useState(false)
   const [err, setErr] = useState<{ code: string; msg: string } | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    let active = true
+    supabase.auth
+      .getUser()
+      .then(async ({ data }) => {
+        if (!active) return
+        if (!data.user) {
+          setAuthed(false)
+          return
+        }
+        setAuthed(true)
+        const { data: profile } = await supabase.from('profiles').select('coins').eq('id', data.user.id).single()
+        if (active) setBalance(profile?.coins ?? 0)
+      })
+      .catch(() => {
+        if (active) setAuthed(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   async function buy() {
     setErr(null)
-    setLoading(true)
+    setBuying(true)
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
@@ -21,7 +48,6 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
       const body = await res.json().catch(() => null)
       const status = body?.data?.status
       if (res.ok && (status === 'paid' || status === 'already_owned')) {
-        // active ngay → reload: product detail hiển thị "Đã sở hữu" + Header cập nhật coin.
         window.location.reload()
         return
       }
@@ -32,35 +58,88 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
     } catch {
       setErr({ code: 'NETWORK', msg: 'Lỗi mạng, vui lòng thử lại.' })
     } finally {
-      setLoading(false)
+      setBuying(false)
     }
   }
 
-  return (
-    <div className="mt-3 flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={buy}
-        disabled={loading}
-        className="inline-flex items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+  const enough = balance != null && balance >= priceCoins
+  const need = Math.max(0, priceCoins - (balance ?? 0))
+
+  // Chưa đăng nhập → CTA đăng nhập
+  if (authed === false) {
+    return (
+      <Link
+        href="/login"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-[13px] bg-[#7C5CE6] p-[15px] text-[15.5px] font-bold text-white shadow-[0_14px_28px_-10px_rgba(124,92,230,0.5)] transition hover:bg-[#6A48D6]"
       >
-        {loading ? 'Đang xử lý…' : `Mua bằng coin · 🪙 ${priceCoins}`}
-      </button>
+        Đăng nhập để mua →
+      </Link>
+    )
+  }
+
+  return (
+    <>
+      {/* Số dư */}
+      <div className="mt-4 flex items-center justify-between rounded-[12px] border border-[#EEEAF6] bg-[#FBFAFF] px-3.5 py-[11px]">
+        <span className="text-[13px] font-semibold text-[#857F96]">Số dư của bạn</span>
+        <span className={`text-[14.5px] font-extrabold ${enough ? 'text-[#1E9E63]' : 'text-[#C98A1A]'}`}>
+          🪙 {balance == null ? '…' : balance.toLocaleString('vi-VN')}
+        </span>
+      </div>
+
+      {balance != null && !enough ? (
+        <>
+          <div className="mt-4 flex items-center gap-2.5 rounded-[13px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[13px]">
+            <span className="h-[7px] w-[7px] flex-none rounded-full bg-[#E59A1B]" />
+            <span className="text-[13px] font-semibold leading-[1.4] text-[#A66A12]">
+              Thiếu <b>🪙{need.toLocaleString('vi-VN')}</b> để mua bộ đề này.
+            </span>
+          </div>
+          <Link
+            href="/pricing"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-[13px] bg-[#2A2740] p-[15px] text-[15.5px] font-bold text-white transition hover:bg-[#17152A]"
+          >
+            Nạp thêm coin →
+          </Link>
+          <div className="mt-[11px] text-center text-[12.5px] font-semibold text-[#A8A2BA]">
+            Sau khi nạp, quay lại đây để mua ngay
+          </div>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={buy}
+            disabled={buying || balance == null}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[13px] bg-[#7C5CE6] p-[15px] text-[15.5px] font-bold text-white shadow-[0_14px_28px_-10px_rgba(124,92,230,0.5)] transition hover:bg-[#6A48D6] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {buying ? 'Đang xử lý…' : (
+              <>
+                Mua bằng coin <span className="font-extrabold opacity-85">· 🪙 {priceCoins}</span>
+              </>
+            )}
+          </button>
+          <div className="mt-[11px] text-center text-[12.5px] font-semibold text-[#A8A2BA]">
+            Trừ 🪙{priceCoins} — sở hữu vĩnh viễn, làm lại không giới hạn
+          </div>
+        </>
+      )}
+
       {err && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
+        <div className="mt-2.5 rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
           {err.msg}
           {err.code === 'INSUFFICIENT_COINS' && (
-            <Link href="/pricing" className="ml-1 font-medium text-teal-700 underline">
+            <Link href="/pricing" className="ml-1 font-medium text-[#6A48D6] underline">
               Nạp coin →
             </Link>
           )}
           {err.code === 'UNAUTHORIZED' && (
-            <Link href="/login" className="ml-1 font-medium text-teal-700 underline">
+            <Link href="/login" className="ml-1 font-medium text-[#6A48D6] underline">
               Đăng nhập →
             </Link>
           )}
         </div>
       )}
-    </div>
+    </>
   )
 }

@@ -5,6 +5,7 @@ import Link from 'next/link'
 
 // W13 — Admin Product/Bundle manager (M11/M04). Guard THẬT ở server (admin layout + /api/admin/* requireAdmin).
 //   Client chỉ gọi API; KHÔNG import scoring/secret. Giá là dữ liệu admin nhập — SERVER là nguồn (price_coins authoritative).
+//   Layout theo design frame 4 (bảng list). Logic/data flow GIỮ NGUYÊN, chỉ thay markup.
 type ProductKind = 'single' | 'bundle'
 type ProductListItem = {
   id: string
@@ -17,17 +18,20 @@ type ProductListItem = {
   test_count: number
 }
 
-const labelCls = 'block text-xs font-semibold text-slate-600'
-const inputCls = 'mt-1 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500'
+const labelCls = 'block text-xs font-semibold text-[#6A6480]'
+const inputCls =
+  'mt-1 w-full rounded-[10px] border border-[#E4DEEE] bg-white p-2.5 text-sm text-[#2A2740] focus:border-[#7C5CE6] focus:outline-none'
 
-function StatusBadge({ status }: { status: string }) {
-  const cls = status === 'published' ? 'bg-emerald-100 text-emerald-700' : status === 'hidden' ? 'bg-slate-200 text-slate-600' : 'bg-amber-100 text-amber-700'
-  return <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${cls}`}>{status}</span>
+function statusStyle(status: string) {
+  if (status === 'published') return 'bg-[#E7F7EE] text-[#1E9E63]'
+  if (status === 'draft') return 'bg-[#FFF1DC] text-[#C98A1A]'
+  return 'bg-[#EFEBF2] text-[#8B8398]'
 }
 
 export function AdminProductManager() {
   const [items, setItems] = useState<ProductListItem[] | null>(null)
   const [loadErr, setLoadErr] = useState('')
+  const [showForm, setShowForm] = useState(false)
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
@@ -51,7 +55,9 @@ export function AdminProductManager() {
       setLoadErr('Lỗi kết nối.')
     }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   async function submit() {
     setPhase('submitting')
@@ -77,7 +83,13 @@ export function AdminProductManager() {
       })
       const j = await r.json().catch(() => null)
       if (r.status === 201 && j?.data?.product_id) {
-        setTitle(''); setSlug(''); setDescription(''); setPriceCoins('0'); setSortOrder('0'); setKind('bundle')
+        setTitle('')
+        setSlug('')
+        setDescription('')
+        setPriceCoins('0')
+        setSortOrder('0')
+        setKind('bundle')
+        setShowForm(false)
         await load()
       } else if (r.status === 403) {
         setError('Bạn không có quyền admin.')
@@ -92,94 +104,139 @@ export function AdminProductManager() {
   }
 
   return (
-    <div>
-      <div className="mb-4 flex items-center gap-3">
-        <Link href="/admin" className="text-sm text-teal-700 underline">← Dashboard</Link>
-        <h1 className="text-xl font-bold text-slate-800">Sản phẩm / Bundle</h1>
+    <div className="rounded-[20px] border border-[#E7E4EE] bg-white p-6 text-[#2A2740] shadow-[0_30px_60px_-38px_rgba(60,40,90,0.4)] sm:p-8">
+      <div className="flex flex-wrap items-end justify-between gap-3.5">
+        <div>
+          <div className="flex items-center gap-3">
+            <Link href="/admin" className="text-sm font-semibold text-[#6A48D6] underline">
+              ← Dashboard
+            </Link>
+            <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Sản phẩm / Bundle</h1>
+          </div>
+          <p className="mt-1 text-[14px] font-semibold text-[#857F96]">Gồm cả draft &amp; hidden — khác catalog công khai</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowForm((v) => !v)}
+          className="inline-flex items-center gap-2 rounded-[11px] bg-[#7C5CE6] px-[18px] py-[11px] text-[14px] font-bold text-white shadow-[0_12px_24px_-10px_rgba(124,92,230,0.45)] transition hover:bg-[#6A48D6]"
+        >
+          <span className="text-[16px] leading-none">{showForm ? '×' : '+'}</span> {showForm ? 'Đóng' : 'Tạo sản phẩm'}
+        </button>
       </div>
 
-      <p className="mb-4 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
-        Giá (<code>price_coins</code>) là dữ liệu admin nhập — <b>server là nguồn quyết định</b> khi mua. Sản phẩm tạo ở trạng thái
-        <b> draft</b>; chỉ <b>published</b> mới hiện ở catalog công khai.
+      {/* Create form (toggle) */}
+      {showForm && (
+        <div className="mt-5 rounded-[15px] border border-[#ECE9F2] bg-[#FBFAFE] p-4">
+          <h2 className="mb-2 text-[15px] font-extrabold">Tạo sản phẩm</h2>
+          <label className={labelCls}>
+            Tiêu đề
+            <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: IELTS Reading Bundle 1" />
+          </label>
+          <label className={`${labelCls} mt-2`}>
+            Slug
+            <input className={`${inputCls} font-mono`} value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="ielts-reading-bundle-1" />
+          </label>
+          <p className="mt-1 text-[11px] text-[#A8A2BA]">Chữ thường, số và dấu gạch ngang (kebab-case).</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <label className={labelCls}>
+              Loại
+              <select className={inputCls} value={kind} onChange={(e) => setKind(e.target.value as ProductKind)}>
+                <option value="bundle">bundle</option>
+                <option value="single">single</option>
+              </select>
+            </label>
+            <label className={labelCls}>
+              Giá (coins)
+              <input className={inputCls} type="number" min={0} value={priceCoins} onChange={(e) => setPriceCoins(e.target.value)} />
+            </label>
+          </div>
+          <label className={`${labelCls} mt-2`}>
+            Mô tả (tuỳ chọn)
+            <textarea className={inputCls} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mô tả ngắn…" />
+          </label>
+          <label className={`${labelCls} mt-2`}>
+            Thứ tự sắp xếp
+            <input className={inputCls} type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
+          </label>
+
+          {error && (
+            <p aria-live="assertive" className="mt-3 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={submit}
+            disabled={phase === 'submitting' || !title.trim() || !slug.trim()}
+            className="mt-3 w-full rounded-[11px] bg-[#7C5CE6] px-5 py-2.5 font-bold text-white transition hover:bg-[#6A48D6] disabled:cursor-not-allowed disabled:bg-[#D8D2E4]"
+          >
+            {phase === 'submitting' ? 'Đang lưu…' : 'Tạo sản phẩm (draft)'}
+          </button>
+        </div>
+      )}
+
+      {/* Notice */}
+      <p className="mt-4 rounded-[10px] border border-[#E4DEEE] bg-[#FBFAFF] px-3 py-2 text-[12px] text-[#6A6480]">
+        Giá (<code className="font-mono">price_coins</code>) là dữ liệu admin nhập — <b>server là nguồn quyết định</b> khi mua. Sản
+        phẩm tạo ở trạng thái <b>draft</b>; chỉ <b>published</b> mới hiện ở catalog công khai.
       </p>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-        {/* Create form */}
-        <section className="lg:col-span-2">
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="mb-2 font-semibold text-slate-800">Tạo sản phẩm</h2>
-            <label className={labelCls}>Tiêu đề
-              <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: IELTS Reading Bundle 1" />
-            </label>
-            <label className={`${labelCls} mt-2`}>Slug
-              <input className={inputCls} value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="ielts-reading-bundle-1" />
-            </label>
-            <p className="mt-1 text-[11px] text-slate-400">Chữ thường, số và dấu gạch ngang (kebab-case).</p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <label className={labelCls}>Loại
-                <select className={inputCls} value={kind} onChange={(e) => setKind(e.target.value as ProductKind)}>
-                  <option value="bundle">bundle</option>
-                  <option value="single">single</option>
-                </select>
-              </label>
-              <label className={labelCls}>Giá (coins)
-                <input className={inputCls} type="number" min={0} value={priceCoins} onChange={(e) => setPriceCoins(e.target.value)} />
-              </label>
-            </div>
-            <label className={`${labelCls} mt-2`}>Mô tả (tuỳ chọn)
-              <textarea className={inputCls} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mô tả ngắn…" />
-            </label>
-            <label className={`${labelCls} mt-2`}>Thứ tự sắp xếp
-              <input className={inputCls} type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
-            </label>
+      {loadErr && <p className="mt-4 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadErr}</p>}
 
-            {error && <p aria-live="assertive" className="mt-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-
-            <button type="button" onClick={submit} disabled={phase === 'submitting' || !title.trim() || !slug.trim()}
-              className="mt-3 w-full rounded-md bg-teal-600 px-5 py-2.5 font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-slate-300">
-              {phase === 'submitting' ? 'Đang lưu…' : 'Tạo sản phẩm (draft)'}
-            </button>
+      {/* Table */}
+      <div className="mt-5 overflow-x-auto rounded-[15px] border border-[#ECE9F2]">
+        <div className="min-w-[760px]">
+          <div className="grid grid-cols-[2.4fr_1fr_0.8fr_0.9fr_1fr_0.8fr] gap-3 bg-[#F7F5FB] px-[18px] py-3.5 text-[11.5px] font-extrabold uppercase tracking-[0.04em] text-[#9088A2]">
+            <span>Sản phẩm</span>
+            <span>Loại</span>
+            <span>Đề</span>
+            <span>Giá</span>
+            <span>Trạng thái</span>
+            <span className="text-right">Thao tác</span>
           </div>
-        </section>
 
-        {/* List */}
-        <section className="lg:col-span-3">
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="font-semibold text-slate-800">Danh sách ({items?.length ?? 0})</h2>
-              <button type="button" onClick={load} className="text-xs text-teal-700 underline">↻ Tải lại</button>
+          {!items && !loadErr && <p className="px-[18px] py-6 text-center text-sm text-[#A8A2BA]">Đang tải…</p>}
+          {items && items.length === 0 && (
+            <p className="px-[18px] py-6 text-center text-sm text-[#A8A2BA]">Chưa có sản phẩm. Tạo sản phẩm đầu tiên.</p>
+          )}
+
+          {items?.map((p) => (
+            <div
+              key={p.id}
+              className="grid grid-cols-[2.4fr_1fr_0.8fr_0.9fr_1fr_0.8fr] items-center gap-3 border-t border-[#F0EDF5] bg-white px-[18px] py-3.5 transition hover:bg-[#FBFAFE]"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] text-[16px] font-extrabold text-white/85"
+                  style={{ background: 'linear-gradient(135deg,#D9CFFF,#B098FF)' }}
+                >
+                  {(p.title ?? '?').charAt(0).toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-[14px] font-bold text-[#2A2740]">{p.title || '(chưa có tiêu đề)'}</div>
+                  <div className="truncate font-mono text-[11.5px] font-semibold text-[#A8A2BA]">{p.slug}</div>
+                </div>
+              </div>
+              <span className="justify-self-start rounded-[7px] bg-[#F0ECFF] px-2 py-1 text-[12px] font-bold capitalize text-[#5B43C7]">
+                {p.kind ?? '—'}
+              </span>
+              <span className="text-[13.5px] font-bold text-[#564F6B]">{p.test_count}</span>
+              <span className="text-[13.5px] font-extrabold text-[#2A2740]">
+                {p.price_coins === 0 ? 'Free' : `🪙 ${p.price_coins}`}
+              </span>
+              <span className={`justify-self-start rounded-full px-2.5 py-1 text-[11.5px] font-extrabold ${statusStyle(p.status)}`}>
+                {p.status}
+              </span>
+              <Link
+                href={`/admin/products/${p.id}`}
+                className="justify-self-end text-right text-[13px] font-bold text-[#6A48D6] hover:text-[#7C5CE6]"
+              >
+                Sửa →
+              </Link>
             </div>
-
-            {loadErr && <p className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{loadErr}</p>}
-
-            {!items && !loadErr && <p className="py-6 text-center text-sm text-slate-400">Đang tải…</p>}
-
-            {items && items.length === 0 && (
-              <p className="py-6 text-center text-sm text-slate-400">Chưa có sản phẩm. Tạo sản phẩm đầu tiên ở bên trái.</p>
-            )}
-
-            {items && items.length > 0 && (
-              <ul className="divide-y divide-slate-100">
-                {items.map((p) => (
-                  <li key={p.id} className="flex flex-wrap items-center gap-2 py-2.5">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-medium text-slate-800">{p.title || '(chưa có tiêu đề)'}</span>
-                        <StatusBadge status={p.status} />
-                      </div>
-                      <div className="mt-0.5 truncate text-xs text-slate-500">
-                        <span className="font-mono">{p.slug}</span> · {p.kind} · {p.price_coins} coins · {p.test_count} đề
-                      </div>
-                    </div>
-                    <Link href={`/admin/products/${p.id}`} className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
-                      Quản lý →
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
+          ))}
+        </div>
       </div>
     </div>
   )
