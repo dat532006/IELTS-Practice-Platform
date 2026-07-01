@@ -452,5 +452,96 @@ begin
   raise notice 'PASS check23: products_select_published — published lộ, draft ẩn với client';
 end $$;
 
+-- ============================================================
+-- W15 — Payment/Redeem atomic RPCs (M08): execute-deny client + money logic.
+-- Map docs/ContractForAI/.../W15 + payment_redeem_contract §1/§2/§3.
+-- ============================================================
+
+-- seed: product trả phí + test premium + mục lục + activation code
+insert into public.products (id, slug, title, kind, price_coins, status) values
+  ('00000000-0000-0000-0000-000000000051', 'pay-prod', 'Pay Product', 'single', 50, 'published');
+insert into public.tests (id, slug, title, type, is_free, status) values
+  ('00000000-0000-0000-0000-000000000052', 'pay-test', 'Pay Test', 'reading', false, 'published');
+insert into public.collection_tests (product_id, test_id, position) values
+  ('00000000-0000-0000-0000-000000000051', '00000000-0000-0000-0000-000000000052', 1);
+insert into public.activation_codes (id, code_hash, code_prefix, code_last4, product_id, status, max_redemptions, redeemed_count) values
+  ('00000000-0000-0000-0000-000000000053', 'w15hash_active_1', 'W15A', 'CT01', '00000000-0000-0000-0000-000000000051', 'active', 1, 0);
+
+-- ---------- Check 24: authenticated KHÔNG execute payment RPC (service_role only) ----------
+do $$
+begin
+  if has_function_privilege('authenticated', 'public.redeem_activation_code(uuid,text)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.checkout(uuid,uuid[])', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.credit_topup(public.provider_t,text)', 'EXECUTE')
+  then raise exception 'FAIL check24: client execute được payment RPC'; end if;
+  if not has_function_privilege('service_role', 'public.checkout(uuid,uuid[])', 'EXECUTE')
+  then raise exception 'FAIL check24: service_role KHÔNG execute được checkout'; end if;
+  raise notice 'PASS check24: payment RPC execute = service_role only (client denied)';
+end $$;
+
+-- ---------- Check 25: redeem atomic — unlock + expand test_unlocks; reuse idempotent (count KHÔNG tăng) ----------
+do $$
+declare r jsonb; r2 jsonb; tu int; rc int;
+begin
+  r := public.redeem_activation_code('00000000-0000-0000-0000-00000000000a', 'w15hash_active_1');
+  if r->>'status' <> 'OK' then raise exception 'FAIL check25: redeem lần 1 = % (kỳ vọng OK)', r->>'status'; end if;
+  select count(*) into tu from public.test_unlocks
+   where user_id = '00000000-0000-0000-0000-00000000000a' and test_id = '00000000-0000-0000-0000-000000000052';
+  if tu <> 1 then raise exception 'FAIL check25: redeem KHÔNG expand test_unlocks'; end if;
+  r2 := public.redeem_activation_code('00000000-0000-0000-0000-00000000000a', 'w15hash_active_1');
+  if r2->>'status' <> 'already_unlocked' then raise exception 'FAIL check25: reuse = % (kỳ vọng already_unlocked)', r2->>'status'; end if;
+  select redeemed_count into rc from public.activation_codes where id = '00000000-0000-0000-0000-000000000053';
+  if rc <> 1 then raise exception 'FAIL check25: redeemed_count = % (reuse KHÔNG được tăng)', rc; end if;
+  raise notice 'PASS check25: redeem unlock+expand; reuse idempotent (count=1)';
+end $$;
+
+-- ---------- Check 26: checkout atomic — conditional coin + expand; ALREADY_OWNED/INSUFFICIENT KHÔNG trừ ----------
+do $$
+declare r jsonb; r2 jsonb; r3 jsonb; c int; tu int;
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true); -- trigger cho phép update coins
+  update public.profiles set coins = 50 where id = '00000000-0000-0000-0000-00000000000b';
+  r := public.checkout('00000000-0000-0000-0000-00000000000b', array['00000000-0000-0000-0000-000000000051']::uuid[]);
+  if r->>'status' <> 'OK' then raise exception 'FAIL check26: checkout = % (kỳ vọng OK)', r->>'status'; end if;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  if c <> 0 then raise exception 'FAIL check26: coins sau mua = % (kỳ vọng 0)', c; end if;
+  select count(*) into tu from public.test_unlocks where user_id = '00000000-0000-0000-0000-00000000000b' and test_id = '00000000-0000-0000-0000-000000000052';
+  if tu <> 1 then raise exception 'FAIL check26: checkout KHÔNG expand test_unlocks'; end if;
+  -- double → ALREADY_OWNED, KHÔNG trừ thêm
+  r2 := public.checkout('00000000-0000-0000-0000-00000000000b', array['00000000-0000-0000-0000-000000000051']::uuid[]);
+  if r2->>'status' <> 'ALREADY_OWNED' then raise exception 'FAIL check26: double = % (kỳ vọng ALREADY_OWNED)', r2->>'status'; end if;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  if c <> 0 then raise exception 'FAIL check26: double trừ coin (= %)', c; end if;
+  -- insufficient → KHÔNG trừ, KHÔNG unlock (compensate)
+  update public.profiles set coins = 10 where id = '00000000-0000-0000-0000-00000000000a';
+  r3 := public.checkout('00000000-0000-0000-0000-00000000000a', array['00000000-0000-0000-0000-000000000013']::uuid[]); -- p3-pub giá 100
+  if r3->>'status' <> 'INSUFFICIENT_COINS' then raise exception 'FAIL check26: thiếu = % (kỳ vọng INSUFFICIENT_COINS)', r3->>'status'; end if;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000a';
+  if c <> 10 then raise exception 'FAIL check26: insufficient vẫn trừ coin (= %)', c; end if;
+  if exists (select 1 from public.product_unlocks where user_id = '00000000-0000-0000-0000-00000000000a' and product_id = '00000000-0000-0000-0000-000000000013')
+  then raise exception 'FAIL check26: insufficient vẫn để lại product_unlock (compensate sai)'; end if;
+  reset role;
+  raise notice 'PASS check26: checkout conditional coin + expand; ALREADY_OWNED + INSUFFICIENT không trừ/không unlock';
+end $$;
+
+-- ---------- Check 27: credit_topup idempotent (UNIQUE provider,txn_id): cộng 1 lần, lặp KHÔNG cộng ----------
+do $$
+declare r jsonb; r2 jsonb; c int;
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  update public.profiles set coins = 0 where id = '00000000-0000-0000-0000-00000000000b';
+  -- payment/create đã tạo pending topup; webhook credit
+  insert into public.transactions (user_id, amount_coins, type, provider, provider_txn_id, status)
+  values ('00000000-0000-0000-0000-00000000000b', 200, 'topup', 'vnpay', 'W15-TXN-1', 'pending');
+  r := public.credit_topup('vnpay', 'W15-TXN-1');
+  if (r->>'credited')::boolean is not true then raise exception 'FAIL check27: topup lần 1 không credited'; end if;
+  r2 := public.credit_topup('vnpay', 'W15-TXN-1');
+  if (r2->>'credited')::boolean is not false then raise exception 'FAIL check27: topup lặp vẫn credited (double credit)'; end if;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  if c <> 200 then raise exception 'FAIL check27: coins sau topup lặp = % (kỳ vọng 200, cộng 1 lần)', c; end if;
+  reset role;
+  raise notice 'PASS check27: credit_topup idempotent (cộng 1 lần, lặp txn_id không cộng)';
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
 

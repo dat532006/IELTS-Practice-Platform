@@ -39,29 +39,39 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4">
-        <Link href="/" className="text-lg font-bold text-teal-700">
-          IELTS<span className="text-slate-900">Practice</span>
+    <header className="sticky top-0 z-40 border-b border-[rgba(42,39,64,0.07)] bg-[rgba(251,249,255,0.8)] backdrop-blur-[12px] backdrop-saturate-[180%]">
+      <div className="mx-auto flex h-[72px] w-[min(1200px,93vw)] items-center gap-6">
+        <Link
+          href="/"
+          className="flex flex-none items-center gap-2.5 text-[20px] font-extrabold tracking-[-0.02em] text-[#2A2740]"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-[#7C5CE6] shadow-[0_6px_16px_rgba(124,92,230,0.34)]">
+            <span className="block h-[13px] w-[13px] rotate-45 rounded-[4px] bg-white" />
+          </span>
+          <span>
+            <span className="text-[#7C5CE6]">IELTS</span>Practice
+          </span>
         </Link>
 
-        <nav className="hidden flex-1 items-center gap-4 md:flex">
+        <nav className="hidden flex-1 items-center gap-[22px] md:flex">
           {MAIN_NAV.map((item) =>
             item.comingSoon ? (
               <span
                 key={item.label}
                 title="Coming soon — ngoài scope v1"
                 aria-disabled="true"
-                className="cursor-not-allowed text-sm text-slate-400"
+                className="inline-flex cursor-not-allowed items-center gap-1.5 text-[14.5px] font-semibold text-[#A8A2BA]"
               >
                 {item.label}
-                <span className="ml-1 rounded bg-slate-100 px-1 text-[10px] uppercase">soon</span>
+                <span className="rounded-[5px] bg-[#EFEBF4] px-[5px] py-0.5 text-[9px] font-extrabold uppercase text-[#9D96AE]">
+                  soon
+                </span>
               </span>
             ) : (
               <Link
                 key={item.label}
                 href={item.href}
-                className="text-sm text-slate-700 hover:text-teal-700"
+                className="text-[14.5px] font-semibold text-[#564F6B] transition hover:text-[#7C5CE6]"
               >
                 {item.label}
               </Link>
@@ -69,27 +79,28 @@ export function Header() {
           )}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex flex-none items-center gap-3.5">
           {email ? (
             <>
-              <span className="text-sm text-slate-600" title="Số dư coin">
+              <span className="text-[14.5px] font-semibold text-[#564F6B]" title="Số dư coin">
                 🪙 {coins ?? '—'}
               </span>
-              <span className="hidden max-w-[12rem] truncate text-sm text-slate-500 sm:inline">
-                {email}
-              </span>
-              <button onClick={logout} className="text-sm text-slate-700 hover:text-teal-700">
+              <span className="hidden max-w-[12rem] truncate text-[14.5px] text-[#857F96] sm:inline">{email}</span>
+              <button
+                onClick={logout}
+                className="text-[14.5px] font-bold text-[#2A2740] transition hover:text-[#7C5CE6]"
+              >
                 Đăng xuất
               </button>
             </>
           ) : (
             <>
-              <Link href="/login" className="text-sm text-slate-700 hover:text-teal-700">
+              <Link href="/login" className="text-[14.5px] font-bold text-[#2A2740] transition hover:text-[#7C5CE6]">
                 Đăng nhập
               </Link>
               <Link
                 href="/register"
-                className="rounded-md bg-teal-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
+                className="rounded-[11px] bg-[#7C5CE6] px-[18px] py-2.5 text-[14.5px] font-bold text-white shadow-[0_8px_20px_rgba(124,92,230,0.26)] transition hover:bg-[#6A48D6]"
               >
                 Thi thử ngay
               </Link>
