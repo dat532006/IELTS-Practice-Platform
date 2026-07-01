@@ -137,12 +137,18 @@ function mockGrade(input: GraderInput): RawAiGrade {
   return { task1: task(input.task1_text, 4.5), task2: task(input.task2_text, 4.5) }
 }
 
-function useMock(): boolean {
-  return process.env.WRITING_GRADER_MOCK === '1' || !process.env.ANTHROPIC_API_KEY
+// F5 — mock CHỈ khi: (a) bật tường minh WRITING_GRADER_MOCK=1 (test/dev), hoặc (b) thiếu ANTHROPIC_API_KEY
+//   Ở MÔI TRƯỜNG NON-PROD. Prod thiếu key → KHÔNG mock âm thầm: rơi xuống nhánh LIVE, SDK thiếu key sẽ throw
+//   → AI_UNAVAILABLE (fail loud), KHÔNG trả band giả cho người dùng trả tiền.
+//   (Tên KHÔNG bắt đầu bằng "use" để tránh eslint react-hooks/rules-of-hooks hiểu nhầm là React hook.)
+function mockEnabled(): boolean {
+  if (process.env.WRITING_GRADER_MOCK === '1') return true
+  if (process.env.ANTHROPIC_API_KEY) return false
+  return process.env.NODE_ENV !== 'production'
 }
 
 export async function gradeWriting(input: GraderInput): Promise<GradeOutcome> {
-  if (useMock()) {
+  if (mockEnabled()) {
     const grade = validateAiGradeOutput(mockGrade(input))
     return grade ? { ok: true, grade, mock: true } : { ok: false, code: 'AI_INVALID_OUTPUT' }
   }

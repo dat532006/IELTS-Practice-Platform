@@ -5,7 +5,10 @@ import { fail } from '@/lib/api/response'
 //   Server client + RLS own-only → CSV chỉ chứa dữ liệu của user hiện tại, không lộ người khác.
 //   Escape CSV đúng (bọc dấu ", nhân đôi " nội bộ) để chống chèn/gãy cột.
 function csvCell(value: unknown): string {
-  const s = value == null ? '' : String(value)
+  let s = value == null ? '' : String(value)
+  // Chống CSV/formula injection: cell bắt đầu bằng = + - @ (hoặc tab/CR) có thể bị Excel/Sheets diễn giải
+  //   thành CÔNG THỨC → prefix dấu nháy đơn để trung hoà (dữ liệu người dùng, tránh chạy lệnh khi mở file).
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 

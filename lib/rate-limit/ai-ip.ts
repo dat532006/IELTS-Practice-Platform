@@ -10,18 +10,27 @@ export function getAiGradeIpDailyLimit(): number {
   return Math.min(raw, 500)
 }
 
+// F4 — CHỈ tin header do NỀN TẢNG chèn (client KHÔNG giả mạo được):
+//   • cf-connecting-ip (Cloudflare) • x-vercel-forwarded-for (Vercel).
+//   x-real-ip / x-forwarded-for do client gửi có thể bị spoof → CHỈ dùng khi tự-host sau proxy tin cậy
+//   và bật opt-in TRUST_FORWARDED_IP=1. Không có IP tin cậy → 'unknown' (per-user quota vẫn chặn abuse).
 export function extractTrustedClientIp(headers: Headers): string {
-  // Assumes the hosting proxy strips spoofed inbound values before forwarding.
-  const candidates = [
-    headers.get('cf-connecting-ip'),
-    headers.get('x-vercel-forwarded-for'),
-    headers.get('x-real-ip'),
-    headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
-  ]
-  return candidates.find((v) => v && v.length <= 128) ?? 'unknown'
+  const trusted = [headers.get('cf-connecting-ip'), headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim()]
+  const platform = trusted.find((v) => v && v.length <= 128)
+  if (platform) return platform
+  if (process.env.TRUST_FORWARDED_IP === '1') {
+    const fwd = [headers.get('x-real-ip'), headers.get('x-forwarded-for')?.split(',')[0]?.trim()].find(
+      (v) => v && v.length <= 128,
+    )
+    if (fwd) return fwd
+  }
+  return 'unknown'
 }
 
+// F3 — pepper RIÊNG cho băm IP; KHÔNG tái dùng SUPABASE_SERVICE_ROLE_KEY (tránh key-reuse / coupling rotation).
+//   Thiếu AI_GRADE_IP_RATE_LIMIT_PEPPER → FALLBACK_PEPPER (chỉ ảnh hưởng tính ổn định của rate-limit IP,
+//   KHÔNG lộ secret vì output đã là SHA-256). Prod NÊN set pepper riêng.
 export function hashAiGradeIp(ip: string): string {
-  const pepper = process.env.AI_GRADE_IP_RATE_LIMIT_PEPPER || process.env.SUPABASE_SERVICE_ROLE_KEY || FALLBACK_PEPPER
+  const pepper = process.env.AI_GRADE_IP_RATE_LIMIT_PEPPER || FALLBACK_PEPPER
   return createHash('sha256').update(`${pepper}:${ip}`).digest('hex')
 }
