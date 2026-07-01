@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { COIN_VND_RATE, MIN_TOPUP_VND, MAX_TOPUP_VND } from '@/lib/payments/topup-constants'
+import { PaymentDisclaimer } from '@/components/payment/PaymentDisclaimer'
 
 // W16 — Trang nạp coin (M08). Fixed-rate 1.000 VND = 1 coin. Client CHỈ gửi { amount_vnd, provider };
 //   server tự tính coin (preview chỉ để hiển thị). Layout theo design "Purchase & Admin.dc.html" frame 1.
@@ -186,6 +187,8 @@ export default function PricingPage() {
             🔒 Chuyển hướng tới cổng thanh toán an toàn
           </div>
           {error && <p className="mt-3 text-center text-[13.5px] font-semibold text-rose-600">{error}</p>}
+
+          <PaymentDisclaimer className="mt-5" />
         </div>
       </div>
     </div>
