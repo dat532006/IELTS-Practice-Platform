@@ -241,6 +241,30 @@ const run = async () => {
   const { data: txnOver } = await a.from('transactions').select('status').eq('provider', 'momo').eq('provider_txn_id', overTxn).single()
   check('overpay giữ pending (chờ đối soát, không auto-credit)', txnOver?.status === 'pending', `status=${txnOver?.status}`)
 
+  // ===== F1 (review) — RECOVERY: webhook hợp lệ đến SAU khi reconcile đã đánh 'failed' (expired) → vẫn credit, KHÔNG mất tiền =====
+  await setCoins(a, USER.id, 0)
+  const crLate = await api('POST', '/api/payment/create', USER.cookie, { amount_vnd: 80000, provider: 'bank' })
+  const lateTxn = crLate.body?.data?.provider_txn_id
+  // mô phỏng reconciliation dọn pending quá hạn → 'failed' (expire_pending_topups đặt đúng status này)
+  await a.from('transactions').update({ status: 'failed' }).eq('provider', 'bank').eq('provider_txn_id', lateTxn)
+  // lệch tiền trên nhánh recover vẫn PHẢI bị chặn (amount verify nới sang 'failed')
+  const mmLatePayload = { provider: 'bank', provider_txn_id: lateTxn, amount: 70000, status: 'success' }
+  const mmLate = await api('POST', '/api/payment/webhook', null, { ...mmLatePayload, signature: webhookSig(mmLatePayload, webhookSecret) })
+  check('F1: recover + lệch tiền → 400 PAYMENT_AMOUNT_MISMATCH', mmLate.status === 400 && mmLate.body?.meta?.error_code === 'PAYMENT_AMOUNT_MISMATCH', `got ${mmLate.status} ${JSON.stringify(mmLate.body?.meta)}`)
+  const { data: profMmLate } = await a.from('profiles').select('coins').eq('id', USER.id).single()
+  check('F1: recover lệch tiền KHÔNG cộng coin (=0)', profMmLate?.coins === 0, `coins=${profMmLate?.coins}`)
+  // đúng chữ ký + đúng tiền, dù txn đã 'failed' → phục hồi credit đúng 80 coin
+  const latePayload = { provider: 'bank', provider_txn_id: lateTxn, amount: 80000, status: 'success' }
+  const late = await api('POST', '/api/payment/webhook', null, { ...latePayload, signature: webhookSig(latePayload, webhookSecret) })
+  check('F1: webhook muộn (txn đã failed) → credited true (KHÔNG mất tiền)', late.status === 200 && late.body?.data?.credited === true, `got ${late.status} ${JSON.stringify(late.body?.data)}`)
+  const { data: profLate } = await a.from('profiles').select('coins').eq('id', USER.id).single()
+  check('F1: recover cộng đúng 80 coin (80000/1000)', profLate?.coins === 80, `coins=${profLate?.coins}`)
+  // idempotent: sau recover, replay KHÔNG cộng lại
+  const late2 = await api('POST', '/api/payment/webhook', null, { ...latePayload, signature: webhookSig(latePayload, webhookSecret) })
+  check('F1: replay sau recover → credited false (idempotent)', late2.status === 200 && late2.body?.data?.credited === false)
+  const { data: profLate2 } = await a.from('profiles').select('coins').eq('id', USER.id).single()
+  check('F1: replay KHÔNG cộng lại (coins=80)', profLate2?.coins === 80, `coins=${profLate2?.coins}`)
+
   finish()
 }
 function finish() {

@@ -647,5 +647,52 @@ begin
   reset role;
 end $$;
 
+-- ============================================================
+-- W19+ — Payment hardening (review F1/F2). Map 20260609000100_payment_hardening_f1_f2.sql.
+-- ============================================================
+
+-- ---------- Check 33 (F1): credit_topup phục hồi topup 'failed' (đã bị reconcile dọn) khi webhook hợp lệ đến MUỘN ----------
+do $$
+declare r jsonb; c int;
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  update public.profiles set coins = 0 where id = '00000000-0000-0000-0000-00000000000b';
+  -- topup pending quá hạn → reconcile đánh 'failed'
+  insert into public.transactions (user_id, amount_coins, type, provider, provider_txn_id, status, expires_at)
+  values ('00000000-0000-0000-0000-00000000000b', 80, 'topup', 'bank', 'W19-LATE-1', 'pending', now() - interval '1 hour');
+  perform public.expire_pending_topups();
+  if (select status from public.transactions where provider = 'bank' and provider_txn_id = 'W19-LATE-1') <> 'failed'
+    then raise exception 'FAIL check33: reconcile KHÔNG đánh failed topup quá hạn'; end if;
+  -- webhook hợp lệ đến muộn (route đã verify chữ ký + số tiền) → credit_topup phục hồi, KHÔNG mất tiền
+  r := public.credit_topup('bank', 'W19-LATE-1');
+  if (r->>'credited')::boolean is not true then raise exception 'FAIL check33: webhook muộn KHÔNG credit topup đã failed (mất tiền khách)'; end if;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  if c <> 80 then raise exception 'FAIL check33: coins sau recover = % (kỳ vọng 80)', c; end if;
+  -- idempotent: recover xong lặp KHÔNG cộng lại
+  if (public.credit_topup('bank', 'W19-LATE-1')->>'credited')::boolean is not false
+    then raise exception 'FAIL check33: recover xong vẫn credit lần 2 (double credit)'; end if;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  if c <> 80 then raise exception 'FAIL check33: double credit sau recover (coins=%)', c; end if;
+  reset role;
+  raise notice 'PASS check33: credit_topup phục hồi topup failed (webhook muộn) idempotent — KHÔNG mất tiền';
+end $$;
+
+-- ---------- Check 34 (F2): checkout CHỈ mở product published — draft KHÔNG unlock/không trừ coin ----------
+do $$
+declare c int; puc int;
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  update public.profiles set coins = 150 where id = '00000000-0000-0000-0000-00000000000b';
+  -- ...012 = 'Draft Bundle' (status='draft', giá 100) đã seed đầu file. checkout PHẢI bị chặn.
+  perform public.checkout('00000000-0000-0000-0000-00000000000b', array['00000000-0000-0000-0000-000000000012']::uuid[]);
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  select count(*) into puc from public.product_unlocks
+   where user_id = '00000000-0000-0000-0000-00000000000b' and product_id = '00000000-0000-0000-0000-000000000012';
+  if puc <> 0 then raise exception 'FAIL check34: checkout unlock được product DRAFT (rò nội dung chưa phát hành)'; end if;
+  if c <> 150 then raise exception 'FAIL check34: checkout draft vẫn trừ coin (coins=%)', c; end if;
+  reset role;
+  raise notice 'PASS check34: checkout chỉ mở product published (draft ...012 bị chặn, KHÔNG trừ coin)';
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
 
