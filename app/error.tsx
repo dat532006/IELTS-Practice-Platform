@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 // W19 (M10) — error boundary toàn site (route segment gốc). Client component bắt buộc.
 // Không lộ chi tiết lỗi/stack cho người dùng; chỉ thông báo + retry. (global-error.tsx bắt lỗi ở layout gốc.)
 export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
@@ -17,12 +19,12 @@ export default function Error({ reset }: { error: Error & { digest?: string }; r
         >
           Thử lại
         </button>
-        <a
+        <Link
           href="/"
           className="rounded-[13px] border border-[#E4DEEE] bg-white px-5 py-3 text-[15px] font-bold text-[#564F6B] transition hover:border-[#CCC3DC]"
         >
           Về trang chủ
-        </a>
+        </Link>
       </div>
     </main>
   )

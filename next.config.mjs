@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Shell W1+2 chưa cấu hình ESLint; giữ TypeScript check ON (không bỏ qua lỗi type).
-  eslint: { ignoreDuringBuilds: true },
+  // F7 — ESLint đã cấu hình (.eslintrc.json = next/core-web-vitals) → enforce lint khi build. TypeScript check vẫn ON.
+  eslint: { ignoreDuringBuilds: false },
 }
 
 export default nextConfig
