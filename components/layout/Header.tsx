@@ -82,6 +82,12 @@ export function Header() {
         <div className="ml-auto flex flex-none items-center gap-3.5">
           {email ? (
             <>
+              <Link
+                href="/dashboard"
+                className="hidden text-[14.5px] font-bold text-[#2A2740] transition hover:text-[#7C5CE6] sm:inline"
+              >
+                Bảng điều khiển
+              </Link>
               <span className="text-[14.5px] font-semibold text-[#564F6B]" title="Số dư coin">
                 🪙 {coins ?? '—'}
               </span>
