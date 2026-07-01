@@ -265,6 +265,19 @@ const run = async () => {
   const { data: profLate2 } = await a.from('profiles').select('coins').eq('id', USER.id).single()
   check('F1: replay KHÔNG cộng lại (coins=80)', profLate2?.coins === 80, `coins=${profLate2?.coins}`)
 
+  // ===== R2 (review cross-check) — webhook status=success THIẾU `amount` → fail-closed, KHÔNG credit mù =====
+  await setCoins(a, USER.id, 0)
+  const crNoAmt = await api('POST', '/api/payment/create', USER.cookie, { amount_vnd: 60000, provider: 'vnpay' })
+  const noAmtTxn = crNoAmt.body?.data?.provider_txn_id
+  // payload success nhưng KHÔNG có field amount; chữ ký vẫn HỢP LỆ (ký trên canonical không gồm amount)
+  const noAmtPayload = { provider: 'vnpay', provider_txn_id: noAmtTxn, status: 'success' }
+  const noAmt = await api('POST', '/api/payment/webhook', null, { ...noAmtPayload, signature: webhookSig(noAmtPayload, webhookSecret) })
+  check('R2: webhook success THIẾU amount → 400 PAYMENT_AMOUNT_MISMATCH (fail-closed)', noAmt.status === 400 && noAmt.body?.meta?.error_code === 'PAYMENT_AMOUNT_MISMATCH', `got ${noAmt.status} ${JSON.stringify(noAmt.body?.meta)}`)
+  const { data: profNoAmt } = await a.from('profiles').select('coins').eq('id', USER.id).single()
+  check('R2: thiếu amount KHÔNG cộng coin (=0)', profNoAmt?.coins === 0, `coins=${profNoAmt?.coins}`)
+  const { data: txnNoAmt } = await a.from('transactions').select('status').eq('provider', 'vnpay').eq('provider_txn_id', noAmtTxn).single()
+  check('R2: thiếu amount giữ pending (KHÔNG mark success)', txnNoAmt?.status === 'pending', `status=${txnNoAmt?.status}`)
+
   finish()
 }
 function finish() {

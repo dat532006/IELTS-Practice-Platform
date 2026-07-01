@@ -34,12 +34,20 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
+  // R2 (review hardening) — trên nhánh CREDIT (status success), `amount` là BẮT BUỘC → fail-closed.
+  //   Trước đây `amount` optional: webhook thiếu amount sẽ BỎ QUA verify và credit MÙ số coin server khai
+  //   → mất mắt xích anti-fraud (paid == expected). Non-success notification đã return ở trên (không credit),
+  //   nên yêu cầu amount ở đây KHÔNG ảnh hưởng thông báo thất bại. BẮT BUỘC trước khi cắm cổng thật (A1).
+  if (parsed.data.amount === undefined) {
+    return fail('PAYMENT_AMOUNT_MISMATCH', 'Webhook thiếu số tiền để đối chiếu', { status: 400 })
+  }
+
   // W16 — verify SỐ TIỀN khớp chính xác transaction (paid_vnd == amount_vnd).
   //   Lệch tiền → KHÔNG credit, KHÔNG mark success, giữ nguyên để đối soát (chưa có policy xử lý phần dư).
-  //   amount_vnd null (row cũ trước migration) → bỏ qua check (backward-compat).
+  //   amount_vnd null (row cũ trước migration) → bỏ qua so khớp (backward-compat row legacy).
   //   F1: xét cả 'failed' (topup pending quá hạn đã bị reconcile dọn) — credit_topup phục hồi được,
   //       nên amount vẫn PHẢI verify trên đúng row đó, không chỉ 'pending'.
-  if (parsed.data.amount !== undefined) {
+  {
     const { data: txn } = await admin
       .from('transactions')
       .select('amount_vnd')
