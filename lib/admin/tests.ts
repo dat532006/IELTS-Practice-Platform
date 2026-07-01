@@ -118,7 +118,25 @@ export async function getTestPreview(admin: SupabaseClient, testId: string) {
 }
 
 // Publish draft→published. Trả status mới.
+// R4 (review hardening): reading/listening PHẢI có answer_keys hợp lệ TRƯỚC khi publish.
+//   Đề published là attemptable (is_free | unlocked); thiếu keys → submit chấm ra raw_score=null
+//   (ANSWER_KEYS_MISSING) — đề "hỏng" hiển thị/bán được mà KHÔNG có lớp nào đỡ. Writing KHÔNG cần keys
+//   (chấm bằng AI). (KHÁC bundle-có-test-draft: đó là incremental release cố ý, test draft bị RLS ẩn.)
 export async function publishTest(admin: SupabaseClient, testId: string): Promise<AdminTestOutcome> {
+  const { data: t, error: tErr } = await admin.from('tests').select('type').eq('id', testId).maybeSingle()
+  if (tErr) return { ok: false, code: 'INTERNAL', detail: tErr.message }
+  if (!t) return { ok: false, code: 'NOT_FOUND' }
+  const testType = (t as { type?: string }).type
+  if (testType === 'reading' || testType === 'listening') {
+    const { data: ak } = await admin.from('answer_keys').select('keys').eq('test_id', testId).maybeSingle()
+    const keys = (ak as { keys?: unknown } | null)?.keys
+    const hasKeys =
+      keys != null && typeof keys === 'object' && Object.keys(keys as Record<string, unknown>).length > 0
+    if (!hasKeys) {
+      return { ok: false, code: 'VALIDATION_ERROR', detail: 'Đề reading/listening cần answer_keys hợp lệ trước khi publish' }
+    }
+  }
+
   const { data, error } = await admin
     .from('tests')
     .update({ status: 'published' })

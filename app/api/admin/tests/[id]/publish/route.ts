@@ -14,6 +14,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const res = await publishTest(createAdminClient(), id)
   if (!res.ok) {
     if (res.code === 'NOT_FOUND') return fail('NOT_FOUND', 'Không tìm thấy đề', { status: 404 })
+    // R4: reading/listening thiếu answer_keys → chặn publish (400, KHÔNG 500).
+    if (res.code === 'VALIDATION_ERROR') return fail('VALIDATION_ERROR', res.detail ?? 'Đề chưa đủ điều kiện publish', { status: 400 })
     return fail('INTERNAL', 'Không publish được đề', { status: 500 })
   }
   return ok({ test_id: res.test_id, status: res.status })

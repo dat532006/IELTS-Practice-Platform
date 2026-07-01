@@ -109,6 +109,18 @@ const run = async () => {
   const pub = await api('POST', `/api/admin/tests/${testId}/publish`, ADMIN.cookie)
   check('admin publish → 200 status=published', pub.status === 200 && pub.body?.data?.status === 'published', `got ${pub.status}`)
 
+  // 6b) R4 (review hardening): publish reading test THIẾU answer_keys → 400 (chống publish đề không chấm được)
+  const noKey = await api('POST', '/api/admin/tests', ADMIN.cookie, {
+    ...TEST_BODY, slug: 'w12-smoke-nokey', title: '[W12] No Key', answer_keys: undefined,
+    questions: [{ id: 'q1', number: 1, type: 'gap_filling' }],
+  })
+  const noKeyId = noKey.body?.data?.test_id
+  check('R4: seed reading test KHÔNG answer_keys → 201 draft', noKey.status === 201 && !!noKeyId, `got ${noKey.status}`)
+  const noKeyPub = await api('POST', `/api/admin/tests/${noKeyId}/publish`, ADMIN.cookie)
+  check('R4: publish reading THIẾU answer_keys → 400 VALIDATION_ERROR', noKeyPub.status === 400 && noKeyPub.body?.meta?.error_code === 'VALIDATION_ERROR', `got ${noKeyPub.status} ${JSON.stringify(noKeyPub.body?.meta)}`)
+  const { data: nkRow } = await ADMIN.admin.from('tests').select('status').eq('id', noKeyId).single()
+  check('R4: đề thiếu keys giữ nguyên draft (KHÔNG publish)', nkRow?.status === 'draft', `status=${nkRow?.status}`)
+
   // 7) /api/exam no-leak regression (test is_free + published)
   const exam = await api('GET', `/api/exam/${testId}`, USER.cookie)
   check('GET /api/exam → 200 (free+published)', exam.status === 200, `got ${exam.status}`)
