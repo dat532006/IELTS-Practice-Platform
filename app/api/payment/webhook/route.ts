@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { verifyWebhookSignature, isWebhookConfigured } from '@/lib/payments/webhook'
+import { getWebhookAdapter } from '@/lib/payments/gateway'
 import { ok, fail } from '@/lib/api/response'
 
 // POST /api/payment/webhook — provider gọi (KHÔNG user session). Theo payment_redeem_contract §3.
@@ -21,8 +21,10 @@ export async function POST(request: Request) {
   if (!parsed.success) return fail('VALIDATION_ERROR', 'Payload không hợp lệ', { status: 400 })
 
   const { signature, ...payload } = parsed.data
-  // Thiếu secret → KHÔNG verify được → reject (an toàn, KHÔNG cộng coin).
-  if (!isWebhookConfigured() || !verifyWebhookSignature(payload, signature)) {
+  // Verify chữ ký theo provider (gateway seam). Sandbox HMAC hiện tại; cổng thật cắm ở lib/payments/gateway.ts.
+  // Thiếu secret / sai chữ ký → reject (an toàn, KHÔNG cộng coin).
+  const adapter = getWebhookAdapter(parsed.data.provider)
+  if (!adapter.configured() || !adapter.verify(payload, signature)) {
     return fail('PAYMENT_SIGNATURE_INVALID', 'Chữ ký không hợp lệ', { status: 400 })
   }
   // Chỉ status success mới credit (idempotent ở RPC).
@@ -32,17 +34,27 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // W16 — verify SỐ TIỀN khớp chính xác transaction pending (paid_vnd == amount_vnd).
-  //   Lệch tiền → KHÔNG credit, KHÔNG mark success, giữ pending để đối soát (chưa có policy xử lý phần dư).
-  //   amount_vnd null (row cũ trước migration) → bỏ qua check (backward-compat).
-  if (parsed.data.amount !== undefined) {
+  // R2 (review hardening) — trên nhánh CREDIT (status success), `amount` là BẮT BUỘC → fail-closed.
+  //   Trước đây `amount` optional: webhook thiếu amount sẽ BỎ QUA verify và credit MÙ số coin server khai
+  //   → mất mắt xích anti-fraud (paid == expected). Non-success notification đã return ở trên (không credit),
+  //   nên yêu cầu amount ở đây KHÔNG ảnh hưởng thông báo thất bại. BẮT BUỘC trước khi cắm cổng thật (A1).
+  if (parsed.data.amount === undefined) {
+    return fail('PAYMENT_AMOUNT_MISMATCH', 'Webhook thiếu số tiền để đối chiếu', { status: 400 })
+  }
+
+  // W16 — verify SỐ TIỀN khớp chính xác transaction (paid_vnd == amount_vnd).
+  //   Lệch tiền → KHÔNG credit, KHÔNG mark success, giữ nguyên để đối soát (chưa có policy xử lý phần dư).
+  //   amount_vnd null (row cũ trước migration) → bỏ qua so khớp (backward-compat row legacy).
+  //   F1: xét cả 'failed' (topup pending quá hạn đã bị reconcile dọn) — credit_topup phục hồi được,
+  //       nên amount vẫn PHẢI verify trên đúng row đó, không chỉ 'pending'.
+  {
     const { data: txn } = await admin
       .from('transactions')
       .select('amount_vnd')
       .eq('provider', parsed.data.provider)
       .eq('provider_txn_id', parsed.data.provider_txn_id)
       .eq('type', 'topup')
-      .eq('status', 'pending')
+      .in('status', ['pending', 'failed'])
       .maybeSingle()
     const expected = (txn as { amount_vnd: number | null } | null)?.amount_vnd
     if (expected != null && parsed.data.amount !== expected) {

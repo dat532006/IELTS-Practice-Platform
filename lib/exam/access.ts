@@ -14,6 +14,12 @@ import { signR2GetUrl } from '@/lib/storage/r2'
 //
 // `test_unlocks` đọc qua client RLS của user → user chỉ thấy unlock của CHÍNH MÌNH
 //   (policy W1+2 `test_unlocks_select_own`). Không tin client gửi.
+//
+// 🛡️ DEFENSE-IN-DEPTH (review R1): cả 3 helper LỌC `.eq('user_id', userId)` TRỰC TIẾP trong query —
+//   KHÔNG chỉ dựa vào caller truyền đúng RLS client. security_rls_contract §3 quy định guard =
+//   `is_free OR test_unlocks(user_id, test_id)` (CÓ user_id). Nếu lỡ truyền admin (service_role,
+//   BYPASSRLS) — như chính route exam đã có sẵn `admin` — mà query không có user_id thì sẽ trả unlock
+//   của NGƯỜI KHÁC → bypass cổng premium. Có `.eq('user_id')` → đúng bất kể client nào.
 // ============================================================
 
 // 1 test: user có test_unlocks không? (caller tự cộng điều kiện is_free.)
@@ -26,6 +32,7 @@ export async function hasTestUnlock(
   const { data, error } = await supabase
     .from('test_unlocks')
     .select('id')
+    .eq('user_id', userId) // R1: user-scope tường minh (không chỉ dựa RLS client)
     .eq('test_id', testId)
     .limit(1)
   if (error) throw new Error(error.message)
@@ -42,6 +49,7 @@ export async function getUnlockedTestIds(
   const { data, error } = await supabase
     .from('test_unlocks')
     .select('test_id')
+    .eq('user_id', userId) // R1: user-scope tường minh
     .in('test_id', testIds)
   if (error) throw new Error(error.message)
   return new Set((data ?? []).map((r) => (r as { test_id: string }).test_id))
@@ -58,6 +66,7 @@ export async function hasProductUnlock(
   const { data, error } = await supabase
     .from('product_unlocks')
     .select('id')
+    .eq('user_id', userId) // R1: user-scope tường minh
     .eq('product_id', productId)
     .limit(1)
   if (error) throw new Error(error.message)

@@ -10,7 +10,7 @@ export default function ProductsError({ reset }: { error: Error; reset: () => vo
       </p>
       <button
         onClick={reset}
-        className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+        className="mt-4 rounded-md bg-[#7C5CE6] px-4 py-2 text-sm font-medium text-white hover:bg-[#6A48D6]"
       >
         Thử lại
       </button>

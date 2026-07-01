@@ -543,5 +543,177 @@ begin
   raise notice 'PASS check27: credit_topup idempotent (cộng 1 lần, lặp txn_id không cộng)';
 end $$;
 
+-- ============================================================
+-- W17 — M09 Dashboard/History/Vocab own-only (vocab_log / bookmarks).
+-- Map docs/TaskBrief/.../phase4/w17.md: dữ liệu cá nhân OWN-ONLY, cross-user deny, with-check chặn ghi hộ.
+-- ============================================================
+
+-- ---------- Check 28: vocab_log own-only — A thấy của A, B KHÔNG; with-check chặn ghi hộ user khác ----------
+do $$
+declare a_cnt int; b_cnt int;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated;
+  insert into public.vocab_log (user_id, word, definition) values
+    ('00000000-0000-0000-0000-00000000000a', 'ephemeral', 'lasting a very short time');
+  select count(*) into a_cnt from public.vocab_log where word = 'ephemeral';   -- A thấy own → 1
+  if a_cnt <> 1 then raise exception 'FAIL check28a: A không thấy vocab của chính mình'; end if;
+  -- A KHÔNG được insert vocab cho user B (with check user_id = auth.uid())
+  begin
+    insert into public.vocab_log (user_id, word) values ('00000000-0000-0000-0000-00000000000b', 'forbidden');
+    raise exception 'FAIL check28b: A insert được vocab hộ user B (with-check sai)';
+  exception when insufficient_privilege then
+    raise notice 'PASS check28b: vocab with-check chặn ghi hộ user khác';
+  end;
+  reset role;
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+  set local role authenticated;
+  select count(*) into b_cnt from public.vocab_log where word = 'ephemeral';   -- B KHÔNG thấy của A → 0
+  if b_cnt <> 0 then raise exception 'FAIL check28c: B thấy vocab của A (RLS own-only sai)'; end if;
+  reset role;
+  raise notice 'PASS check28: vocab_log own-only (A thấy, B không; with-check chặn ghi hộ)';
+end $$;
+
+-- ---------- Check 29: bookmarks own-only — B KHÔNG thấy & KHÔNG xóa được bookmark của A ----------
+do $$
+declare b_seen int; still int;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated;
+  insert into public.bookmarks (user_id, test_id) values
+    ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-000000000024')
+  on conflict (user_id, test_id) do nothing;
+  reset role;
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+  set local role authenticated;
+  select count(*) into b_seen from public.bookmarks;                            -- B chỉ thấy own → 0
+  if b_seen <> 0 then raise exception 'FAIL check29a: B thấy bookmark của A (kỳ vọng 0, got %)', b_seen; end if;
+  delete from public.bookmarks where user_id = '00000000-0000-0000-0000-00000000000a';  -- RLS using → 0 row
+  reset role;
+  select count(*) into still from public.bookmarks                              -- owner bypass RLS → vẫn còn của A
+   where user_id = '00000000-0000-0000-0000-00000000000a'
+     and test_id = '00000000-0000-0000-0000-000000000024';
+  if still < 1 then raise exception 'FAIL check29b: B xóa được bookmark của A (RLS using sai)'; end if;
+  raise notice 'PASS check29: bookmarks own-only (B không thấy & không xóa được của A)';
+end $$;
+
+-- ============================================================
+-- W18 — Security QA: forge ownership / tamper ledger / sensitive-column deny (data-layer).
+-- Map docs/TaskBrief/.../phase4/w18.md 18.1: client KHÔNG forge unlock/txn, KHÔNG tự set plan.
+-- ============================================================
+
+-- ---------- Check 30: client KHÔNG insert product_unlocks (forge ownership) ----------
+do $$
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated;
+  begin
+    insert into public.product_unlocks (user_id, product_id, via)
+    values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-000000000011', 'purchase');
+    raise exception 'FAIL check30: client forge được product_unlocks (giả sở hữu)';
+  exception when insufficient_privilege then
+    raise notice 'PASS check30: product_unlocks insert denied to client (unlock chỉ server sau charge/redeem)';
+  end;
+  reset role;
+end $$;
+
+-- ---------- Check 31: client KHÔNG update transactions (tamper ledger coin) ----------
+do $$
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+  set local role authenticated;
+  begin
+    update public.transactions set amount_coins = 999999, status = 'success'
+     where user_id = '00000000-0000-0000-0000-00000000000b';
+    raise exception 'FAIL check31: client update được transactions (sửa ledger)';
+  exception when insufficient_privilege then
+    raise notice 'PASS check31: transactions update denied to client (ledger server-only)';
+  end;
+  reset role;
+end $$;
+
+-- ---------- Check 32: client KHÔNG tự set profiles.plan (nâng plan free→pro) — column-grant tier ----------
+do $$
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated;
+  -- name update vẫn OK (đã verify check6); plan bị chặn ở column-grant (không grant update(plan))
+  begin
+    update public.profiles set plan = 'pro' where id = '00000000-0000-0000-0000-00000000000a';
+    raise exception 'FAIL check32: client tự nâng profiles.plan (free→pro)';
+  exception when insufficient_privilege then
+    raise notice 'PASS check32: profiles.plan update denied (column grant — chống tự nâng plan)';
+  end;
+  reset role;
+end $$;
+
+-- ============================================================
+-- W19+ — Payment hardening (review F1/F2). Map 20260609000100_payment_hardening_f1_f2.sql.
+-- ============================================================
+
+-- ---------- Check 33 (F1): credit_topup phục hồi topup 'failed' (đã bị reconcile dọn) khi webhook hợp lệ đến MUỘN ----------
+do $$
+declare r jsonb; c int;
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  update public.profiles set coins = 0 where id = '00000000-0000-0000-0000-00000000000b';
+  -- topup pending quá hạn → reconcile đánh 'failed'
+  insert into public.transactions (user_id, amount_coins, type, provider, provider_txn_id, status, expires_at)
+  values ('00000000-0000-0000-0000-00000000000b', 80, 'topup', 'bank', 'W19-LATE-1', 'pending', now() - interval '1 hour');
+  perform public.expire_pending_topups();
+  if (select status from public.transactions where provider = 'bank' and provider_txn_id = 'W19-LATE-1') <> 'failed'
+    then raise exception 'FAIL check33: reconcile KHÔNG đánh failed topup quá hạn'; end if;
+  -- webhook hợp lệ đến muộn (route đã verify chữ ký + số tiền) → credit_topup phục hồi, KHÔNG mất tiền
+  r := public.credit_topup('bank', 'W19-LATE-1');
+  if (r->>'credited')::boolean is not true then raise exception 'FAIL check33: webhook muộn KHÔNG credit topup đã failed (mất tiền khách)'; end if;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  if c <> 80 then raise exception 'FAIL check33: coins sau recover = % (kỳ vọng 80)', c; end if;
+  -- idempotent: recover xong lặp KHÔNG cộng lại
+  if (public.credit_topup('bank', 'W19-LATE-1')->>'credited')::boolean is not false
+    then raise exception 'FAIL check33: recover xong vẫn credit lần 2 (double credit)'; end if;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  if c <> 80 then raise exception 'FAIL check33: double credit sau recover (coins=%)', c; end if;
+  reset role;
+  raise notice 'PASS check33: credit_topup phục hồi topup failed (webhook muộn) idempotent — KHÔNG mất tiền';
+end $$;
+
+-- ---------- Check 34 (F2): checkout CHỈ mở product published — draft KHÔNG unlock/không trừ coin ----------
+do $$
+declare c int; puc int;
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  update public.profiles set coins = 150 where id = '00000000-0000-0000-0000-00000000000b';
+  -- ...012 = 'Draft Bundle' (status='draft', giá 100) đã seed đầu file. checkout PHẢI bị chặn.
+  perform public.checkout('00000000-0000-0000-0000-00000000000b', array['00000000-0000-0000-0000-000000000012']::uuid[]);
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  select count(*) into puc from public.product_unlocks
+   where user_id = '00000000-0000-0000-0000-00000000000b' and product_id = '00000000-0000-0000-0000-000000000012';
+  if puc <> 0 then raise exception 'FAIL check34: checkout unlock được product DRAFT (rò nội dung chưa phát hành)'; end if;
+  if c <> 150 then raise exception 'FAIL check34: checkout draft vẫn trừ coin (coins=%)', c; end if;
+  reset role;
+  raise notice 'PASS check34: checkout chỉ mở product published (draft ...012 bị chặn, KHÔNG trừ coin)';
+end $$;
+
+-- ============================================================
+-- W19+ — Review hardening cross-check (R3). Map 20260610000100_profiles_coins_nonneg.sql.
+-- ============================================================
+
+-- ---------- Check 35 (R3): CHECK(coins >= 0) — kể cả service_role KHÔNG set coins âm được (defense-in-depth) ----------
+do $$
+declare c int;
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  update public.profiles set coins = 5 where id = '00000000-0000-0000-0000-00000000000b';
+  begin
+    update public.profiles set coins = -1 where id = '00000000-0000-0000-0000-00000000000b';
+    raise exception 'FAIL check35: set coins = -1 KHÔNG bị chặn (thiếu CHECK coins>=0)';
+  exception when check_violation then
+    raise notice 'PASS check35: profiles.coins < 0 bị CHECK chặn (defense-in-depth, mọi role)';
+  end;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  if c <> 5 then raise exception 'FAIL check35: coins đổi sau khi set âm bị chặn (=%)', c; end if;
+  reset role;
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
 

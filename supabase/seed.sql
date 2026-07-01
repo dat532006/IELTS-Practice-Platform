@@ -110,18 +110,124 @@ insert into public.answer_keys (test_id, keys) values
 on conflict (test_id) do update set
   keys = excluded.keys;
 
--- Product bundle (published) chứa premium test
+-- Product bundle (published) chứa premium test.
+-- W16 (G5) — VOL chuẩn Owner D4/D5: mỗi VOL = 1 product, price_coins=60 (= MIN_TOPUP 60.000 VND), 10 test/VOL.
+--   Upsert price/title để hội tụ trên DB đã seed trước (trước đây price=100).
 insert into public.products (id, slug, title, description, kind, price_coins, status, sort_order) values
-  ('33333333-3333-3333-3333-333333333333', 'reading-vol-1', 'READING VOL 1', 'Bộ đề Reading tự soạn', 'bundle', 100, 'published', 1),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'listening-vol-1', 'LISTENING VOL 1', 'Bộ đề Listening tự soạn', 'bundle', 100, 'published', 2)
-on conflict (slug) do nothing;
+  ('33333333-3333-3333-3333-333333333333', 'reading-vol-1', 'READING VOL 1', 'Bộ đề Reading tự soạn (10 test)', 'bundle', 60, 'published', 1),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'listening-vol-1', 'LISTENING VOL 1', 'Bộ đề Listening tự soạn (10 test)', 'bundle', 60, 'published', 2)
+on conflict (slug) do update set
+  title = excluded.title, description = excluded.description, kind = excluded.kind,
+  price_coins = excluded.price_coins, status = excluded.status, sort_order = excluded.sort_order;
 
+-- Mapping fixture cũ (giữ nguyên để smoke W4/W6/W7 không vỡ: exam_access dùng 2222, listening_audio dùng 8888).
 insert into public.collection_tests (product_id, test_id, position) values
   ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222', 1),
   ('33333333-3333-3333-3333-333333333333', '66666666-6666-6666-6666-666666666666', 2),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '88888888-8888-8888-8888-888888888888', 1)
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '88888888-8888-8888-8888-888888888888', 1),
+  -- free demo listening (77777777) vào listening-vol-1 để có ≥1 test is_free trong VOL
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '77777777-7777-7777-7777-777777777777', 2)
 on conflict (product_id, test_id) do update set
   position = excluded.position;
+
+-- ============================================================
+-- W16 (G5) — Canonical VOL shaping: bổ sung test để mỗi VOL đủ 10 test.
+--   • reading-vol-1  = 2222 + 6666 + 8 generated reading tests (pos 3..10) = 10.
+--   • listening-vol-1 = 8888 + 77777777 + 8 generated listening tests (pos 3..10) = 10.
+--   Generated test có ĐÚNG 3 passage/section (đề mẫu Dev fixture; passages/questions KHÔNG chứa đáp án).
+--   Deterministic id = md5(slug)::uuid → idempotent qua on conflict (chạy lại hội tụ, không nhân bản).
+--   answer_keys server-only (RLS deny client). Chỉ reading (type=reading) trong reading-vol-1 để catalog
+--   skill=reading vẫn chỉ trả reading-vol-1.
+-- ============================================================
+
+-- 8 generated reading tests → reading-vol-1
+insert into public.tests (id, slug, title, type, source, is_free, difficulty, question_types, duration_sec, status, passages, questions)
+select
+  md5('reading-vol-1-test-' || g)::uuid,
+  'reading-vol-1-test-' || lpad(g::text, 2, '0'),
+  'READING VOL 1 — Test ' || g,
+  'reading', 'Dev fixture (VOL)', false, 3,
+  '{gap_filling,tfng,mcq}', 3600, 'published',
+  jsonb_build_array(
+    jsonb_build_object('id','p1','number',1,'title','Passage 1','content','[VOL fixture] Reading passage 1 — test ' || g || '. Nội dung đề mẫu để demo mở khóa VOL (KHÔNG phải đề thi thật).'),
+    jsonb_build_object('id','p2','number',2,'title','Passage 2','content','[VOL fixture] Reading passage 2 — test ' || g || '.'),
+    jsonb_build_object('id','p3','number',3,'title','Passage 3','content','[VOL fixture] Reading passage 3 — test ' || g || '.')
+  ),
+  jsonb_build_array(
+    jsonb_build_object('id','q1','passage_id','p1','number',1,'type','gap_filling','instruction','Write ONE WORD ONLY.','prompt','This passage is a _____ sample.'),
+    jsonb_build_object('id','q2','passage_id','p2','number',2,'type','tfng','instruction','TRUE / FALSE / NOT GIVEN','statement','Passage 2 is a fixture passage.'),
+    jsonb_build_object('id','q3','passage_id','p3','number',3,'type','mcq','instruction','Choose the correct answer.','prompt','What is this content for?',
+      'options', jsonb_build_array(
+        jsonb_build_object('key','A','text','Demo / mở khóa VOL'),
+        jsonb_build_object('key','B','text','Đề thi chính thức'),
+        jsonb_build_object('key','C','text','Không rõ')))
+  )
+from generate_series(3, 10) as g
+on conflict (id) do update set
+  slug = excluded.slug, title = excluded.title, type = excluded.type, source = excluded.source,
+  is_free = excluded.is_free, difficulty = excluded.difficulty, question_types = excluded.question_types,
+  duration_sec = excluded.duration_sec, status = excluded.status,
+  passages = excluded.passages, questions = excluded.questions;
+
+-- 8 generated listening tests → listening-vol-1 (audio_key server-only, file demo chưa upload — dev fixture)
+insert into public.tests (id, slug, title, type, source, is_free, difficulty, question_types, duration_sec, status, passages, questions, audio_key)
+select
+  md5('listening-vol-1-test-' || g)::uuid,
+  'listening-vol-1-test-' || lpad(g::text, 2, '0'),
+  'LISTENING VOL 1 — Test ' || g,
+  'listening', 'Dev fixture (VOL)', false, 3,
+  '{form_completion,gap_filling,mcq}', 1800, 'published',
+  jsonb_build_array(
+    jsonb_build_object('id','s1','number',1,'title','Section 1','content','[VOL fixture] Listening section 1 — test ' || g || '.'),
+    jsonb_build_object('id','s2','number',2,'title','Section 2','content','[VOL fixture] Listening section 2 — test ' || g || '.'),
+    jsonb_build_object('id','s3','number',3,'title','Section 3','content','[VOL fixture] Listening section 3 — test ' || g || '.')
+  ),
+  jsonb_build_array(
+    jsonb_build_object('id','q1','section_id','s1','number',1,'type','form_completion','instruction','Write ONE WORD ONLY.','prompt','Fixture gap 1:'),
+    jsonb_build_object('id','q2','section_id','s2','number',2,'type','gap_filling','instruction','Write ONE WORD ONLY.','prompt','Fixture gap 2:'),
+    jsonb_build_object('id','q3','section_id','s3','number',3,'type','mcq','instruction','Choose the correct answer.','prompt','Fixture MCQ:',
+      'options', jsonb_build_array(
+        jsonb_build_object('key','A','text','A'),
+        jsonb_build_object('key','B','text','B'),
+        jsonb_build_object('key','C','text','C')))
+  ),
+  'listening/vol1-test-' || lpad(g::text, 2, '0') || '.mp3'
+from generate_series(3, 10) as g
+on conflict (id) do update set
+  slug = excluded.slug, title = excluded.title, type = excluded.type, source = excluded.source,
+  is_free = excluded.is_free, difficulty = excluded.difficulty, question_types = excluded.question_types,
+  duration_sec = excluded.duration_sec, status = excluded.status,
+  passages = excluded.passages, questions = excluded.questions, audio_key = excluded.audio_key;
+
+-- answer_keys cho generated tests (server-only). reading: gap/tfng/mcq; listening: form/gap/mcq.
+insert into public.answer_keys (test_id, keys)
+select md5('reading-vol-1-test-' || g)::uuid,
+  jsonb_build_object(
+    'q1', jsonb_build_object('type','gap_filling','answers', jsonb_build_array('sample'),'match','ci'),
+    'q2', jsonb_build_object('type','tfng','answers', jsonb_build_array('TRUE'),'match','ci'),
+    'q3', jsonb_build_object('type','mcq_single','answers', jsonb_build_array('A'),'match','ci'))
+from generate_series(3, 10) as g
+on conflict (test_id) do update set keys = excluded.keys;
+
+insert into public.answer_keys (test_id, keys)
+select md5('listening-vol-1-test-' || g)::uuid,
+  jsonb_build_object(
+    'q1', jsonb_build_object('type','form_completion','answers', jsonb_build_array('sample'),'match','ci'),
+    'q2', jsonb_build_object('type','gap_filling','answers', jsonb_build_array('sample'),'match','ci'),
+    'q3', jsonb_build_object('type','mcq_single','answers', jsonb_build_array('A'),'match','ci'))
+from generate_series(3, 10) as g
+on conflict (test_id) do update set keys = excluded.keys;
+
+-- collection_tests: generated tests vào đúng VOL, position 3..10.
+insert into public.collection_tests (product_id, test_id, position)
+select '33333333-3333-3333-3333-333333333333'::uuid, md5('reading-vol-1-test-' || g)::uuid, g
+from generate_series(3, 10) as g
+on conflict (product_id, test_id) do update set position = excluded.position;
+
+insert into public.collection_tests (product_id, test_id, position)
+select 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, md5('listening-vol-1-test-' || g)::uuid, g
+from generate_series(3, 10) as g
+on conflict (product_id, test_id) do update set position = excluded.position;
 
 refresh materialized view public.product_search;
 

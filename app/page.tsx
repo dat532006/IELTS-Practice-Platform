@@ -30,8 +30,8 @@ export const metadata: Metadata = {
 
 // ⚠️ v1 shell: static sample data (not yet wired to /api/products).
 const HOT: LandingProduct[] = [
-  { title: 'READING VOL 1', skills: ['reading'], attempts: 1240, state: 'locked', price: 100, href: '/products/reading-vol-1' },
-  { title: 'LISTENING VOL 1', skills: ['listening'], attempts: 980, state: 'locked', price: 100, href: '/products/listening-vol-1' },
+  { title: 'READING VOL 1', skills: ['reading'], attempts: 1240, state: 'locked', price: 60, href: '/products/reading-vol-1' },
+  { title: 'LISTENING VOL 1', skills: ['listening'], attempts: 980, state: 'locked', price: 60, href: '/products/listening-vol-1' },
   { title: 'WRITING Task 2 Pack', skills: ['writing'], attempts: 540, state: 'coming_soon', price: 150 },
 ]
 const FREE: LandingProduct[] = [

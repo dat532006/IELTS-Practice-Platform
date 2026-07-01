@@ -1,8 +1,9 @@
-// W10 runtime smoke — Writing AI grading route (MOCK mode; no ANTHROPIC_API_KEY needed).
+// W10 runtime smoke — Writing AI grading route (MOCK mode).
 // Contract: docs/ContractForAI/BackendEngineer/phase2/W10/w10_writing_grading_contract.md §6
 // Drives REAL API. Prereq: Supabase local (migration reserve_ai_grade applied) + seed (writing 99999999) + next start.
-//   Grader runs in MOCK (deterministic) because .env.local has no ANTHROPIC_API_KEY → asserts overall server-computed.
-// Usage: SMOKE_BASE=http://127.0.0.1:3100 node supabase/smoke/writing_grading_smoke.mjs
+//   ⚠️ F5 hardening: mock KHÔNG còn tự bật khi thiếu key ở prod (next start = production) → PHẢI set
+//   WRITING_GRADER_MOCK=1 khi chạy server cho smoke (thiếu key + không mock ở prod = AI_UNAVAILABLE fail-loud).
+// Usage: WRITING_GRADER_MOCK=1 next start; SMOKE_BASE=http://127.0.0.1:3100 node supabase/smoke/writing_grading_smoke.mjs
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
@@ -33,7 +34,7 @@ const jsonHas = (o, sub) => JSON.stringify(o ?? '').toLowerCase().includes(sub.t
 async function api(method, path, cookie, payload, extraHeaders = {}) {
   const r = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'content-type': 'application/json', 'x-forwarded-for': SMOKE_IP, ...(cookie ? { Cookie: cookie } : {}), ...extraHeaders },
+    headers: { 'content-type': 'application/json', 'x-vercel-forwarded-for': SMOKE_IP, ...(cookie ? { Cookie: cookie } : {}), ...extraHeaders },
     body: payload === undefined ? undefined : JSON.stringify(payload),
   })
   let body = null
@@ -54,7 +55,7 @@ function aiIpLimit() {
   return Number.isFinite(raw) && raw > 0 ? Math.min(raw, 500) : 20
 }
 function aiIpHash(ip) {
-  const pepper = process.env.AI_GRADE_IP_RATE_LIMIT_PEPPER || process.env.SUPABASE_SERVICE_ROLE_KEY || 'local-dev-ai-ip-rate-limit'
+  const pepper = process.env.AI_GRADE_IP_RATE_LIMIT_PEPPER || 'local-dev-ai-ip-rate-limit' // F3: khớp server (bỏ fallback service_role)
   return createHash('sha256').update(`${pepper}:${ip}`).digest('hex')
 }
 function today() { return new Date().toISOString().slice(0, 10) }
@@ -154,7 +155,7 @@ const run = async () => {
     check('Pro grade #2 (same day) → 200 (bypass rate limit)', r2.status === 200, `got ${r2.status}`)
     const limit = aiIpLimit()
     await B.admin.from('ai_grade_ip_usage').upsert({ ip_hash: aiIpHash(LIMITED_IP), used_on: today(), count: limit }, { onConflict: 'ip_hash,used_on' })
-    const limited = await api('POST', '/api/grade-writing', B.cookie, { attempt_id: attemptB, task1_text: words(180), task2_text: words(280) }, { 'x-forwarded-for': LIMITED_IP })
+    const limited = await api('POST', '/api/grade-writing', B.cookie, { attempt_id: attemptB, task1_text: words(180), task2_text: words(280) }, { 'x-vercel-forwarded-for': LIMITED_IP })
     check('IP daily limit prefilled → 429', limited.status === 429, `got ${limited.status}`)
     check('IP limit error_code RATE_LIMITED', limited.body?.meta?.error_code === 'RATE_LIMITED', JSON.stringify(limited.body?.meta))
   }

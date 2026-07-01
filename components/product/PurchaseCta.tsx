@@ -1,4 +1,5 @@
 import { BuyButtons } from './BuyButtons'
+import { PaymentDisclaimer } from '@/components/payment/PaymentDisclaimer'
 
 // Panel CTA mua product detail (M08, W16). owned / free / buy — layout theo design frame 2.
 // ⚠️ Normal purchase flow KHÔNG dùng activation code → KHÔNG nút "Nhập mã" (redeem chỉ cho admin/offline).
@@ -70,6 +71,7 @@ export function PurchaseCta({
             <span className="text-[14px] font-bold text-[#857F96]">coins</span>
           </div>
           <BuyButtons productId={productId} priceCoins={priceCoins} />
+          <PaymentDisclaimer className="mt-4" />
         </>
       )}
 
