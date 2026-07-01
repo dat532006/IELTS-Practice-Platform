@@ -694,5 +694,26 @@ begin
   raise notice 'PASS check34: checkout chỉ mở product published (draft ...012 bị chặn, KHÔNG trừ coin)';
 end $$;
 
+-- ============================================================
+-- W19+ — Review hardening cross-check (R3). Map 20260610000100_profiles_coins_nonneg.sql.
+-- ============================================================
+
+-- ---------- Check 35 (R3): CHECK(coins >= 0) — kể cả service_role KHÔNG set coins âm được (defense-in-depth) ----------
+do $$
+declare c int;
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  update public.profiles set coins = 5 where id = '00000000-0000-0000-0000-00000000000b';
+  begin
+    update public.profiles set coins = -1 where id = '00000000-0000-0000-0000-00000000000b';
+    raise exception 'FAIL check35: set coins = -1 KHÔNG bị chặn (thiếu CHECK coins>=0)';
+  exception when check_violation then
+    raise notice 'PASS check35: profiles.coins < 0 bị CHECK chặn (defense-in-depth, mọi role)';
+  end;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  if c <> 5 then raise exception 'FAIL check35: coins đổi sau khi set âm bị chặn (=%)', c; end if;
+  reset role;
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
 
