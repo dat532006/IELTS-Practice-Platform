@@ -16,3 +16,8 @@ IELTS_Platform_Project_Plan.md
 tmp-next-smoke*.log
 supabase/.temp/
 supabase/.branches/
+
+# OCR tooling (self-hosted, offline) — KHÔNG commit: output là text đề có bản quyền + model/cache lớn
+ocr-output/
+scripts/.tesscache/
+scripts/.tessdata_best/
