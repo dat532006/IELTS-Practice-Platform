@@ -1,6 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Plus_Jakarta_Sans, Newsreader } from 'next/font/google'
+import { createClient } from '@/lib/supabase/server'
+import { getProductCatalog } from '@/lib/products/queries'
+import { COIN_VND_RATE } from '@/lib/payments/topup-constants'
+import { LEGAL_PAGES, LEGAL_SLUGS } from '@/lib/legal'
 import { LandingProductCard, type LandingProduct } from '@/components/landing/LandingProductCard'
 import { SkillTabs } from '@/components/landing/SkillTabs'
 import { LeadForm } from '@/components/landing/LeadForm'
@@ -28,23 +32,59 @@ export const metadata: Metadata = {
     'Original IELTS tests on a real exam interface, with server-side scoring and AI Writing feedback mapped to the official band descriptors.',
 }
 
-// ⚠️ v1 shell: static sample data (not yet wired to /api/products).
-const HOT: LandingProduct[] = [
-  { title: 'READING VOL 1', skills: ['reading'], attempts: 1240, state: 'locked', price: 60, href: '/products/reading-vol-1' },
-  { title: 'LISTENING VOL 1', skills: ['listening'], attempts: 980, state: 'locked', price: 60, href: '/products/listening-vol-1' },
-  { title: 'WRITING Task 2 Pack', skills: ['writing'], attempts: 540, state: 'coming_soon', price: 150 },
-]
-const FREE: LandingProduct[] = [
-  { title: 'Reading Test · Free 1', skills: ['reading'], attempts: 3200, state: 'free', price: 0, href: '/tests/11111111-1111-1111-1111-111111111111' },
-  { title: 'Listening Test · Free 1', skills: ['listening'], attempts: 2100, state: 'free', price: 0, href: '/tests/77777777-7777-7777-7777-777777777777' },
-  { title: 'Writing Task 2 · Free 1', skills: ['writing'], attempts: 1500, state: 'free', price: 0, href: '/free' },
-]
+// Prediction packs CHƯA có thật (content pipeline A4) → coming_soon, KHÔNG số liệu bịa, KHÔNG link.
 const PREDICTION: LandingProduct[] = [
-  { title: 'Prediction 2026 Q3', skills: ['reading', 'listening'], attempts: 410, state: 'coming_soon', price: 120 },
+  { title: 'Prediction 2026 Q3', skills: ['reading', 'listening'], attempts: 0, state: 'coming_soon', price: 120 },
   { title: 'Prediction 2026 Q4', skills: ['writing'], attempts: 0, state: 'coming_soon', price: 120 },
 ]
 
-export default function LandingPage() {
+// FE-F03: gói nạp coin khớp fixed-rate thật (1.000 VND = 1 coin, không bonus) — giá tính từ constant.
+const COIN_PACKS = [
+  { name: 'Starter', coins: 60, note: 'Enough for one pack', popular: false },
+  { name: 'Regular', coins: 200, note: 'Best for steady practice', popular: true },
+  { name: 'Intensive', coins: 500, note: 'For a full study cycle', popular: false },
+]
+const vnd = (n: number) => n.toLocaleString('vi-VN')
+
+// FE-F04: HOT/FREE lấy từ catalog thật (RLS published-only) thay cho sample tĩnh + seed UUID.
+//   DB lỗi/trống → mảng rỗng, section tự ẩn — landing không 500.
+async function getLandingData(): Promise<{ hot: LandingProduct[]; free: LandingProduct[] }> {
+  try {
+    const supabase = await createClient()
+    const [catalog, freeRes] = await Promise.all([
+      getProductCatalog(supabase, { sort: 'hot', page_size: '3' }),
+      supabase
+        .from('tests')
+        .select('id, title, type, is_free, attempts_count')
+        .eq('is_free', true)
+        .order('attempts_count', { ascending: false })
+        .limit(3),
+    ])
+    const hot: LandingProduct[] = catalog.data.items.map((p) => ({
+      title: p.title,
+      skills: [p.skill],
+      attempts: p.attempts_total,
+      state: p.is_free ? ('free' as const) : ('locked' as const),
+      price: p.price_coins,
+      href: `/products/${p.slug}`,
+    }))
+    type FreeRow = { id: string; title: string; type: string; attempts_count: number | null }
+    const free: LandingProduct[] = ((freeRes.data ?? []) as unknown as FreeRow[]).map((t) => ({
+      title: t.title,
+      skills: [t.type],
+      attempts: t.attempts_count ?? 0,
+      state: 'free' as const,
+      price: 0,
+      href: `/tests/${t.id}`,
+    }))
+    return { hot, free }
+  } catch {
+    return { hot: [], free: [] }
+  }
+}
+
+export default async function LandingPage() {
+  const { hot, free } = await getLandingData()
   return (
     <div className={`dc-home ${jakarta.variable} ${newsreader.variable}`}>
       {/* ANNOUNCEMENT */}
@@ -122,13 +162,14 @@ export default function LandingPage() {
               Search
             </button>
           </form>
+          {/* FE-F03: bỏ số liệu bịa (10,000+/4.8) — chỉ claim tính chất sản phẩm có thật. */}
           <div className="hero-stats">
             <span>
-              <span className="stat-num">10,000+</span> tests taken
+              <span className="stat-num">100%</span> original tests
             </span>
             <span className="stat-sep" />
             <span>
-              <span className="stars">★★★★★</span> 4.8/5 rating
+              <span className="stat-num">Free</span> tests to start
             </span>
           </div>
         </div>
@@ -261,41 +302,45 @@ export default function LandingPage() {
         <SkillTabs />
       </section>
 
-      {/* HOT COLLECTIONS */}
-      <section className="section-row" style={{ padding: '70px 0 10px' }} id="hot">
-        <div className="row-header">
-          <div>
-            <h2 className="row-h2">Hot collections</h2>
-            <p className="row-sub">The most-attempted test packs</p>
+      {/* HOT COLLECTIONS — dữ liệu thật từ catalog (FE-F04); trống → ẩn section */}
+      {hot.length > 0 && (
+        <section className="section-row" style={{ padding: '70px 0 10px' }} id="hot">
+          <div className="row-header">
+            <div>
+              <h2 className="row-h2">Hot collections</h2>
+              <p className="row-sub">The most-attempted test packs</p>
+            </div>
+            <Link href="/products" className="row-link">
+              View all →
+            </Link>
           </div>
-          <Link href="/products" className="row-link">
-            View all →
-          </Link>
-        </div>
-        <div className="cards-grid">
-          {HOT.map((p) => (
-            <LandingProductCard key={p.title} p={p} />
-          ))}
-        </div>
-      </section>
+          <div className="cards-grid">
+            {hot.map((p) => (
+              <LandingProductCard key={p.href ?? p.title} p={p} />
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* FREE TESTS */}
-      <section className="section-row" style={{ padding: '54px 0 10px' }} id="free">
-        <div className="row-header">
-          <div>
-            <h2 className="row-h2">Free tests</h2>
-            <p className="row-sub">Try them free — no purchase needed</p>
+      {/* FREE TESTS — đề free published thật (FE-F04); trống → ẩn section */}
+      {free.length > 0 && (
+        <section className="section-row" style={{ padding: '54px 0 10px' }} id="free">
+          <div className="row-header">
+            <div>
+              <h2 className="row-h2">Free tests</h2>
+              <p className="row-sub">Try them free — no purchase needed</p>
+            </div>
+            <Link href="/free" className="row-link">
+              All free tests →
+            </Link>
           </div>
-          <Link href="/free" className="row-link">
-            All free tests →
-          </Link>
-        </div>
-        <div className="cards-grid">
-          {FREE.map((p) => (
-            <LandingProductCard key={p.title} p={p} />
-          ))}
-        </div>
-      </section>
+          <div className="cards-grid">
+            {free.map((p) => (
+              <LandingProductCard key={p.href ?? p.title} p={p} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* AI WRITING */}
       <section className="ai-section">
@@ -400,108 +445,83 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PRICING */}
+      {/* PRICING — FE-F03: khớp fixed-rate thật (1.000 VND = 1 coin), KHÔNG bonus/USD bịa. */}
       <section id="pricing">
         <div className="pricing-hdr">
-          <div className="section-eyebrow">Simple coin pricing</div>
+          <div className="section-eyebrow">Fixed rate · {vnd(COIN_VND_RATE)} VND = 1 coin</div>
           <h2 className="section-h2">Top up coins, unlock any pack</h2>
           <p className="section-lead">
-            Spend coins on premium packs, or redeem an activation code. Free tests stay free, forever.
+            Spend coins on premium packs. Free tests stay free, forever.
           </p>
         </div>
         <div className="pricing-grid">
-          <div className="coin-card">
-            <div className="coin-name">Starter</div>
-            <div className="coin-amount">
-              <span className="coin-num">🪙 100</span>
+          {COIN_PACKS.map((pack) => (
+            <div key={pack.name} className={`coin-card${pack.popular ? ' popular' : ''}`}>
+              {pack.popular && <div className="popular-badge">Most popular</div>}
+              <div className="coin-name">{pack.name}</div>
+              <div className="coin-amount">
+                <span className="coin-num">🪙 {pack.coins}</span>
+              </div>
+              <div className="coin-note">{pack.note}</div>
+              <div className="coin-price">{vnd(pack.coins * COIN_VND_RATE)} ₫</div>
+              <Link href="/pricing" className={`coin-btn${pack.popular ? ' popular' : ''}`}>
+                Top up
+              </Link>
             </div>
-            <div className="coin-note">Enough for one pack</div>
-            <div className="coin-price">$2.90</div>
-            <Link href="/pricing" className="coin-btn">
-              Buy coins
-            </Link>
-          </div>
-          <div className="coin-card popular">
-            <div className="popular-badge">Most popular</div>
-            <div className="coin-name">Regular</div>
-            <div className="coin-amount">
-              <span className="coin-num">🪙 300</span>
-              <span className="coin-bonus">+30 bonus</span>
-            </div>
-            <div className="coin-note">Best for steady practice</div>
-            <div className="coin-price">$6.90</div>
-            <Link href="/pricing" className="coin-btn popular">
-              Buy coins
-            </Link>
-          </div>
-          <div className="coin-card">
-            <div className="coin-name">Pro</div>
-            <div className="coin-amount">
-              <span className="coin-num">🪙 700</span>
-              <span className="coin-bonus">+120 bonus</span>
-            </div>
-            <div className="coin-note">Save 25% overall</div>
-            <div className="coin-price">$13.90</div>
-            <Link href="/pricing" className="coin-btn">
-              Buy coins
-            </Link>
-          </div>
+          ))}
         </div>
         <p className="pricing-footer">
-          Coins never expire.{' '}
+          Coins never expire — server verifies every payment.{' '}
           <Link href="/pricing">Top up coins →</Link>
         </p>
       </section>
 
-      {/* TESTIMONIALS */}
+      {/* HIGHLIGHTS — FE-F03: bỏ testimonial/5-sao/band bịa; giữ layout, nội dung = tính chất sản phẩm có thật. */}
       <section className="testimonials">
         <div className="testimonials-hdr">
-          <div className="section-eyebrow">Loved by learners</div>
-          <h2 className="section-h2">What students say</h2>
+          <div className="section-eyebrow">Why practice here</div>
+          <h2 className="section-h2">Built for serious practice</h2>
         </div>
         <div className="testimonials-grid">
           <div className="testimonial-card">
-            <div className="test-stars">★★★★★</div>
             <p className="test-quote">
-              &quot;The test interface feels exactly like the real exam — no surprises on test day.&quot;
+              The test interface mirrors the computer-delivered exam — timer, navigation, highlights and notes included.
             </p>
             <div className="test-author">
               <span className="test-avatar" style={{ background: '#FFEDE6' }}>
-                M
+                R
               </span>
               <div>
-                <div className="test-name">Minh Anh</div>
-                <div className="test-meta">Achieved 7.5 overall</div>
+                <div className="test-name">Real exam interface</div>
+                <div className="test-meta">Reading · Listening</div>
               </div>
             </div>
           </div>
           <div className="testimonial-card">
-            <div className="test-stars">★★★★★</div>
             <p className="test-quote">
-              &quot;AI grades my Writing in detail by each criterion, so I know precisely what to fix.&quot;
+              Writing is graded by AI against the four band-descriptor criteria, with sentence-level suggestions.
             </p>
             <div className="test-author">
               <span className="test-avatar" style={{ background: '#F0ECFF' }}>
-                Q
+                W
               </span>
               <div>
-                <div className="test-name">Quoc Bao</div>
-                <div className="test-meta">Writing 6.0 → 7.0</div>
+                <div className="test-name">AI Writing feedback</div>
+                <div className="test-meta">Scores are indicative, not official</div>
               </div>
             </div>
           </div>
           <div className="testimonial-card">
-            <div className="test-stars">★★★★★</div>
             <p className="test-quote">
-              &quot;I try free tests first, then unlock packs with coins. Convenient and budget-friendly.&quot;
+              Start with free tests, then unlock full packs with coins — pay only for what you practice.
             </p>
             <div className="test-author">
               <span className="test-avatar" style={{ background: '#FFE9F1' }}>
-                T
+                C
               </span>
               <div>
-                <div className="test-name">Thu Ha</div>
-                <div className="test-meta">Achieved 8.0 overall</div>
+                <div className="test-name">Coin-based unlock</div>
+                <div className="test-meta">Free tests included</div>
               </div>
             </div>
           </div>
@@ -515,8 +535,9 @@ export default function LandingPage() {
           <div className="lead-blob lead-blob-2" />
           <div className="lead-content">
             <h2 className="lead-h2">Need help with your study plan?</h2>
+            {/* FE-F08: hết form giả — dẫn tới kênh liên hệ thật (trang Liên hệ). */}
             <p className="lead-sub">
-              Leave your email and our team will reach out with a personalized roadmap to your target band.
+              Tell us your target band and timeline through our contact page — we&apos;ll suggest a practice roadmap.
             </p>
             <LeadForm />
           </div>
@@ -569,10 +590,13 @@ export default function LandingPage() {
         <div className="footer-bottom">
           <div className="footer-bottom-inner">
             <span>© 2026 IELTSPractice. All rights reserved.</span>
+            {/* FE-F06: đủ 7 trang pháp lý (yêu cầu merchant review) — đồng bộ Footer (marketing). */}
             <div className="footer-legal">
-              <Link href="/legal/privacy">Privacy</Link>
-              <Link href="/legal/transaction-terms">Terms</Link>
-              <Link href="/legal/contact">Contact</Link>
+              {LEGAL_SLUGS.map((slug) => (
+                <Link key={slug} href={`/legal/${slug}`}>
+                  {LEGAL_PAGES[slug].title}
+                </Link>
+              ))}
             </div>
           </div>
         </div>

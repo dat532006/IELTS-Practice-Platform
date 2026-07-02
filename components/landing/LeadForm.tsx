@@ -1,28 +1,17 @@
-'use client'
+import Link from 'next/link'
 
-import { useState } from 'react'
-
-// Lead-capture form on the landing page. No backend endpoint yet (v1 shell) —
-// captures the email client-side and shows an acknowledgement.
+// FE-F08: form email cũ chỉ giả lập gửi (dữ liệu không đi đâu → hứa hẹn sai với user).
+//   Thay bằng CTA tới kênh liên hệ thật (/legal/contact). Khi có backend lead-capture thì khôi phục form.
 export function LeadForm() {
-  const [sent, setSent] = useState(false)
-
-  if (sent) {
-    return <p className="lead-thanks">Thanks — we&apos;ll be in touch with your study roadmap shortly. ✨</p>
-  }
-
   return (
-    <form
-      className="lead-form"
-      onSubmit={(e) => {
-        e.preventDefault()
-        setSent(true)
-      }}
-    >
-      <input type="email" className="lead-email" placeholder="you@email.com" required />
-      <button className="btn-send" type="submit">
-        Send
-      </button>
-    </form>
+    <div className="lead-form" style={{ justifyContent: 'center' }}>
+      <Link
+        href="/legal/contact"
+        className="btn-send"
+        style={{ display: 'inline-flex', alignItems: 'center', padding: '14px 26px' }}
+      >
+        Contact our team →
+      </Link>
+    </div>
   )
 }

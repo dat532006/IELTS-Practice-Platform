@@ -26,9 +26,10 @@ function badgeFor(state: LandingCardState) {
   return { label: 'Coming soon', bg: '#EFEBF2', color: '#8B8398' }
 }
 
+// FE-F07: user KHÔNG có luồng redeem (Owner W16: redeem chỉ admin/offline) → CTA chỉ nói mua bằng coin.
 function ctaFor(state: LandingCardState, price: number) {
   if (state === 'free') return { text: 'Try now →', color: '#1E9E63' }
-  if (state === 'locked') return { text: `🪙 ${price} · Buy / Redeem`, color: '#C98A1A' }
+  if (state === 'locked') return { text: `🪙 ${price} · Buy with coins`, color: '#C98A1A' }
   return { text: 'Coming soon', color: '#9D96AE' }
 }
 
