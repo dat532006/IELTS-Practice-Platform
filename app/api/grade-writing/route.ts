@@ -38,6 +38,8 @@ export async function POST(request: Request) {
       switch (res.code) {
         case 'NOT_FOUND':
           return fail('NOT_FOUND', 'Không tìm thấy lượt làm bài', { status: 404 })
+        case 'ATTEMPT_TERMINAL':
+          return fail('ATTEMPT_TERMINAL', 'Bài đã nộp và chấm xong, không thể chấm lại', { status: 409 })
         case 'WORD_COUNT_TOO_LOW':
           return fail('WORD_COUNT_TOO_LOW', 'Task 1 cần ≥150 từ và Task 2 cần ≥250 từ', { status: 400 })
         case 'RATE_LIMITED':

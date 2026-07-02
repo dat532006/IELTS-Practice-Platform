@@ -19,7 +19,7 @@ export const countWords = (s: string): number => (s.trim().match(/\S+/g) ?? []).
 
 export type WritingOutcome =
   | { ok: true; result: WritingGradeResult; warnings: string[] }
-  | { ok: false; code: 'NOT_FOUND' | 'WORD_COUNT_TOO_LOW' | 'RATE_LIMITED' | 'AI_UNAVAILABLE' }
+  | { ok: false; code: 'NOT_FOUND' | 'ATTEMPT_TERMINAL' | 'WORD_COUNT_TOO_LOW' | 'RATE_LIMITED' | 'AI_UNAVAILABLE' }
 
 type AttemptRow = { id: string; user_id: string; test_id: string; status: string }
 type Passage = { id?: string; number?: number; title?: string; content?: string }
@@ -58,6 +58,11 @@ export async function submitWritingGrade(
   if (aErr) throw new Error(aErr.message)
   const attempt = aData as AttemptRow | null
   if (!attempt || attempt.user_id !== userId) return { ok: false, code: 'NOT_FOUND' }
+
+  // 1b) B-05 (review fix): attempt terminal là BẤT BIẾN (như /api/submit, /answers). Chặn chấm lại
+  //   attempt đã submitted/expired → không ghi đè writing_submissions sau nộp, không lệch attempts.band,
+  //   không tiêu quota AI vô ích. Retry sau AI_UNAVAILABLE vẫn OK (fail giữ in_progress).
+  if (attempt.status !== 'in_progress') return { ok: false, code: 'ATTEMPT_TERMINAL' }
 
   // 2) Word count — server đếm lại (KHÔNG tin client).
   const task1_wc = countWords(body.task1_text)
