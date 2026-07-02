@@ -23,6 +23,9 @@ export type TestMeta = {
   source: string | null
   question_types: string[]
   locked: boolean
+  // FE-F01: product published chứa test (mục lục RLS published-only) — CTA mua ở pre-exam khi locked.
+  //   null khi test chưa thuộc bundle nào (CTA fallback /products). Vẫn chỉ metadata public.
+  product: { slug: string; title: string } | null
 }
 
 // W5 — Attempt lifecycle (M05). Timer neo server; client KHÔNG gửi thời gian tin cậy.

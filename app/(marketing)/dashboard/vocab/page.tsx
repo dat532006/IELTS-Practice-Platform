@@ -14,6 +14,7 @@ export default function VocabPage() {
   const [definition, setDefinition] = useState('')
   const [example, setExample] = useState('')
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
   async function load() {
@@ -55,6 +56,8 @@ export default function VocabPage() {
   }
 
   async function remove(id: string) {
+    if (deletingId) return // FE-F09: chống double-click xóa (đồng bộ với guard `saving` của form thêm)
+    setDeletingId(id)
     try {
       const res = await fetch('/api/vocab', {
         method: 'DELETE',
@@ -62,7 +65,9 @@ export default function VocabPage() {
         body: JSON.stringify({ id }),
       })
       if (res.ok) await load()
-    } catch { /* ignore */ }
+    } catch { /* ignore */ } finally {
+      setDeletingId(null)
+    }
   }
 
   if (state === 'loading') return <p className="text-[14px] text-[#857F96]">Đang tải…</p>
@@ -138,9 +143,10 @@ export default function VocabPage() {
                 <button
                   type="button"
                   onClick={() => remove(v.id)}
-                  className="flex-none rounded-[10px] border border-[#F0DDE4] px-3 py-1.5 text-[13px] font-bold text-rose-500 hover:bg-rose-50"
+                  disabled={deletingId !== null}
+                  className="flex-none rounded-[10px] border border-[#F0DDE4] px-3 py-1.5 text-[13px] font-bold text-rose-500 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Xóa
+                  {deletingId === v.id ? 'Đang xóa…' : 'Xóa'}
                 </button>
               </li>
             ))}

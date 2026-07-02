@@ -17,9 +17,10 @@ function Cta({ p }: { p: ProductCardData }) {
     case 'already_owned':
       return <span className="text-sm font-medium text-teal-700">Vào học →</span>
     case 'locked':
+      // FE-F07: user KHÔNG có luồng redeem (Owner W16) → CTA chỉ mua bằng coin.
       return (
         <span className="text-sm font-medium text-amber-700">
-          🪙 {p.priceCoins} · Mua / Nhập mã
+          🪙 {p.priceCoins} · Mua bằng coin
         </span>
       )
     case 'coming_soon':

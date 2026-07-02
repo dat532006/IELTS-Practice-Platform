@@ -146,7 +146,10 @@ async function authedStates() {
       check('authed not-owned → premium test "Khóa"', d.text.includes('Khóa'))
 
       const p = await getHtml(`/tests/${PREMIUM_ID}`, Cookie)
-      check('locked_auth pre-exam → CTA "Mua bộ đề" + "Nhập mã"', p.text.includes('Mua bộ đề') && p.text.includes('Nhập mã'))
+      // FE-F01 (2026-07-02): locked_auth = CTA mua bundle THẬT (link /products/[slug]); redeem KHÔNG
+      //   thuộc luồng mua thường (Owner W16) → KHÔNG còn nút "Nhập mã"/copy W15-16 disabled.
+      check('locked_auth pre-exam → CTA "Mua bộ đề" (link /products/)', p.text.includes('Mua bộ đề') && p.text.includes('/products/'))
+      check('locked_auth pre-exam → KHÔNG "Nhập mã" (redeem ngoài luồng user)', !p.text.includes('Nhập mã'))
       check('locked_auth pre-exam → KHÔNG "Đăng nhập để mở khóa"', !p.text.includes('Đăng nhập để mở khóa'))
       check('locked_auth pre-exam → KHÔNG "Bắt đầu/Vào làm"', !p.text.includes('Bắt đầu làm bài') && !p.text.includes('Vào làm bài'))
       check('locked_auth pre-exam → KHÔNG link /exam/{premium}', !p.text.includes(`/exam/${PREMIUM_ID}`))
@@ -159,7 +162,8 @@ async function authedStates() {
     {
       const d = await getHtml(`/products/${PRODUCT_SLUG}`, Cookie)
       check('owned detail → badge "Đã sở hữu"', d.text.includes('Đã sở hữu'))
-      check('owned detail → panel "Bạn đã sở hữu"', d.text.includes('Bạn đã sở hữu'))
+      // Copy panel owned đổi ở W16 (redesign violet): "Đã sở hữu bộ đề" + "Bạn đã mở khoá toàn bộ bộ đề."
+      check('owned detail → panel "Đã sở hữu bộ đề"', d.text.includes('Đã sở hữu bộ đề') && d.text.includes('đã mở khoá toàn bộ'))
       check('owned detail → KHÔNG "Mua bằng coin"', !d.text.includes('Mua bằng coin'))
       check('owned detail → premium test badge "Đã mở"', d.text.includes('Đã mở'))
       check('owned detail → KHÔNG lộ passage', !d.text.includes(PREMIUM_PASSAGE))
