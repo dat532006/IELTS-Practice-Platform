@@ -25,6 +25,14 @@ const actions = [
     iconBg: '#FFEDE6',
     iconDot: '#F2724E',
   },
+  {
+    href: '/admin/activation-codes',
+    title: 'Mã kích hoạt',
+    desc: 'Sinh mã theo sản phẩm → hiển thị 1 lần + tải CSV. Chỉ lưu bản băm.',
+    cta: 'Sinh mã →',
+    iconBg: '#FFF3DC',
+    iconDot: '#ECA22B',
+  },
 ]
 
 export default function AdminDashboard() {
