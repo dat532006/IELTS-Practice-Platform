@@ -8,7 +8,7 @@ import { ok, fail } from '@/lib/api/response'
 // LUẬT THÉP:
 //   - KHÔNG mở endpoint privileged mà không có auth: nếu CRON_SECRET chưa set → 503 (từ chối chạy).
 //   - Auth bằng bearer CRON_SECRET (so sánh timing-safe), KHÔNG dùng session admin (cron không có cookie).
-//   - Chỉ gọi expire_pending_topups (service_role RPC): pending + expires_at < now() → status='failed'.
+//   - Chỉ gọi expire_pending_topups (service_role RPC): pending + expires_at < now() → status='expired' (B-03).
 //     TUYỆT ĐỐI KHÔNG cộng coin ở đây — credit CHỈ ở webhook sau verify chữ ký + số tiền.
 //   - Idempotent: chạy lại nhiều lần an toàn (chỉ đụng pending quá hạn).
 export const runtime = 'nodejs'

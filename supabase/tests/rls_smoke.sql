@@ -651,21 +651,21 @@ end $$;
 -- W19+ — Payment hardening (review F1/F2). Map 20260609000100_payment_hardening_f1_f2.sql.
 -- ============================================================
 
--- ---------- Check 33 (F1): credit_topup phục hồi topup 'failed' (đã bị reconcile dọn) khi webhook hợp lệ đến MUỘN ----------
+-- ---------- Check 33 (F1/B-03): credit_topup phục hồi topup 'expired' (reconcile dọn) khi webhook hợp lệ đến MUỘN ----------
 do $$
 declare r jsonb; c int;
 begin
   perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
   update public.profiles set coins = 0 where id = '00000000-0000-0000-0000-00000000000b';
-  -- topup pending quá hạn → reconcile đánh 'failed'
+  -- topup pending quá hạn → reconcile đánh 'expired' (B-03: KHÔNG còn dùng 'failed' cho reconcile)
   insert into public.transactions (user_id, amount_coins, type, provider, provider_txn_id, status, expires_at)
   values ('00000000-0000-0000-0000-00000000000b', 80, 'topup', 'bank', 'W19-LATE-1', 'pending', now() - interval '1 hour');
   perform public.expire_pending_topups();
-  if (select status from public.transactions where provider = 'bank' and provider_txn_id = 'W19-LATE-1') <> 'failed'
-    then raise exception 'FAIL check33: reconcile KHÔNG đánh failed topup quá hạn'; end if;
+  if (select status from public.transactions where provider = 'bank' and provider_txn_id = 'W19-LATE-1') <> 'expired'
+    then raise exception 'FAIL check33: reconcile KHÔNG đánh expired topup quá hạn'; end if;
   -- webhook hợp lệ đến muộn (route đã verify chữ ký + số tiền) → credit_topup phục hồi, KHÔNG mất tiền
   r := public.credit_topup('bank', 'W19-LATE-1');
-  if (r->>'credited')::boolean is not true then raise exception 'FAIL check33: webhook muộn KHÔNG credit topup đã failed (mất tiền khách)'; end if;
+  if (r->>'credited')::boolean is not true then raise exception 'FAIL check33: webhook muộn KHÔNG credit topup đã expired (mất tiền khách)'; end if;
   select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
   if c <> 80 then raise exception 'FAIL check33: coins sau recover = % (kỳ vọng 80)', c; end if;
   -- idempotent: recover xong lặp KHÔNG cộng lại
@@ -674,7 +674,25 @@ begin
   select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
   if c <> 80 then raise exception 'FAIL check33: double credit sau recover (coins=%)', c; end if;
   reset role;
-  raise notice 'PASS check33: credit_topup phục hồi topup failed (webhook muộn) idempotent — KHÔNG mất tiền';
+  raise notice 'PASS check33: credit_topup phục hồi topup expired (webhook muộn) idempotent — KHÔNG mất tiền';
+end $$;
+
+-- ---------- Check 36 (B-03): topup 'failed' (provider báo thất bại — adapter A1 tương lai) KHÔNG BAO GIỜ credit ----------
+do $$
+declare c int;
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  update public.profiles set coins = 0 where id = '00000000-0000-0000-0000-00000000000b';
+  insert into public.transactions (user_id, amount_coins, type, provider, provider_txn_id, status)
+  values ('00000000-0000-0000-0000-00000000000b', 999, 'topup', 'bank', 'W19-PROVFAIL-1', 'failed');
+  if (public.credit_topup('bank', 'W19-PROVFAIL-1')->>'credited')::boolean is not false
+    then raise exception 'FAIL check36: credit_topup credit được topup failed (provider-failed) — vi phạm ngữ nghĩa B-03'; end if;
+  select coins into c from public.profiles where id = '00000000-0000-0000-0000-00000000000b';
+  if c <> 0 then raise exception 'FAIL check36: coins đổi sau credit topup failed (=%)', c; end if;
+  if (select status from public.transactions where provider = 'bank' and provider_txn_id = 'W19-PROVFAIL-1') <> 'failed'
+    then raise exception 'FAIL check36: status topup failed bị đổi'; end if;
+  reset role;
+  raise notice 'PASS check36: topup failed (provider) KHÔNG credit được — chỉ expired (reconcile) mới phục hồi';
 end $$;
 
 -- ---------- Check 34 (F2): checkout CHỈ mở product published — draft KHÔNG unlock/không trừ coin ----------
