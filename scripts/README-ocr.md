@@ -37,6 +37,8 @@ Không có file này thì tool tự dùng model `fast` mặc định (kém chín
 ```bash
 # 0) SMART: tự nhận text layer → pdftotext -layout; không thì tự OCR. LUÔN dùng cái này trước.
 node scripts/extract-pdf.mjs "C:/path/to/Test 3.pdf"
+#   [--from N] [--to N]   giới hạn trang — vd đề 12 trang, KEY ở trang 12 → --from 1 --to 11
+#                         (BỎ trang key để NHẬP TAY; áp dụng cả text-layer lẫn OCR)
 #   [--out DIR] [--force-ocr] [--raw] [--min-chars N]   (cờ khác chuyển tiếp cho ocr-pdf nếu phải OCR)
 
 # 1) (chỉ khi scan) OCR trực tiếp: rasterize + PHÂN LOẠI VÙNG (prose / figure-noise / grid) + tessdata_best

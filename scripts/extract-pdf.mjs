@@ -29,6 +29,10 @@ const has = (n) => args.includes(`--${n}`)
 const forceOcr = has('force-ocr')
 const layout = !has('raw') // -layout mặc định (giữ cột bảng); --raw để lấy dòng thuần
 const minChars = parseInt(opt('min-chars', '80'), 10) || 80
+// Giới hạn trang — vd đề 12 trang, key ở trang 12: --from 1 --to 11 để BỎ trang key (nhập key tay).
+//   Áp dụng cho cả nhánh text-layer lẫn OCR (--from/--to được chuyển tiếp cho ocr-pdf.mjs).
+const from = Math.max(1, parseInt(opt('from', '1'), 10) || 1)
+const to = parseInt(opt('to', '999999'), 10) || 999999
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const outDir = resolve(opt('out', resolve(scriptDir, '..', 'ocr-output', basename(input).replace(/\.pdf$/i, ''))))
@@ -89,13 +93,16 @@ if (avg < minChars) {
 // có text layer → ghi outputs (page-NNN.txt + _combined.md), giống format OCR để bước sau dùng chung.
 await mkdir(outDir, { recursive: true })
 const combined = []
-let total = 0
+let total = 0, written = 0
 for (let i = 0; i < pages.length; i++) {
+  const pageNo = i + 1
+  if (pageNo < from || pageNo > to) continue // BỎ trang ngoài khoảng (vd trang answer key)
   const text = cleanTextLayer(pages[i])
-  total += text.length
-  await writeFile(resolve(outDir, `page-${String(i + 1).padStart(3, '0')}.txt`), text, 'utf8')
-  combined.push(`\n\n===== PAGE ${i + 1} =====\n\n${text}`)
+  total += text.length; written++
+  await writeFile(resolve(outDir, `page-${String(pageNo).padStart(3, '0')}.txt`), text, 'utf8')
+  combined.push(`\n\n===== PAGE ${pageNo} =====\n\n${text}`)
 }
 await writeFile(resolve(outDir, '_combined.md'), combined.join('\n').trim() + '\n', 'utf8')
-console.log(`DONE (text layer · pdftotext) · ${total} ký tự → ${outDir}`)
+const range = (from > 1 || to < pages.length) ? ` (trang ${from}..${to === 999999 ? pages.length : to}, bỏ ${pages.length - written})` : ''
+console.log(`DONE (text layer · pdftotext) · ${written} trang${range} · ${total} ký tự → ${outDir}`)
 console.log(`ℹ️  Hình/map (line-art) KHÔNG có trong text — dùng: node scripts/export-pdf-image.mjs "${input}" --page <N>`)
