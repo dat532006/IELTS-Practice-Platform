@@ -12,6 +12,15 @@ import { vndToCoins, COIN_VND_RATE, MIN_TOPUP_VND, MAX_TOPUP_VND } from '@/lib/p
 // ⚠️ redirect_url = sandbox placeholder; tích hợp payUrl thật (VNPay/MoMo) khi có keys (Owner/DevOps).
 const TOPUP_PENDING_TTL_MS = 30 * 60 * 1000 // 30 phút
 
+// B-04 (review fix) — cap số topup pending CHƯA hết hạn / user: chống spam tạo pending (rác ledger/đối soát).
+//   Pending quá hạn do cron dọn ('expired') không tính vào cap. Override qua env TOPUP_MAX_PENDING.
+const DEFAULT_MAX_PENDING_TOPUPS = 10
+function getMaxPendingTopups(): number {
+  const raw = Number.parseInt(process.env.TOPUP_MAX_PENDING ?? '', 10)
+  if (!Number.isFinite(raw) || raw < 1) return DEFAULT_MAX_PENDING_TOPUPS
+  return Math.min(raw, 100)
+}
+
 const CreateSchema = z.object({
   amount_vnd: z.number().int().positive(),
   provider: z.enum(['vnpay', 'momo', 'bank']),
@@ -36,8 +45,24 @@ export async function POST(request: Request) {
     return fail('VALIDATION_ERROR', msg, { status: 400 })
   }
 
-  const provider_txn_id = 'TOPUP-' + randomBytes(9).toString('hex')
   const admin = createAdminClient()
+
+  // B-04: đếm pending chưa hết hạn của user TRƯỚC khi insert — vượt cap → 429 (không tạo thêm rác pending).
+  const { count: pendingCount, error: cntErr } = await admin
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('type', 'topup')
+    .eq('status', 'pending')
+    .gt('expires_at', new Date().toISOString())
+  if (cntErr) return fail('INTERNAL', 'Không khởi tạo được thanh toán', { status: 500 })
+  if ((pendingCount ?? 0) >= getMaxPendingTopups()) {
+    return fail('RATE_LIMITED', 'Bạn có quá nhiều giao dịch nạp đang chờ, vui lòng hoàn tất hoặc chờ hết hạn', {
+      status: 429,
+    })
+  }
+
+  const provider_txn_id = 'TOPUP-' + randomBytes(9).toString('hex')
   const { error } = await admin.from('transactions').insert({
     user_id: user.id,
     amount_vnd: parsed.data.amount_vnd, // fiat phải trả (webhook verify khớp)

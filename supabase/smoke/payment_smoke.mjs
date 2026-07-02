@@ -241,22 +241,25 @@ const run = async () => {
   const { data: txnOver } = await a.from('transactions').select('status').eq('provider', 'momo').eq('provider_txn_id', overTxn).single()
   check('overpay giữ pending (chờ đối soát, không auto-credit)', txnOver?.status === 'pending', `status=${txnOver?.status}`)
 
-  // ===== F1 (review) — RECOVERY: webhook hợp lệ đến SAU khi reconcile đã đánh 'failed' (expired) → vẫn credit, KHÔNG mất tiền =====
+  // ===== F1 (review) — RECOVERY: webhook hợp lệ đến SAU khi reconcile đã đánh 'expired' → vẫn credit, KHÔNG mất tiền =====
   await setCoins(a, USER.id, 0)
   const crLate = await api('POST', '/api/payment/create', USER.cookie, { amount_vnd: 80000, provider: 'bank' })
   const lateTxn = crLate.body?.data?.provider_txn_id
-  // mô phỏng reconciliation dọn pending quá hạn → 'failed' (expire_pending_topups đặt đúng status này)
-  await a.from('transactions').update({ status: 'failed' }).eq('provider', 'bank').eq('provider_txn_id', lateTxn)
-  // lệch tiền trên nhánh recover vẫn PHẢI bị chặn (amount verify nới sang 'failed')
+  // mô phỏng reconciliation dọn pending quá hạn: backdate expires_at rồi gọi ĐÚNG RPC expire_pending_topups
+  await a.from('transactions').update({ expires_at: new Date(Date.now() - 3600_000).toISOString() }).eq('provider', 'bank').eq('provider_txn_id', lateTxn)
+  await a.rpc('expire_pending_topups')
+  const { data: txnLateSt } = await a.from('transactions').select('status').eq('provider', 'bank').eq('provider_txn_id', lateTxn).single()
+  check("F1: reconcile đánh 'expired' (B-03, không dùng 'failed')", txnLateSt?.status === 'expired', `status=${txnLateSt?.status}`)
+  // lệch tiền trên nhánh recover vẫn PHẢI bị chặn (amount verify áp cho pending|expired)
   const mmLatePayload = { provider: 'bank', provider_txn_id: lateTxn, amount: 70000, status: 'success' }
   const mmLate = await api('POST', '/api/payment/webhook', null, { ...mmLatePayload, signature: webhookSig(mmLatePayload, webhookSecret) })
   check('F1: recover + lệch tiền → 400 PAYMENT_AMOUNT_MISMATCH', mmLate.status === 400 && mmLate.body?.meta?.error_code === 'PAYMENT_AMOUNT_MISMATCH', `got ${mmLate.status} ${JSON.stringify(mmLate.body?.meta)}`)
   const { data: profMmLate } = await a.from('profiles').select('coins').eq('id', USER.id).single()
   check('F1: recover lệch tiền KHÔNG cộng coin (=0)', profMmLate?.coins === 0, `coins=${profMmLate?.coins}`)
-  // đúng chữ ký + đúng tiền, dù txn đã 'failed' → phục hồi credit đúng 80 coin
+  // đúng chữ ký + đúng tiền, dù txn đã 'expired' → phục hồi credit đúng 80 coin
   const latePayload = { provider: 'bank', provider_txn_id: lateTxn, amount: 80000, status: 'success' }
   const late = await api('POST', '/api/payment/webhook', null, { ...latePayload, signature: webhookSig(latePayload, webhookSecret) })
-  check('F1: webhook muộn (txn đã failed) → credited true (KHÔNG mất tiền)', late.status === 200 && late.body?.data?.credited === true, `got ${late.status} ${JSON.stringify(late.body?.data)}`)
+  check('F1: webhook muộn (txn đã expired) → credited true (KHÔNG mất tiền)', late.status === 200 && late.body?.data?.credited === true, `got ${late.status} ${JSON.stringify(late.body?.data)}`)
   const { data: profLate } = await a.from('profiles').select('coins').eq('id', USER.id).single()
   check('F1: recover cộng đúng 80 coin (80000/1000)', profLate?.coins === 80, `coins=${profLate?.coins}`)
   // idempotent: sau recover, replay KHÔNG cộng lại
@@ -264,6 +267,46 @@ const run = async () => {
   check('F1: replay sau recover → credited false (idempotent)', late2.status === 200 && late2.body?.data?.credited === false)
   const { data: profLate2 } = await a.from('profiles').select('coins').eq('id', USER.id).single()
   check('F1: replay KHÔNG cộng lại (coins=80)', profLate2?.coins === 80, `coins=${profLate2?.coins}`)
+
+  // ===== B-03 — topup 'failed' (provider báo thất bại) KHÔNG BAO GIỜ credit qua webhook =====
+  await setCoins(a, USER.id, 0)
+  const provFailTxn = 'W15-PROVFAIL-' + Date.now()
+  await a.from('transactions').insert({ user_id: USER.id, amount_coins: 999, amount_vnd: 999000, type: 'topup', provider: 'bank', provider_txn_id: provFailTxn, status: 'failed' })
+  const pfPayload = { provider: 'bank', provider_txn_id: provFailTxn, amount: 999000, status: 'success' }
+  const pf = await api('POST', '/api/payment/webhook', null, { ...pfPayload, signature: webhookSig(pfPayload, webhookSecret) })
+  check("B-03: webhook trên txn 'failed' (provider) → credited false (KHÔNG phục hồi)", pf.status === 200 && pf.body?.data?.credited === false, `got ${pf.status} ${JSON.stringify(pf.body?.data)}`)
+  const { data: profPf } = await a.from('profiles').select('coins').eq('id', USER.id).single()
+  check('B-03: provider-failed KHÔNG cộng coin (=0)', profPf?.coins === 0, `coins=${profPf?.coins}`)
+  const { data: txnPf } = await a.from('transactions').select('status').eq('provider', 'bank').eq('provider_txn_id', provFailTxn).single()
+  check("B-03: txn giữ 'failed' (không bị đổi)", txnPf?.status === 'failed', `status=${txnPf?.status}`)
+
+  // ===== B-02 — row creditable THIẾU amount_vnd (legacy) → fail-closed, KHÔNG credit mù =====
+  await setCoins(a, USER.id, 0)
+  const crNull = await api('POST', '/api/payment/create', USER.cookie, { amount_vnd: 60000, provider: 'momo' })
+  const nullTxn = crNull.body?.data?.provider_txn_id
+  await a.from('transactions').update({ amount_vnd: null }).eq('provider', 'momo').eq('provider_txn_id', nullTxn) // mô phỏng row legacy trước 20260607000100
+  const nullPayload = { provider: 'momo', provider_txn_id: nullTxn, amount: 60000, status: 'success' }
+  const nullRes = await api('POST', '/api/payment/webhook', null, { ...nullPayload, signature: webhookSig(nullPayload, webhookSecret) })
+  check('B-02: row thiếu amount_vnd → 400 PAYMENT_AMOUNT_MISMATCH (fail-closed, không credit mù)', nullRes.status === 400 && nullRes.body?.meta?.error_code === 'PAYMENT_AMOUNT_MISMATCH', `got ${nullRes.status} ${JSON.stringify(nullRes.body?.meta)}`)
+  const { data: profNull } = await a.from('profiles').select('coins').eq('id', USER.id).single()
+  check('B-02: KHÔNG cộng coin (=0)', profNull?.coins === 0, `coins=${profNull?.coins}`)
+  const { data: txnNull } = await a.from('transactions').select('status').eq('provider', 'momo').eq('provider_txn_id', nullTxn).single()
+  check('B-02: giữ pending (đối soát tay)', txnNull?.status === 'pending', `status=${txnNull?.status}`)
+
+  // ===== B-04 — cap topup pending chưa hết hạn / user (chống spam pending) =====
+  const USER3 = await signIn(url, anon, service, 'w15-user3@test.dev', 'user')
+  await a.from('transactions').delete().eq('user_id', USER3.id) // dọn run trước để deterministic
+  const CAP = 10 // khớp DEFAULT_MAX_PENDING_TOPUPS (env TOPUP_MAX_PENDING không set trong smoke)
+  let capOk = true
+  for (let i = 0; i < CAP; i++) {
+    const r = await api('POST', '/api/payment/create', USER3.cookie, { amount_vnd: 60000, provider: 'bank' })
+    if (r.status !== 201) { capOk = false; break }
+  }
+  check(`B-04: tạo ${CAP} topup pending đầu → đều 201`, capOk)
+  const over11 = await api('POST', '/api/payment/create', USER3.cookie, { amount_vnd: 60000, provider: 'bank' })
+  check('B-04: topup pending vượt cap → 429 RATE_LIMITED', over11.status === 429 && over11.body?.meta?.error_code === 'RATE_LIMITED', `got ${over11.status} ${JSON.stringify(over11.body?.meta)}`)
+  const { count: pendCnt } = await a.from('transactions').select('*', { count: 'exact', head: true }).eq('user_id', USER3.id).eq('type', 'topup').eq('status', 'pending')
+  check(`B-04: KHÔNG tạo pending vượt cap (count=${CAP})`, pendCnt === CAP, `count=${pendCnt}`)
 
   // ===== R2 (review cross-check) — webhook status=success THIẾU `amount` → fail-closed, KHÔNG credit mù =====
   await setCoins(a, USER.id, 0)
