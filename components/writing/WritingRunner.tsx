@@ -40,6 +40,7 @@ export function WritingRunner({ testId }: { testId: string }) {
   const [task2, setTask2] = useState('')
   const [result, setResult] = useState<WritingGradeResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [restarting, setRestarting] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -103,6 +104,8 @@ export function WritingRunner({ testId }: { testId: string }) {
       const code = j?.meta?.error_code
       if (r.status === 404) return setPhase('notfound')
       if (r.status === 429) setErrorMsg('Bạn đã dùng hết lượt chấm AI miễn phí hôm nay. Thử lại ngày mai hoặc nâng cấp Pro.')
+      // B-05: attempt đã chấm xong là terminal — cần lượt mới (nút "Viết lại" tự tạo).
+      else if (code === 'ATTEMPT_TERMINAL') setErrorMsg('Lượt làm này đã được chấm xong. Bấm "← Viết lại" để tạo lượt mới rồi nộp lại — bài viết của bạn vẫn được giữ nguyên.')
       else if (code === 'WORD_COUNT_TOO_LOW') setErrorMsg('Task 1 cần ≥150 từ và Task 2 cần ≥250 từ.')
       else if (r.status === 502) setErrorMsg('Hệ thống chấm AI tạm thời không khả dụng. Bài viết được giữ nguyên — vui lòng thử lại.')
       else setErrorMsg((j?.message as string) || 'Không chấm được bài. Vui lòng thử lại.')
@@ -112,6 +115,30 @@ export function WritingRunner({ testId }: { testId: string }) {
       setPhase('active')
     }
   }, [attempt, task1, task2])
+
+  // FE-F05 (khớp B-05): attempt bị finalize `submitted` ngay sau lần chấm đầu → chấm lại attempt cũ = 409.
+  //   "Viết lại" phải xin attempt in_progress MỚI qua /start (idempotent: terminal không chặn tạo mới).
+  //   Text bài viết giữ nguyên trong state — chỉ đổi attempt.
+  const rewrite = useCallback(async () => {
+    if (restarting) return
+    setErrorMsg('')
+    setRestarting(true)
+    try {
+      const sr = await fetch(`/api/exam/${testId}/start`, { method: 'POST' })
+      const sj = await sr.json().catch(() => null)
+      if (sr.ok && sj?.data?.attempt_id) {
+        setAttempt(sj.data as AttemptDTO)
+        setResult(null)
+        setPhase('active')
+      } else {
+        setErrorMsg('Không tạo được lượt viết mới — vui lòng tải lại trang.')
+      }
+    } catch {
+      setErrorMsg('Lỗi kết nối khi tạo lượt viết mới — vui lòng tải lại trang.')
+    } finally {
+      setRestarting(false)
+    }
+  }, [restarting, testId])
 
   // ---- States ----
   if (phase === 'loading') return <Centered>Đang tải bài viết…</Centered>
@@ -147,17 +174,16 @@ export function WritingRunner({ testId }: { testId: string }) {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => {
-                setResult(null)
-                setPhase('active')
-              }}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100"
+              onClick={rewrite}
+              disabled={restarting}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              ← Viết lại
+              {restarting ? 'Đang tạo lượt mới…' : '← Viết lại'}
             </button>
             <Link href={`/writing-result/${result.attempt_id}`} className="text-sm text-teal-700 underline">
               Xem lại kết quả này
             </Link>
+            {errorMsg && <span className="text-sm text-red-600">{errorMsg}</span>}
           </div>
         </main>
       ) : (
