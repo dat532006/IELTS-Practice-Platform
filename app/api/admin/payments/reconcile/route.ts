@@ -4,7 +4,7 @@ import { ok, fail } from '@/lib/api/response'
 
 // POST /api/admin/payments/reconcile — dọn topup pending quá hạn (M08, W16 G9).
 // LUẬT THÉP: requireAdmin TRƯỚC (server-side role check), rồi mới gọi service_role RPC.
-//   expire_pending_topups: pending + expires_at < now() → status='failed'. KHÔNG cộng coin (credit chỉ ở webhook).
+//   expire_pending_topups: pending + expires_at < now() → status='expired' (B-03). KHÔNG cộng coin (credit chỉ ở webhook).
 //   Idempotent: chỉ đụng pending quá hạn → chạy lại nhiều lần an toàn. Có thể gọi từ cron/job ngoài.
 export async function POST() {
   const g = await requireAdminApi()

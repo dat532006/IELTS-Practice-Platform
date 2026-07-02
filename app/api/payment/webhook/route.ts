@@ -44,9 +44,11 @@ export async function POST(request: Request) {
 
   // W16 — verify SỐ TIỀN khớp chính xác transaction (paid_vnd == amount_vnd).
   //   Lệch tiền → KHÔNG credit, KHÔNG mark success, giữ nguyên để đối soát (chưa có policy xử lý phần dư).
-  //   amount_vnd null (row cũ trước migration) → bỏ qua so khớp (backward-compat row legacy).
-  //   F1: xét cả 'failed' (topup pending quá hạn đã bị reconcile dọn) — credit_topup phục hồi được,
-  //       nên amount vẫn PHẢI verify trên đúng row đó, không chỉ 'pending'.
+  //   B-02 (review fix): row creditable mà amount_vnd IS NULL (legacy trước migration 20260607000100)
+  //     → FAIL-CLOSED 400 (không còn nhánh credit-mù bỏ qua đối chiếu; xử lý tay khi đối soát).
+  //   B-03: reconcile giờ đánh 'expired' (không phải 'failed') — credit_topup chỉ phục hồi
+  //     pending|expired, nên amount verify trên đúng 2 status đó. 'failed' = provider-failed, không credit.
+  //   Không thấy row (đã 'success'/không tồn tại) → đi tiếp: credit_topup tự trả credited=false (idempotent).
   {
     const { data: txn } = await admin
       .from('transactions')
@@ -54,12 +56,18 @@ export async function POST(request: Request) {
       .eq('provider', parsed.data.provider)
       .eq('provider_txn_id', parsed.data.provider_txn_id)
       .eq('type', 'topup')
-      .in('status', ['pending', 'failed'])
+      .in('status', ['pending', 'expired'])
       .maybeSingle()
-    const expected = (txn as { amount_vnd: number | null } | null)?.amount_vnd
-    if (expected != null && parsed.data.amount !== expected) {
+    const row = txn as { amount_vnd: number | null } | null
+    if (row && row.amount_vnd == null) {
       console.error(
-        `[payment/webhook] amount mismatch txn=${parsed.data.provider_txn_id} paid=${parsed.data.amount} expected=${expected}`,
+        `[payment/webhook] missing amount_vnd on creditable txn=${parsed.data.provider_txn_id} — fail-closed, cần đối soát tay`,
+      )
+      return fail('PAYMENT_AMOUNT_MISMATCH', 'Giao dịch thiếu số tiền đối chiếu', { status: 400 })
+    }
+    if (row && parsed.data.amount !== row.amount_vnd) {
+      console.error(
+        `[payment/webhook] amount mismatch txn=${parsed.data.provider_txn_id} paid=${parsed.data.amount} expected=${row.amount_vnd}`,
       )
       return fail('PAYMENT_AMOUNT_MISMATCH', 'Số tiền thanh toán không khớp', { status: 400 })
     }

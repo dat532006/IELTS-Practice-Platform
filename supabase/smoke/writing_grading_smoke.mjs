@@ -138,24 +138,36 @@ const run = async () => {
     check('writing_submissions persisted error_highlights sanitized', Array.isArray(ws?.ai_score?.task1?.error_highlights) && !deepHas(ws.ai_score.task1.error_highlights, 'answer_keys'))
   }
 
-  // === 3) Free 2nd grade same day → 429 (rate limit, không gọi Claude) ===
+  // === 3a) B-05 (review fix): attempt đã terminal (chấm xong ở §2) → chấm lại bị chặn 409, KHÔNG tiêu quota ===
   {
     const r = await api('POST', '/api/grade-writing', A.cookie, { attempt_id: attemptA, task1_text: words(160), task2_text: words(260) })
+    check('B-05: re-grade attempt terminal → 409', r.status === 409, `got ${r.status}`)
+    check('B-05: error_code ATTEMPT_TERMINAL', r.body?.meta?.error_code === 'ATTEMPT_TERMINAL', JSON.stringify(r.body?.meta))
+    const { data: ws } = await A.admin.from('writing_submissions').select('id', { count: 'exact' }).eq('attempt_id', attemptA)
+    check('B-05: writing_submissions KHÔNG bị ghi đè/nhân bản (=1)', (ws ?? []).length === 1, `count=${(ws ?? []).length}`)
+  }
+
+  // === 3b) Free 2nd grade same day → 429 (rate limit, không gọi Claude) — attempt MỚI (in_progress) để qua guard terminal ===
+  {
+    const attemptA2 = await startAttempt(A.cookie)
+    const r = await api('POST', '/api/grade-writing', A.cookie, { attempt_id: attemptA2, task1_text: words(160), task2_text: words(260) })
     check('free 2nd/day → 429', r.status === 429, `got ${r.status}`)
     check('error_code RATE_LIMITED', r.body?.meta?.error_code === 'RATE_LIMITED', JSON.stringify(r.body?.meta))
   }
 
-  // === 4) Pro bypass: B plan=pro → chấm nhiều lần OK ===
+  // === 4) Pro bypass: B plan=pro → chấm nhiều lần OK (mỗi lần 1 attempt mới — attempt terminal không chấm lại, B-05) ===
   {
     await B.admin.from('profiles').update({ plan: 'pro' }).eq('id', B.session.user.id)
     const attemptB = await startAttempt(B.cookie)
     const r1 = await api('POST', '/api/grade-writing', B.cookie, { attempt_id: attemptB, task1_text: words(160), task2_text: words(260) })
-    const r2 = await api('POST', '/api/grade-writing', B.cookie, { attempt_id: attemptB, task1_text: words(170), task2_text: words(270) })
     check('Pro grade #1 → 200', r1.status === 200, `got ${r1.status}`)
-    check('Pro grade #2 (same day) → 200 (bypass rate limit)', r2.status === 200, `got ${r2.status}`)
+    const attemptB2 = await startAttempt(B.cookie) // attemptB đã terminal → retake = attempt mới
+    const r2 = await api('POST', '/api/grade-writing', B.cookie, { attempt_id: attemptB2, task1_text: words(170), task2_text: words(270) })
+    check('Pro grade #2 (same day, attempt mới) → 200 (bypass rate limit)', r2.status === 200, `got ${r2.status}`)
     const limit = aiIpLimit()
     await B.admin.from('ai_grade_ip_usage').upsert({ ip_hash: aiIpHash(LIMITED_IP), used_on: today(), count: limit }, { onConflict: 'ip_hash,used_on' })
-    const limited = await api('POST', '/api/grade-writing', B.cookie, { attempt_id: attemptB, task1_text: words(180), task2_text: words(280) }, { 'x-vercel-forwarded-for': LIMITED_IP })
+    const attemptB3 = await startAttempt(B.cookie)
+    const limited = await api('POST', '/api/grade-writing', B.cookie, { attempt_id: attemptB3, task1_text: words(180), task2_text: words(280) }, { 'x-vercel-forwarded-for': LIMITED_IP })
     check('IP daily limit prefilled → 429', limited.status === 429, `got ${limited.status}`)
     check('IP limit error_code RATE_LIMITED', limited.body?.meta?.error_code === 'RATE_LIMITED', JSON.stringify(limited.body?.meta))
   }
