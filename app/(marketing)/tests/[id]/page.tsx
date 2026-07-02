@@ -91,17 +91,12 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
         {/* CTA theo access-state */}
         <div className="mt-6 border-t border-slate-100 pt-5">
           {canEnter ? (
-            <>
-              <Link
-                href={`/exam/${meta.id}`}
-                className="inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-800 sm:w-auto"
-              >
-                {meta.is_free ? 'Bắt đầu làm bài →' : 'Vào làm bài →'}
-              </Link>
-              <p className="mt-2 text-xs text-slate-400">
-                Trình làm bài (exam engine) sẽ mở ở W5.
-              </p>
-            </>
+            <Link
+              href={`/exam/${meta.id}`}
+              className="inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-800 sm:w-auto"
+            >
+              {meta.is_free ? 'Bắt đầu làm bài →' : 'Vào làm bài →'}
+            </Link>
           ) : state === 'locked_guest' ? (
             <>
               <Link
@@ -111,34 +106,23 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
                 Đăng nhập để mở khóa
               </Link>
               <p className="mt-2 text-xs text-slate-400">
-                Đây là đề trả phí — đăng nhập rồi mua bộ đề hoặc nhập mã kích hoạt.
+                Đây là đề trả phí — đăng nhập rồi mua bộ đề bằng coin để mở khóa.
               </p>
             </>
           ) : (
-            /* locked_auth — đã đăng nhập nhưng chưa mở khóa: CTA Mua/Nhập mã placeholder (checkout M08/W15–16) */
+            /* locked_auth — đã đăng nhập nhưng chưa mở khóa: CTA mua bundle chứa đề (checkout coin W16 đã live).
+               FE-F01: hết nút disabled/copy "mở ở W15–16"; redeem KHÔNG thuộc luồng mua thường (Owner W16). */
             <>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <button
-                  type="button"
-                  disabled
-                  title="Thanh toán mở ở giai đoạn sau (W15–16)"
-                  className="inline-flex items-center justify-center rounded-md bg-teal-700 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Mua bộ đề
-                </button>
-                <button
-                  type="button"
-                  disabled
-                  title="Nhập mã kích hoạt mở ở giai đoạn sau (W15–16)"
-                  className="inline-flex items-center justify-center rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Nhập mã
-                </button>
-              </div>
+              <Link
+                href={meta.product ? `/products/${meta.product.slug}` : '/products'}
+                className="inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-800 sm:w-auto"
+              >
+                {meta.product ? `Mua bộ đề "${meta.product.title}" →` : 'Xem bộ đề chứa đề này →'}
+              </Link>
               <p className="mt-2 text-xs text-slate-400">
-                Đề trả phí — mua bộ đề chứa đề này hoặc nhập mã kích hoạt (mở ở giai đoạn sau).{' '}
+                Đề trả phí — mua bộ đề bằng coin, mở khóa ngay sau khi thanh toán.{' '}
                 <Link href="/products" className="text-teal-700 hover:underline">
-                  Xem bộ đề
+                  Xem tất cả bộ đề
                 </Link>
               </p>
             </>

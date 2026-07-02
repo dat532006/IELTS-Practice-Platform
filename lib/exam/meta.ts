@@ -37,6 +37,19 @@ export async function getTestMeta(
   if (!t) return null
 
   const unlocked = t.is_free || (await hasTestUnlock(supabase, t.id, userId))
+
+  // FE-F01: tìm product published chứa test (RLS collection_tests: chỉ lộ khi CẢ product & test published)
+  //   → pre-exam locked có CTA mua thẳng bundle. Chỉ metadata public (slug/title); lỗi/không có → null.
+  let product: { slug: string; title: string } | null = null
+  const { data: linkData } = await supabase
+    .from('collection_tests')
+    .select('product_id, products(slug, title)')
+    .eq('test_id', t.id)
+    .limit(1)
+    .maybeSingle()
+  const linked = (linkData as { products?: { slug?: string | null; title?: string | null } | null } | null)?.products
+  if (linked?.slug) product = { slug: linked.slug, title: linked.title ?? linked.slug }
+
   return {
     id: t.id,
     title: t.title,
@@ -47,5 +60,6 @@ export async function getTestMeta(
     source: t.source,
     question_types: t.question_types ?? [],
     locked: !unlocked,
+    product,
   }
 }
