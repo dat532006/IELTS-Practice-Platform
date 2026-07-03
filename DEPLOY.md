@@ -105,7 +105,7 @@ where relnamespace='public'::regnamespace and relkind='r' order by relname;
 
 **E3. Payment webhook** — ở dashboard cổng thanh toán: URL = `https://<domain>/api/payment/webhook`, secret khớp `PAYMENT_WEBHOOK_SECRET` (sandbox HMAC) hoặc scheme provider (live).
 
-**E4. Cron** — `vercel.json` tự đăng ký job `reconcile-topups` (lịch `0 * * * *`) khi deploy. Kiểm Vercel → Cron Jobs. Test tay:
+**E4. Cron** — `vercel.json` tự đăng ký job `reconcile-topups` (lịch `0 0 * * *` — **1 lần/ngày**, do Vercel **Hobby** chỉ cho cron hàng ngày). Lên **Pro** thì có thể đổi về `0 * * * *` (mỗi giờ) để dọn topup pending nhanh hơn — không bắt buộc vì webhook mới là nguồn cộng coin, cron chỉ housekeeping. Kiểm Vercel → Cron Jobs. Test tay:
 ```bash
 curl -i -H "Authorization: Bearer <CRON_SECRET>" https://<domain>/api/cron/reconcile-topups
 # 200 {"expired":N}; token sai → 401; thiếu env CRON_SECRET → 503 (fail-closed)
