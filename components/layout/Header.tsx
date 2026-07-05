@@ -6,10 +6,12 @@ import { createClient } from '@/lib/supabase/client'
 import { MAIN_NAV } from '@/lib/nav'
 import { Logo } from '@/components/brand/Logo'
 import { FishBone } from '@/components/brand/FishBone'
+import { AccountAvatar } from '@/components/account/AccountAvatar'
 
 export function Header() {
   const [email, setEmail] = useState<string | null>(null)
   const [coins, setCoins] = useState<number | null>(null)
+  const [avatar, setAvatar] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -21,10 +23,13 @@ export function Header() {
         setEmail(data.user.email ?? null)
         const { data: profile } = await supabase
           .from('profiles')
-          .select('coins')
+          .select('coins, avatar')
           .eq('id', data.user.id)
           .single()
-        if (active) setCoins(profile?.coins ?? 0)
+        if (active) {
+          setCoins(profile?.coins ?? 0)
+          setAvatar(profile?.avatar ?? null)
+        }
       })
       .catch(() => {
         /* chưa đăng nhập / chưa cấu hình env — render trạng thái logged-out */
@@ -92,6 +97,14 @@ export function Header() {
               >
                 Đăng xuất
               </button>
+              <Link
+                href="/account"
+                aria-label="Tài khoản"
+                title="Tài khoản"
+                className="flex flex-none overflow-hidden rounded-[11px] shadow-[0_6px_14px_-4px_rgba(124,92,230,0.6)] transition hover:opacity-90"
+              >
+                <AccountAvatar name={email} email={email} avatar={avatar} size={36} radius={11} fontSize={15} />
+              </Link>
             </>
           ) : (
             <>

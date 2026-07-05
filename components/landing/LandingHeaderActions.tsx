@@ -4,12 +4,14 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { FishBone } from '@/components/brand/FishBone'
+import { AccountAvatar } from '@/components/account/AccountAvatar'
 
 // Header actions cho trang chủ (landing) — phản ánh trạng thái đăng nhập giống Header dùng chung.
 // Guest: Log in / Start free. Đã đăng nhập: Dashboard + số dư xương cá + Log out.
 export function LandingHeaderActions() {
   const [email, setEmail] = useState<string | null>(null)
   const [coins, setCoins] = useState<number | null>(null)
+  const [avatar, setAvatar] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -26,11 +28,12 @@ export function LandingHeaderActions() {
         setEmail(data.user.email ?? null)
         const { data: profile } = await supabase
           .from('profiles')
-          .select('coins')
+          .select('coins, avatar')
           .eq('id', data.user.id)
           .single()
         if (active) {
           setCoins(profile?.coins ?? 0)
+          setAvatar(profile?.avatar ?? null)
           setReady(true)
         }
       })
@@ -88,6 +91,9 @@ export function LandingHeaderActions() {
       <button type="button" onClick={logout} className="btn-login">
         Log out
       </button>
+      <Link href="/account" aria-label="Tài khoản" title="Tài khoản" className="flex flex-none overflow-hidden rounded-[11px]">
+        <AccountAvatar name={email} email={email} avatar={avatar} size={34} radius={11} fontSize={14} />
+      </Link>
     </div>
   )
 }
