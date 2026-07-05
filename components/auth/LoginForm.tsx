@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-
-const INPUT =
-  'mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600'
+import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton'
+import { AuthCard, AuthField, FieldLabel, PasswordField, PrimaryButton } from '@/components/auth/fields'
+import { MailIcon, LockIcon } from '@/components/brand/icons'
 
 // `next` đã được sanitize ở server (login page) — path nội bộ an toàn, mặc định '/'.
 export function LoginForm({ next = '/' }: { next?: string }) {
@@ -31,45 +31,64 @@ export function LoginForm({ next = '/' }: { next?: string }) {
     router.refresh()
   }
 
-  async function google() {
-    const supabase = createClient()
-    // Thread `next` qua callback để OAuth cũng quay lại đúng đích (callback re-sanitize).
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
-  }
-
   return (
-    <div>
-      <h1 className="text-lg font-bold">Đăng nhập</h1>
-      <button
-        onClick={google}
-        className="mt-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50"
-      >
-        Tiếp tục với Google
-      </button>
-      <div className="my-4 text-center text-xs text-slate-400">hoặc</div>
-      <form onSubmit={onSubmit} className="space-y-3">
-        <label className="block text-sm">
-          Email
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={INPUT} />
-        </label>
-        <label className="block text-sm">
-          Mật khẩu
-          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className={INPUT} />
-        </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50"
-        >
-          {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
-        </button>
-      </form>
-      <div className="mt-4 flex justify-between text-xs text-slate-500">
-        <Link href="/forgot-password" className="hover:text-teal-700">Quên mật khẩu?</Link>
-        <Link href="/register" className="hover:text-teal-700">Tạo tài khoản</Link>
-      </div>
+    <div className="flex flex-col items-center">
+      <AuthCard>
+        <h2 className="text-[23px] font-extrabold tracking-[-0.02em]">Chào mừng trở lại</h2>
+        <p className="mt-1.5 text-[14px] font-semibold text-[#857F96]">
+          Đăng nhập để tiếp tục hành trình luyện band.
+        </p>
+
+        <div className="mt-[22px]">
+          <GoogleAuthButton next={next} />
+        </div>
+
+        <div className="my-5 flex items-center gap-3">
+          <span className="h-px flex-1 bg-[#EDE8F3]" />
+          <span className="text-[12px] font-bold text-[#B0A9C0]">hoặc</span>
+          <span className="h-px flex-1 bg-[#EDE8F3]" />
+        </div>
+
+        <form onSubmit={onSubmit}>
+          <AuthField
+            label="Email"
+            type="email"
+            required
+            icon={<MailIcon />}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+
+          <PasswordField
+            className="mt-4"
+            labelRow={
+              <div className="mb-[7px] flex items-center justify-between">
+                <FieldLabel>Mật khẩu</FieldLabel>
+                <Link href="/forgot-password" className="text-[12.5px] font-bold text-[#6A48D6]">
+                  Quên mật khẩu?
+                </Link>
+              </div>
+            }
+            required
+            icon={<LockIcon />}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
+          {error && <p className="mt-3.5 text-[13.5px] font-semibold text-[#EF5B5B]">{error}</p>}
+
+          <PrimaryButton type="submit" disabled={loading} className="mt-[22px]">
+            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+          </PrimaryButton>
+        </form>
+      </AuthCard>
+
+      <p className="mt-5 text-[13.5px] font-semibold text-[#857F96]">
+        Chưa có tài khoản?{' '}
+        <Link href="/register" className="font-bold text-[#6A48D6]">
+          Đăng ký miễn phí →
+        </Link>
+      </p>
     </div>
   )
 }

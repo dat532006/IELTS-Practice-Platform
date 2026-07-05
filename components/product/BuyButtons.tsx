@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { FishBone } from '@/components/brand/FishBone'
 
 // W16 — Buy-now bằng coin (M08). Đọc số dư coin của user (RLS own-row) để hiện đủ/thiếu coin;
 //   đủ → POST /api/checkout { product_id } (server trừ coin atomic, active ngay) → reload.
@@ -82,8 +83,8 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
       {/* Số dư */}
       <div className="mt-4 flex items-center justify-between rounded-[12px] border border-[#EEEAF6] bg-[#FBFAFF] px-3.5 py-[11px]">
         <span className="text-[13px] font-semibold text-[#857F96]">Số dư của bạn</span>
-        <span className={`text-[14.5px] font-extrabold ${enough ? 'text-[#1E9E63]' : 'text-[#C98A1A]'}`}>
-          🪙 {balance == null ? '…' : balance.toLocaleString('vi-VN')}
+        <span className={`flex items-center gap-1.5 text-[14.5px] font-extrabold ${enough ? 'text-[#1E9E63]' : 'text-[#C98A1A]'}`}>
+          <FishBone /> {balance == null ? '…' : balance.toLocaleString('vi-VN')}
         </span>
       </div>
 
@@ -92,7 +93,7 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
           <div className="mt-4 flex items-center gap-2.5 rounded-[13px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[13px]">
             <span className="h-[7px] w-[7px] flex-none rounded-full bg-[#E59A1B]" />
             <span className="text-[13px] font-semibold leading-[1.4] text-[#A66A12]">
-              Thiếu <b>🪙{need.toLocaleString('vi-VN')}</b> để mua bộ đề này.
+              Thiếu <b className="inline-flex items-center gap-1"><FishBone />{need.toLocaleString('vi-VN')}</b> để mua bộ đề này.
             </span>
           </div>
           <Link
@@ -115,12 +116,16 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
           >
             {buying ? 'Đang xử lý…' : (
               <>
-                Mua bằng coin <span className="font-extrabold opacity-85">· 🪙 {priceCoins}</span>
+                Mua bằng xương cá{' '}
+                <span className="inline-flex items-center gap-1 font-extrabold opacity-85">
+                  · <FishBone /> {priceCoins}
+                </span>
               </>
             )}
           </button>
-          <div className="mt-[11px] text-center text-[12.5px] font-semibold text-[#A8A2BA]">
-            Trừ 🪙{priceCoins} — sở hữu vĩnh viễn, làm lại không giới hạn
+          <div className="mt-[11px] flex items-center justify-center gap-1 text-center text-[12.5px] font-semibold text-[#A8A2BA]">
+            Trừ <FishBone />
+            {priceCoins} — sở hữu vĩnh viễn, làm lại không giới hạn
           </div>
         </>
       )}

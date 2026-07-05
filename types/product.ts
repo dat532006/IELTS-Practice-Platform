@@ -11,5 +11,7 @@ export type ProductCardData = {
   priceCoins: number
   skills: string[]
   attemptsTotal?: number
+  testCount?: number
+  hot?: boolean // suy từ attempts_total (dữ liệu thật), không bịa
   state: ProductState
 }

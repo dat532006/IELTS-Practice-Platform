@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { FishBone } from '@/components/brand/FishBone'
 
 // Card visual ported from the Claude Design landing ("IELTS Practice Home.dc.html").
 // State-driven badge / CTA / cover gradient, matching the design's deriveCard() logic.
@@ -26,17 +27,28 @@ function badgeFor(state: LandingCardState) {
   return { label: 'Coming soon', bg: '#EFEBF2', color: '#8B8398' }
 }
 
-// FE-F07: user KHÔNG có luồng redeem (Owner W16: redeem chỉ admin/offline) → CTA chỉ nói mua bằng coin.
-function ctaFor(state: LandingCardState, price: number) {
-  if (state === 'free') return { text: 'Try now →', color: '#1E9E63' }
-  if (state === 'locked') return { text: `🪙 ${price} · Buy with coins`, color: '#C98A1A' }
-  return { text: 'Coming soon', color: '#9D96AE' }
+// FE-F07: user KHÔNG có luồng redeem (Owner W16: redeem chỉ admin/offline) → CTA chỉ nói mua bằng xương cá.
+function ctaFor(state: LandingCardState) {
+  if (state === 'free') return { color: '#1E9E63' }
+  if (state === 'locked') return { color: '#C98A1A' }
+  return { color: '#9D96AE' }
+}
+
+function CtaContent({ state, price }: { state: LandingCardState; price: number }) {
+  if (state === 'free') return <>Try now →</>
+  if (state === 'locked')
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <FishBone /> {price} · Buy with fish bones
+      </span>
+    )
+  return <>Coming soon</>
 }
 
 export function LandingProductCard({ p }: { p: LandingProduct }) {
   const sm = skillMeta[p.skills[0]] ?? skillMeta.reading
   const badge = badgeFor(p.state)
-  const cta = ctaFor(p.state, p.price)
+  const cta = ctaFor(p.state)
   const attemptsText = p.attempts > 0 ? `${p.attempts.toLocaleString('en-US')} attempts` : 'New'
 
   const card = (
@@ -65,7 +77,7 @@ export function LandingProductCard({ p }: { p: LandingProduct }) {
           })}
         </div>
         <div className="product-cta" style={{ color: cta.color }}>
-          {cta.text}
+          <CtaContent state={p.state} price={p.price} />
         </div>
       </div>
     </div>

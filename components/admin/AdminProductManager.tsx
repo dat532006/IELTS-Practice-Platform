@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { FishBone } from '@/components/brand/FishBone'
 
 // W13 — Admin Product/Bundle manager (M11/M04). Guard THẬT ở server (admin layout + /api/admin/* requireAdmin).
 //   Client chỉ gọi API; KHÔNG import scoring/secret. Giá là dữ liệu admin nhập — SERVER là nguồn (price_coins authoritative).
@@ -222,8 +223,14 @@ export function AdminProductManager() {
                 {p.kind ?? '—'}
               </span>
               <span className="text-[13.5px] font-bold text-[#564F6B]">{p.test_count}</span>
-              <span className="text-[13.5px] font-extrabold text-[#2A2740]">
-                {p.price_coins === 0 ? 'Free' : `🪙 ${p.price_coins}`}
+              <span className="inline-flex items-center gap-1.5 text-[13.5px] font-extrabold text-[#2A2740]">
+                {p.price_coins === 0 ? (
+                  'Free'
+                ) : (
+                  <>
+                    <FishBone /> {p.price_coins}
+                  </>
+                )}
               </span>
               <span className={`justify-self-start rounded-full px-2.5 py-1 text-[11.5px] font-extrabold ${statusStyle(p.status)}`}>
                 {p.status}

@@ -1,11 +1,30 @@
 @import "tailwindcss";
 
+/* Design system (handoff): purple / Plus Jakarta Sans. */
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+}
+
 :root {
-  --brand: #0f766e;
+  /* Brand tokens — dùng chung cho auth/catalog/detail/prediction. */
+  --brand: #7c5ce6;
+  --deep: #6a48d6;
+  --soft: #f0ecff;
+  --ink: #2a2740;
+  /* Skill accents */
+  --skill-reading: #f2724e;
+  --skill-listening: #eca22b;
+  --skill-writing: #7c5ce6;
+  --skill-speaking: #ee5c92;
 }
 
 html {
   scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 /* W8 — Highlight đoạn văn: rule `::highlight(exam-highlight)` được inject lúc runtime

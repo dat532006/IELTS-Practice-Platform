@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { FishBone } from '@/components/brand/FishBone'
 
 // W13 — Admin Product/Bundle detail manager (M11/M04). Client gọi API; guard THẬT ở server.
 //   Sửa meta/giá (PATCH), gắn đề + sắp xếp position (upsert), publish + refresh catalog (server).
@@ -339,9 +340,9 @@ export function AdminProductDetail({ productId }: { productId: string }) {
         {/* Right: pricing + publish */}
         <aside className="flex flex-col gap-4">
           <div className="rounded-[16px] border border-[#ECE7F4] bg-white p-5">
-            <div className="text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-[#6A6480]">Giá (coins)</div>
+            <div className="text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-[#6A6480]">Giá (xương cá)</div>
             <div className="mt-2.5 flex items-center gap-2.5 rounded-[11px] border border-[#E4DEEE] bg-[#FBFAFF] px-3.5 py-2.5">
-              <span className="text-[18px]">🪙</span>
+              <span className="flex text-[18px]"><FishBone /></span>
               <input
                 type="number"
                 min={0}

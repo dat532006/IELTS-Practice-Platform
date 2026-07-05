@@ -1,23 +1,35 @@
 import { BuyButtons } from './BuyButtons'
 import { PaymentDisclaimer } from '@/components/payment/PaymentDisclaimer'
+import { FishBone } from '@/components/brand/FishBone'
+import { CheckIcon } from '@/components/brand/icons'
 
-// Panel CTA mua product detail (M08, W16). owned / free / buy — layout theo design frame 2.
+// Panel CTA mua product detail (M08, W16). owned / free / buy — layout theo design handoff (aside).
 // ⚠️ Normal purchase flow KHÔNG dùng activation code → KHÔNG nút "Nhập mã" (redeem chỉ cho admin/offline).
-// price_coins server-authoritative; ở đây chỉ hiển thị.
+// price_coins server-authoritative; ở đây chỉ hiển thị. 1 xương cá = 1.000 ₫ (fixed-rate).
 
-function TrustFooter() {
-  const Item = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex items-center gap-2.5 text-[13px] font-semibold text-[#564F6B]">
-      <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-[6px] bg-[#F0ECFF]">
-        <span className="block h-[6px] w-[6px] rotate-45 rounded-[2px] bg-[#7C5CE6]" />
+function IncludedItem({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2.5 text-[13.5px] font-semibold text-[#4A445E]">
+      <span className="flex h-5 w-5 flex-none items-center justify-center rounded-[6px] bg-[#E7F7EE] text-[#1E9E63]">
+        <CheckIcon size={12} strokeWidth={3.2} />
       </span>
       {children}
     </div>
   )
+}
+
+function Included({ testCount }: { testCount?: number }) {
   return (
-    <div className="mt-5 flex flex-col gap-2.5 border-t border-[#F0ECF6] pt-4">
-      <Item>Giao diện thi máy như thật</Item>
-      <Item>Chấm điểm server-side, có giải thích</Item>
+    <div className="mt-5 border-t border-[#EDE8F3] pt-5">
+      <div className="text-[12.5px] font-extrabold uppercase tracking-[0.04em] text-[#2A2740]">
+        Gồm những gì
+      </div>
+      <div className="mt-3.5 flex flex-col gap-3">
+        <IncludedItem>{testCount ? `${testCount} đề full-length` : 'Trọn bộ đề'}</IncludedItem>
+        <IncludedItem>Giao diện thi máy như thật</IncludedItem>
+        <IncludedItem>Chấm điểm server-side</IncludedItem>
+        <IncludedItem>Đáp án chi tiết, có giải thích</IncludedItem>
+      </div>
     </div>
   )
 }
@@ -26,13 +38,15 @@ export function PurchaseCta({
   productId,
   priceCoins,
   owned,
+  testCount,
 }: {
   productId: string
   priceCoins: number
   owned: boolean
+  testCount?: number
 }) {
   return (
-    <div className="rounded-[20px] border border-[#ECE7F4] bg-white p-6 text-[#2A2740] shadow-[0_22px_46px_-28px_rgba(60,40,90,0.4)]">
+    <div className="rounded-[20px] border border-[#EEEAF3] bg-white p-6 text-[#2A2740] shadow-[0_26px_50px_-30px_rgba(90,60,160,0.4)]">
       {owned ? (
         <>
           <div className="inline-flex items-center gap-2 rounded-full bg-[#E7F7EE] px-3.5 py-[7px] text-[13px] font-extrabold text-[#1E9E63]">
@@ -47,6 +61,7 @@ export function PurchaseCta({
           >
             Vào làm bài →
           </a>
+          <Included testCount={testCount} />
         </>
       ) : priceCoins === 0 ? (
         <>
@@ -54,7 +69,7 @@ export function PurchaseCta({
             Miễn phí
           </div>
           <p className="mt-3.5 text-[14px] leading-[1.6] text-[#5C5670]">
-            Bộ đề này hoàn toàn miễn phí — không cần coin. Làm ngay không giới hạn.
+            Bộ đề này hoàn toàn miễn phí — không cần xương cá. Làm ngay không giới hạn.
           </p>
           <a
             href="#muc-luc"
@@ -62,20 +77,24 @@ export function PurchaseCta({
           >
             Làm ngay →
           </a>
+          <Included testCount={testCount} />
         </>
       ) : (
         <>
-          <div className="text-[12.5px] font-bold uppercase tracking-[0.05em] text-[#9D96AE]">Giá bộ đề</div>
-          <div className="mt-[7px] flex items-baseline gap-2">
-            <span className="text-[34px] font-extrabold tracking-[-0.02em] text-[#2A2740]">🪙 {priceCoins}</span>
-            <span className="text-[14px] font-bold text-[#857F96]">coins</span>
+          <div className="text-[12.5px] font-bold text-[#9D96AE]">Mở khoá cả bộ đề</div>
+          <div className="mt-2 flex items-baseline gap-2.5">
+            <span className="flex items-center gap-2 text-[34px] font-extrabold tracking-[-0.02em] text-[#2A2740]">
+              <FishBone /> {priceCoins}
+            </span>
+          </div>
+          <div className="mt-1 text-[13.5px] font-semibold text-[#857F96]">
+            ≈ {(priceCoins * 1000).toLocaleString('vi-VN')} ₫ · một lần, không hết hạn
           </div>
           <BuyButtons productId={productId} priceCoins={priceCoins} />
           <PaymentDisclaimer className="mt-4" />
+          <Included testCount={testCount} />
         </>
       )}
-
-      <TrustFooter />
     </div>
   )
 }
