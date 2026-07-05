@@ -6,6 +6,7 @@ import { getProductCatalog } from '@/lib/products/queries'
 import { COIN_VND_RATE } from '@/lib/payments/topup-constants'
 import { LEGAL_PAGES, LEGAL_SLUGS } from '@/lib/legal'
 import { LandingProductCard, type LandingProduct } from '@/components/landing/LandingProductCard'
+import { LandingHeaderActions } from '@/components/landing/LandingHeaderActions'
 import { SkillTabs } from '@/components/landing/SkillTabs'
 import { LeadForm } from '@/components/landing/LeadForm'
 import { FishBone } from '@/components/brand/FishBone'
@@ -108,24 +109,17 @@ export default async function LandingPage() {
             </span>
           </Link>
           <nav>
-            <a href="#skills">Reading</a>
-            <a href="#skills">Listening</a>
-            <a href="#skills">Writing</a>
-            <a href="#free">Free tests</a>
-            <a href="#prediction">Prediction</a>
-            <a href="#pricing">Pricing</a>
+            <Link href="/products?skill=reading">Reading</Link>
+            <Link href="/products?skill=listening">Listening</Link>
+            <Link href="/products?skill=writing">Writing</Link>
+            <Link href="/free">Free tests</Link>
+            <Link href="/prediction">Prediction</Link>
+            <Link href="/pricing">Pricing</Link>
             <span className="nav-soon">
               Speaking<span className="badge-soon">soon</span>
             </span>
           </nav>
-          <div className="hdr-actions">
-            <Link href="/login" className="btn-login">
-              Log in
-            </Link>
-            <Link href="/register" className="btn-start">
-              Start free
-            </Link>
-          </div>
+          <LandingHeaderActions />
         </div>
       </header>
 
@@ -149,9 +143,9 @@ export default async function LandingPage() {
             <Link href="/register" className="btn-primary">
               Start free
             </Link>
-            <a href="#hot" className="btn-outline">
+            <Link href="/products" className="btn-outline">
               Browse test packs
-            </a>
+            </Link>
           </div>
           <form className="hero-search" action="/products" method="get">
             <div className="search-wrap">
@@ -563,19 +557,19 @@ export default async function LandingPage() {
           <div>
             <div className="footer-col-title">Skills</div>
             <div className="footer-links">
-              <a href="#skills">Reading</a>
-              <a href="#skills">Listening</a>
-              <a href="#skills">Writing</a>
+              <Link href="/products?skill=reading">Reading</Link>
+              <Link href="/products?skill=listening">Listening</Link>
+              <Link href="/products?skill=writing">Writing</Link>
               <span className="nav-soon">Speaking (soon)</span>
             </div>
           </div>
           <div>
             <div className="footer-col-title">Explore</div>
             <div className="footer-links">
-              <a href="#free">Free tests</a>
-              <a href="#prediction">Prediction</a>
-              <a href="#hot">Hot collections</a>
-              <a href="#pricing">Pricing</a>
+              <Link href="/free">Free tests</Link>
+              <Link href="/prediction">Prediction</Link>
+              <Link href="/products">Hot collections</Link>
+              <Link href="/pricing">Pricing</Link>
             </div>
           </div>
           <div>
