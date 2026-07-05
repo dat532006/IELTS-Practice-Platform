@@ -1,6 +1,6 @@
 // True/False/Not Given & Yes/No/Not Given (M06). Radio 3 lựa chọn cố định.
 // answer = string ('TRUE'|'FALSE'|'NOT GIVEN' | 'YES'|'NO'|'NOT GIVEN'). KHÔNG biết đáp án.
-// W9 parity (capture): danh sách radio DỌC, trần (không viền ô), nhãn UPPERCASE như reference.
+// dc-exam restyle: option pill (.dcx-opt) với radio dot tím; nhãn UPPERCASE. Contrast lo qua .themed CSS.
 import type { QuestionComponentProps } from './types'
 
 const OPTIONS = {
@@ -13,7 +13,6 @@ export function TrueFalseQuestion({
   value,
   onChange,
   disabled,
-  contrast,
   hideStatement,
   variant,
 }: QuestionComponentProps & { variant: 'tfng' | 'ynng' }) {
@@ -21,21 +20,16 @@ export function TrueFalseQuestion({
   const opts = OPTIONS[variant]
   const groupName = `q-${question.id}`
   const statement = question.statement ?? question.prompt
-  const base = contrast ? 'hover:bg-white/10' : 'hover:bg-slate-50'
-  const sel = contrast ? 'bg-slate-800' : 'bg-[#E8F0FE]'
 
   return (
-    <div className="space-y-1.5">
-      {!hideStatement && statement && <p className="font-semibold leading-snug">{statement}</p>}
-      <fieldset className="space-y-0.5" disabled={disabled}>
+    <div>
+      {!hideStatement && statement && <p className="dcx-qstatement" style={{ marginBottom: 10 }}>{statement}</p>}
+      <fieldset style={{ display: 'flex', gap: 9, flexWrap: 'wrap', border: 0, margin: 0, padding: 0 }} disabled={disabled}>
         <legend className="sr-only">{question.instruction || `Câu ${question.number ?? ''}`}</legend>
         {opts.map((opt) => {
           const isSel = v === opt
           return (
-            <label
-              key={opt}
-              className={`flex w-fit cursor-pointer items-center gap-2.5 rounded px-2 py-1 pr-6 ${isSel ? sel : base}`}
-            >
+            <label key={opt} className={`dcx-opt${isSel ? ' sel' : ''}`} style={{ width: 'auto' }}>
               <input
                 type="radio"
                 name={groupName}
@@ -43,8 +37,9 @@ export function TrueFalseQuestion({
                 checked={isSel}
                 onChange={() => !disabled && onChange(opt)}
                 disabled={disabled}
-                className="shrink-0 accent-[#1A73E8]"
+                className="sr-only"
               />
+              <span className="dcx-opt-dot" />
               <span>{opt}</span>
             </label>
           )

@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ResultView } from '@/components/result/ResultView'
+import { examFontVars } from '@/app/exam-fonts'
+import '../../exam.css'
 
 // W8 — /result/[attemptId] (M05). Guard owner+terminal do BACKEND (`GET /api/result/[attemptId]`).
 // Server gate: guest → login (result thuộc owner). ResultView fetch API đã guard; KHÔNG đọc answer_keys.
@@ -11,5 +13,9 @@ export default async function ResultPage({ params }: { params: Promise<{ attempt
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect(`/login?next=/result/${attemptId}`)
-  return <ResultView attemptId={attemptId} />
+  return (
+    <div className={examFontVars}>
+      <ResultView attemptId={attemptId} />
+    </div>
+  )
 }
