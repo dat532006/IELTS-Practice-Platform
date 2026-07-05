@@ -8,6 +8,8 @@ import { LEGAL_PAGES, LEGAL_SLUGS } from '@/lib/legal'
 import { LandingProductCard, type LandingProduct } from '@/components/landing/LandingProductCard'
 import { SkillTabs } from '@/components/landing/SkillTabs'
 import { LeadForm } from '@/components/landing/LeadForm'
+import { FishBone } from '@/components/brand/FishBone'
+import { Mascot } from '@/components/brand/Mascot'
 import './home.css'
 
 // Fonts from the design (Plus Jakarta Sans + Newsreader italic), exposed as CSS
@@ -100,9 +102,7 @@ export default async function LandingPage() {
       <header>
         <div className="nav-inner">
           <Link href="/" className="logo">
-            <span className="logo-mark">
-              <span className="logo-diamond" />
-            </span>
+            <Mascot size={38} />
             <span>
               <span className="logo-brand">IELTS</span>Practice
             </span>
@@ -460,7 +460,9 @@ export default async function LandingPage() {
               {pack.popular && <div className="popular-badge">Most popular</div>}
               <div className="coin-name">{pack.name}</div>
               <div className="coin-amount">
-                <span className="coin-num">🪙 {pack.coins}</span>
+                <span className="coin-num inline-flex items-center gap-1.5">
+                  <FishBone /> {pack.coins}
+                </span>
               </div>
               <div className="coin-note">{pack.note}</div>
               <div className="coin-price">{vnd(pack.coins * COIN_VND_RATE)} ₫</div>
@@ -549,9 +551,7 @@ export default async function LandingPage() {
         <div className="footer-inner">
           <div>
             <Link href="/" className="logo" style={{ fontSize: '19px' }}>
-              <span className="logo-mark logo-mark-sm">
-                <span className="logo-diamond logo-diamond-sm" />
-              </span>
+              <Mascot size={30} />
               <span>
                 <span className="logo-brand">IELTS</span>Practice
               </span>

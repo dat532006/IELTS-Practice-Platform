@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { COIN_VND_RATE, MIN_TOPUP_VND, MAX_TOPUP_VND } from '@/lib/payments/topup-constants'
 import { PaymentDisclaimer } from '@/components/payment/PaymentDisclaimer'
+import { FishBone } from '@/components/brand/FishBone'
 
 // W16 — Trang nạp coin (M08). Fixed-rate 1.000 VND = 1 coin. Client CHỈ gửi { amount_vnd, provider };
 //   server tự tính coin (preview chỉ để hiển thị). Layout theo design "Purchase & Admin.dc.html" frame 1.
@@ -96,7 +97,7 @@ export default function PricingPage() {
                       : 'border border-[#E8E2F0] bg-white hover:border-[#CCC3DC]'
                   }`}
                 >
-                  <div className="text-[20px] font-extrabold tracking-[-0.02em] text-[#6A48D6]">🪙 {q / COIN_VND_RATE}</div>
+                  <div className="flex items-center gap-1.5 text-[20px] font-extrabold tracking-[-0.02em] text-[#6A48D6]"><FishBone /> {q / COIN_VND_RATE}</div>
                   <div className="mt-1 text-[12.5px] font-semibold text-[#857F96]">{vnd(q)} ₫</div>
                 </button>
               )
@@ -151,8 +152,9 @@ export default function PricingPage() {
           <div className="mt-6 rounded-[16px] border border-[#E8E2F0] bg-[#FBFAFF] px-[22px] py-5">
             <div className="flex items-baseline justify-between">
               <span className="text-[14px] font-semibold text-[#857F96]">Bạn sẽ nhận</span>
-              <span className="text-[26px] font-extrabold tracking-[-0.02em] text-[#2A2740]">
-                🪙 {valid ? previewCoins : '—'} <span className="text-[15px] font-bold text-[#857F96]">coins</span>
+              <span className="inline-flex items-center gap-2 text-[26px] font-extrabold tracking-[-0.02em] text-[#2A2740]">
+                <FishBone /> {valid ? previewCoins : '—'}{' '}
+                <span className="text-[15px] font-bold text-[#857F96]">xương cá</span>
               </span>
             </div>
             {valid && (

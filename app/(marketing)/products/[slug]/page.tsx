@@ -71,9 +71,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <h1 className="text-[28px] font-extrabold tracking-[-0.025em]">{detail.title}</h1>
-              {detail.owned && (
+              {detail.owned ? (
                 <span className="rounded-full bg-[#E7F7EE] px-2.5 py-[5px] text-[12px] font-extrabold text-[#1E9E63]">
-                  Đã sở hữu
+                  ✓ Đã sở hữu
+                </span>
+              ) : detail.price_coins === 0 ? (
+                <span className="rounded-full bg-[#E7F7EE] px-2.5 py-[5px] text-[12px] font-extrabold text-[#1E9E63]">
+                  Miễn phí
+                </span>
+              ) : (
+                <span className="rounded-full bg-[#FFF1DC] px-2.5 py-[5px] text-[12px] font-extrabold text-[#C98A1A]">
+                  🔒 Chưa mở
                 </span>
               )}
             </div>
@@ -101,7 +109,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
             {/* CTA mobile (trước mục lục) */}
             <div className="mt-5 lg:hidden">
-              <PurchaseCta productId={detail.id} priceCoins={detail.price_coins} owned={detail.owned} />
+              <PurchaseCta
+                productId={detail.id}
+                priceCoins={detail.price_coins}
+                owned={detail.owned}
+                testCount={detail.tests.length}
+              />
             </div>
 
             <h2 id="muc-luc" className="mt-8 scroll-mt-24 text-[17px] font-extrabold tracking-[-0.01em]">
@@ -115,7 +128,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           {/* Aside CTA (sticky desktop) */}
           <aside className="hidden lg:block">
             <div className="sticky top-20">
-              <PurchaseCta productId={detail.id} priceCoins={detail.price_coins} owned={detail.owned} />
+              <PurchaseCta
+                productId={detail.id}
+                priceCoins={detail.price_coins}
+                owned={detail.owned}
+                testCount={detail.tests.length}
+              />
             </div>
           </aside>
         </div>

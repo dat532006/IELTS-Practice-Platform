@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { FishBone } from '@/components/brand/FishBone'
 
 // W17 — Dashboard tổng quan (M09). Fetch /api/dashboard (server tính, RLS own-only). KHÔNG tự suy dữ liệu client.
 type TestRef = { title: string | null; type: string | null; slug: string | null } | null
@@ -80,7 +81,9 @@ export default function DashboardPage() {
             <span className={`rounded-full px-2.5 py-0.5 text-[12px] font-bold ${profile.plan === 'pro' ? 'bg-[#F0ECFF] text-[#6A48D6]' : 'bg-[#EEF0F4] text-[#6B7280]'}`}>
               {profile.plan === 'pro' ? 'PRO' : 'FREE'}
             </span>
-            <span>· 🪙 {profile.coins} coins</span>
+            <span className="inline-flex items-center gap-1.5">
+              · <FishBone /> {profile.coins} xương cá
+            </span>
           </div>
         </div>
         <Link

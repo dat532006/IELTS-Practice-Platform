@@ -49,54 +49,84 @@ export default async function ProductsPage({
     priceCoins: p.price_coins,
     skills: [p.skill],
     attemptsTotal: p.attempts_total,
+    testCount: p.test_count,
+    hot: p.attempts_total >= 1000, // suy từ lượt làm thật, không bịa
     state: p.is_free ? 'free' : 'locked',
   }))
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-2xl font-bold">Bộ đề</h1>
-      <p className="mt-1 text-sm text-slate-500">{total} bộ đề</p>
+    <div className="mx-auto max-w-6xl px-4 py-10 text-[#2A2740]">
+      <h1 className="text-[32px] font-extrabold tracking-[-0.03em]">Bộ đề</h1>
+      <p className="mt-1.5 text-[15px] font-semibold text-[#6A6480]">
+        {total} bộ đề · nội dung gốc trên giao diện thi thật
+      </p>
 
-      <div className="mt-5">
+      <div className="mt-[22px]">
         <Suspense fallback={null}>
           <CatalogFilters />
         </Suspense>
       </div>
 
       {cards.length === 0 ? (
-        <p className="mt-12 text-center text-slate-400">Không có bộ đề khớp bộ lọc.</p>
+        <p className="mt-12 text-center text-[15px] font-semibold text-[#9D96AE]">
+          Không có bộ đề khớp bộ lọc.
+        </p>
       ) : (
         <>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map((c) => (
               <ProductCard key={c.slug} p={c} />
             ))}
           </div>
 
           {total_pages > 1 && (
-            <nav className="mt-8 flex items-center justify-center gap-3 text-sm">
+            <nav className="mt-7 flex items-center justify-center gap-2">
               {page > 1 ? (
                 <Link
                   href={pageHref(params, page - 1)}
-                  className="rounded-md border border-slate-300 px-3 py-1.5 hover:bg-slate-50"
+                  aria-label="Trang trước"
+                  className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E8E2F0] bg-white font-bold text-[#4A445E] transition hover:bg-[#FBFAFF]"
                 >
-                  ← Trước
+                  ←
                 </Link>
               ) : (
-                <span className="rounded-md border border-slate-200 px-3 py-1.5 text-slate-300">← Trước</span>
+                <span className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E8E2F0] bg-white font-bold text-[#B0A9C0]">
+                  ←
+                </span>
               )}
-              <span className="text-slate-600">
-                Trang {page}/{total_pages}
-              </span>
+
+              {Array.from({ length: total_pages }, (_, i) => i + 1).map((n) =>
+                n === page ? (
+                  <span
+                    key={n}
+                    aria-current="page"
+                    className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#2A2740] text-[14px] font-extrabold text-white"
+                  >
+                    {n}
+                  </span>
+                ) : (
+                  <Link
+                    key={n}
+                    href={pageHref(params, n)}
+                    className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E8E2F0] bg-white text-[14px] font-bold text-[#4A445E] transition hover:bg-[#FBFAFF]"
+                  >
+                    {n}
+                  </Link>
+                ),
+              )}
+
               {page < total_pages ? (
                 <Link
                   href={pageHref(params, page + 1)}
-                  className="rounded-md border border-slate-300 px-3 py-1.5 hover:bg-slate-50"
+                  aria-label="Trang sau"
+                  className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E8E2F0] bg-white font-bold text-[#4A445E] transition hover:bg-[#FBFAFF]"
                 >
-                  Sau →
+                  →
                 </Link>
               ) : (
-                <span className="rounded-md border border-slate-200 px-3 py-1.5 text-slate-300">Sau →</span>
+                <span className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E8E2F0] bg-white font-bold text-[#B0A9C0]">
+                  →
+                </span>
               )}
             </nav>
           )}
