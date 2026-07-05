@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { AttemptDTO, ExamPayload, WritingGradeResult } from '@/types/exam'
 import { WritingResultView } from '@/components/writing/WritingResultView'
+import { MenuIcon, CloseIcon, CheckIcon, SparkleIcon, ArrowLeft } from '@/components/exam/ExamIcons'
 
-// W10 — Writing UI (M07). 2 cột: đề | vùng viết Task1+Task2; word count realtime; chấm qua /api/grade-writing.
-// LUẬT THÉP #2/#12: KHÔNG import lib/scoring, KHÔNG tự tính band. overall_band = giá trị server.
+// W10 — Writing UI (M07). dc-exam restyle: tab Task1/Task2 + 1 editor, word count realtime,
+//   chấm qua /api/grade-writing → modal AI (band + 4 tiêu chí). LUẬT THÉP #2/#12: KHÔNG tự tính band.
 type Phase = 'loading' | 'locked' | 'notfound' | 'error' | 'active' | 'submitting' | 'result'
 type Passage = { id?: string; number?: number; title?: string; content?: string }
 
@@ -14,22 +15,17 @@ const T1_MIN = 150
 const T2_MIN = 250
 const countWords = (s: string): number => (s.trim().match(/\S+/g) ?? []).length
 
+const CRITERIA: { key: 'task_response' | 'coherence_cohesion' | 'lexical_resource' | 'grammar'; label: string }[] = [
+  { key: 'task_response', label: 'Task Achievement' },
+  { key: 'coherence_cohesion', label: 'Coherence & Cohesion' },
+  { key: 'lexical_resource', label: 'Lexical Resource' },
+  { key: 'grammar', label: 'Grammatical Range' },
+]
+
 function getPrompts(payload: ExamPayload | null): { task1: Passage | null; task2: Passage | null } {
   const arr = Array.isArray(payload?.passages) ? (payload!.passages as Passage[]) : []
   const pick = (i: number, id: string) => arr.find((p) => p?.id === id) ?? arr[i] ?? null
   return { task1: pick(0, 'task1'), task2: pick(1, 'task2') }
-}
-
-function WordBadge({ wc, min }: { wc: number; min: number }) {
-  const ok = wc >= min
-  return (
-    <span
-      aria-live="polite"
-      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ok ? 'bg-teal-50 text-teal-700' : 'bg-amber-50 text-amber-700'}`}
-    >
-      {wc} từ {ok ? '✓' : `(cần ≥${min})`}
-    </span>
-  )
 }
 
 export function WritingRunner({ testId }: { testId: string }) {
@@ -38,7 +34,9 @@ export function WritingRunner({ testId }: { testId: string }) {
   const [payload, setPayload] = useState<ExamPayload | null>(null)
   const [task1, setTask1] = useState('')
   const [task2, setTask2] = useState('')
+  const [tab, setTab] = useState<1 | 2>(1)
   const [result, setResult] = useState<WritingGradeResult | null>(null)
+  const [aiOpen, setAiOpen] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [restarting, setRestarting] = useState(false)
 
@@ -99,26 +97,24 @@ export function WritingRunner({ testId }: { testId: string }) {
       const j = await r.json().catch(() => null)
       if (r.status === 200 && j?.data) {
         setResult(j.data as WritingGradeResult)
-        return setPhase('result')
+        setAiOpen(true)
+        return setPhase('active')
       }
       const code = j?.meta?.error_code
       if (r.status === 404) return setPhase('notfound')
       if (r.status === 429) setErrorMsg('Bạn đã dùng hết lượt chấm AI miễn phí hôm nay. Thử lại ngày mai hoặc nâng cấp Pro.')
-      // B-05: attempt đã chấm xong là terminal — cần lượt mới (nút "Viết lại" tự tạo).
       else if (code === 'ATTEMPT_TERMINAL') setErrorMsg('Lượt làm này đã được chấm xong. Bấm "← Viết lại" để tạo lượt mới rồi nộp lại — bài viết của bạn vẫn được giữ nguyên.')
       else if (code === 'WORD_COUNT_TOO_LOW') setErrorMsg('Task 1 cần ≥150 từ và Task 2 cần ≥250 từ.')
       else if (r.status === 502) setErrorMsg('Hệ thống chấm AI tạm thời không khả dụng. Bài viết được giữ nguyên — vui lòng thử lại.')
       else setErrorMsg((j?.message as string) || 'Không chấm được bài. Vui lòng thử lại.')
-      setPhase('active') // giữ nguyên bài viết
+      setPhase('active')
     } catch {
       setErrorMsg('Lỗi kết nối. Bài viết của bạn được giữ nguyên.')
       setPhase('active')
     }
   }, [attempt, task1, task2])
 
-  // FE-F05 (khớp B-05): attempt bị finalize `submitted` ngay sau lần chấm đầu → chấm lại attempt cũ = 409.
-  //   "Viết lại" phải xin attempt in_progress MỚI qua /start (idempotent: terminal không chặn tạo mới).
-  //   Text bài viết giữ nguyên trong state — chỉ đổi attempt.
+  // FE-F05: "Viết lại" xin attempt in_progress MỚI; text giữ nguyên.
   const rewrite = useCallback(async () => {
     if (restarting) return
     setErrorMsg('')
@@ -129,6 +125,7 @@ export function WritingRunner({ testId }: { testId: string }) {
       if (sr.ok && sj?.data?.attempt_id) {
         setAttempt(sj.data as AttemptDTO)
         setResult(null)
+        setAiOpen(false)
         setPhase('active')
       } else {
         setErrorMsg('Không tạo được lượt viết mới — vui lòng tải lại trang.')
@@ -140,124 +137,229 @@ export function WritingRunner({ testId }: { testId: string }) {
     }
   }, [restarting, testId])
 
-  // ---- States ----
+  // ---- Non-editor states ----
   if (phase === 'loading') return <Centered>Đang tải bài viết…</Centered>
   if (phase === 'locked')
     return (
       <Centered>
-        <p className="mb-3">Đề thi này cần được mở khóa trước khi làm bài.</p>
-        <Link href="/products" className="text-teal-700 underline">
-          Xem các gói đề
-        </Link>
+        <p style={{ marginBottom: 12 }}>Đề thi này cần được mở khóa trước khi làm bài.</p>
+        <Link href="/products" className="dcx-link">Xem các gói đề</Link>
       </Centered>
     )
   if (phase === 'notfound') return <Centered>Không tìm thấy bài viết.</Centered>
   if (phase === 'error') return <Centered>{errorMsg || 'Đã có lỗi xảy ra.'}</Centered>
 
   const title = payload?.test?.title ?? 'Writing'
+  const activeVal = tab === 1 ? task1 : task2
+  const setActive = tab === 1 ? setTask1 : setTask2
+  const activeWc = tab === 1 ? wc1 : wc2
+  const activeMin = tab === 1 ? T1_MIN : T2_MIN
+  const wcOk = activeWc >= activeMin
+  const submitting = phase === 'submitting'
+  const modalGrade = result ? (tab === 1 ? result.task1 : result.task2) : null
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white px-4 py-3">
-        <div className="mx-auto flex max-w-6xl items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-teal-600 text-sm font-bold text-white">IP</span>
-          <div>
-            <div className="font-semibold leading-tight">{title}</div>
-            <div className="text-xs text-slate-500">IELTS Writing · Task 1 + Task 2</div>
-          </div>
-        </div>
-      </header>
-
-      {phase === 'result' && result ? (
-        <main className="mx-auto max-w-6xl px-4 py-6">
+  // ---- Result phase (chi tiết đầy đủ — WritingResultView) ----
+  if (phase === 'result' && result) {
+    return (
+      <div className="dc-exam ct-bw ts-regular">
+        <Header title={title} />
+        <main style={{ maxWidth: 960, margin: '0 auto', padding: '24px 20px 60px' }}>
           <WritingResultView result={result} essays={{ task1, task2 }} />
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={rewrite}
-              disabled={restarting}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
+          <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+            <button onClick={rewrite} disabled={restarting} className="dcx-btn-ghost" style={{ padding: '10px 18px', fontSize: 14 }}>
               {restarting ? 'Đang tạo lượt mới…' : '← Viết lại'}
             </button>
-            <Link href={`/writing-result/${result.attempt_id}`} className="text-sm text-teal-700 underline">
+            <Link href={`/writing-result/${result.attempt_id}`} className="dcx-link">
               Xem lại kết quả này
             </Link>
-            {errorMsg && <span className="text-sm text-red-600">{errorMsg}</span>}
+            {errorMsg && <span style={{ color: 'var(--coral-deep)', fontSize: 14 }}>{errorMsg}</span>}
           </div>
         </main>
-      ) : (
-        <main className="mx-auto grid max-w-6xl grid-cols-1 gap-5 px-4 py-6 lg:grid-cols-2">
-          {/* Cột trái: đề bài */}
-          <section className="space-y-4 lg:max-h-[calc(100vh-7rem)] lg:overflow-auto lg:pr-2">
-            {[prompts.task1, prompts.task2].map((p, i) => (
-              <div key={i} className="rounded-lg border border-slate-200 bg-white p-4">
-                <h2 className="mb-1 font-bold text-slate-800">{p?.title ?? `Writing Task ${i + 1}`}</h2>
-                <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">
-                  {p?.content ?? 'Đề bài đang được cập nhật.'}
-                </p>
-              </div>
-            ))}
-          </section>
+      </div>
+    )
+  }
 
-          {/* Cột phải: vùng viết */}
-          <section className="space-y-5">
-            {[
-              { n: 1, val: task1, set: setTask1, wc: wc1, min: T1_MIN },
-              { n: 2, val: task2, set: setTask2, wc: wc2, min: T2_MIN },
-            ].map((t) => (
-              <div key={t.n}>
-                <div className="mb-1 flex items-center justify-between">
-                  <label htmlFor={`task${t.n}`} className="font-semibold text-slate-800">
-                    Bài làm Task {t.n}
-                  </label>
-                  <WordBadge wc={t.wc} min={t.min} />
-                </div>
-                <textarea
-                  id={`task${t.n}`}
-                  value={t.val}
-                  onChange={(e) => t.set(e.target.value)}
-                  disabled={phase === 'submitting'}
-                  rows={t.n === 1 ? 9 : 14}
-                  placeholder={`Viết bài Task ${t.n} của bạn ở đây (tối thiểu ${t.min} từ)…`}
-                  className="w-full resize-y rounded-md border border-slate-300 p-3 text-sm leading-relaxed focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:bg-slate-100"
-                />
-              </div>
-            ))}
+  // ---- Editor ----
+  return (
+    <div className="dc-exam ct-bw ts-regular">
+      <div className="dcx-shell">
+        <Header title={title} />
 
-            {errorMsg && (
-              <p aria-live="assertive" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {errorMsg}
-              </p>
-            )}
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={submit}
-                disabled={!canSubmit || phase === 'submitting'}
-                className="rounded-md bg-teal-600 px-5 py-2.5 font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                {phase === 'submitting' ? 'Đang chấm…' : 'Nộp & chấm AI'}
-              </button>
-              {!canSubmit && (
-                <span className="text-xs text-slate-500">Đủ {T1_MIN} từ (Task 1) và {T2_MIN} từ (Task 2) để nộp.</span>
+        {/* Banner + tabs */}
+        <div className="dcx-w-banner">
+          <div className="dcx-w-banner-row">
+            <span className="dcx-badge">Writing</span>
+            <div className="dcx-w-tabs">
+              <button className={`dcx-w-tab${tab === 1 ? ' on' : ''}`} onClick={() => setTab(1)}>Task 1</button>
+              <button className={`dcx-w-tab${tab === 2 ? ' on' : ''}`} onClick={() => setTab(2)}>Task 2</button>
+            </div>
+            <div className="dcx-w-meta">
+              {tab === 1 ? (
+                <>Bạn nên dành khoảng <b>20 phút</b> · tối thiểu <b>150 từ</b></>
+              ) : (
+                <>Bạn nên dành khoảng <b>40 phút</b> · tối thiểu <b>250 từ</b></>
               )}
             </div>
-            <p className="text-xs text-slate-400">
-              Bài chấm bằng AI, điểm chỉ mang tính tham khảo. Free: 1 lượt chấm/ngày.
-            </p>
-          </section>
-        </main>
+          </div>
+        </div>
+
+        {/* Split: prompt | editor */}
+        <div className="dcx-w-split">
+          <div className="dcx-w-prompt">
+            <div className="dcx-w-prompt-text">
+              {(tab === 1 ? prompts.task1 : prompts.task2)?.content ?? 'Đề bài đang được cập nhật.'}
+            </div>
+            {tab === 1 ? (
+              <div className="dcx-w-chart">
+                <SparkleIcon className="h-7 w-7" />
+                <span className="dcx-w-chart-mono">[ hình minh hoạ đề bài Task 1 ]</span>
+                <span className="dcx-w-chart-cap">Biểu đồ/bảng số liệu kèm đề (nếu có)</span>
+              </div>
+            ) : (
+              <div className="dcx-w-hint">
+                <div className="dcx-w-hint-title">Gợi ý dàn bài</div>
+                <div className="dcx-w-hint-body">
+                  • Mở bài: giới thiệu chủ đề &amp; nêu quan điểm<br />
+                  • Thân bài 1: luận điểm thứ nhất + ví dụ<br />
+                  • Thân bài 2: luận điểm thứ hai + ví dụ<br />
+                  • Kết bài: khẳng định lại quan điểm
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="dcx-w-vsep" />
+
+          <div className="dcx-w-editor-col">
+            <div className="dcx-w-editor-inner">
+              <div className="dcx-w-editor-head">
+                <span className="dcx-w-editor-eyebrow">Bài làm của bạn · Task {tab}</span>
+                <span className="dcx-w-count-wrap">
+                  <span className="dcx-w-count-lbl">Số từ:</span>
+                  <span className="dcx-w-count">{activeWc}</span>
+                  <span className={`dcx-w-count-badge${wcOk ? ' ok' : ''}`}>
+                    {wcOk ? 'đạt yêu cầu ✓' : `chưa đủ ${activeMin} từ`}
+                  </span>
+                </span>
+              </div>
+              <textarea
+                className="dcx-w-textarea"
+                value={activeVal}
+                onChange={(e) => setActive(e.target.value)}
+                disabled={submitting}
+                placeholder={`Bắt đầu viết bài Task ${tab} của bạn ở đây… (tối thiểu ${activeMin} từ)`}
+                aria-label={`Bài làm Task ${tab}`}
+              />
+              {errorMsg && <p className="dcx-w-alert" style={{ marginTop: 12 }}>{errorMsg}</p>}
+              <div className="dcx-w-editor-actions">
+                <button className="dcx-w-grade" onClick={submit} disabled={!canSubmit || submitting}>
+                  <SparkleIcon className="h-[18px] w-[18px]" />
+                  {submitting ? 'Đang chấm…' : 'Chấm bằng AI'}
+                </button>
+                <span className="dcx-w-grade-note">
+                  {canSubmit ? 'AI chấm theo 4 tiêu chí band descriptor' : `Cần đủ ${T1_MIN} từ (Task 1) và ${T2_MIN} từ (Task 2).`}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="dcx-w-footer">
+          <span className="dcx-w-footer-note">Task 1 &amp; Task 2 sẽ được nộp cùng lúc.</span>
+          <button className="dcx-submit" onClick={submit} disabled={!canSubmit || submitting}>
+            {submitting ? 'Đang chấm…' : 'Nộp bài viết'} <CheckIcon className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* AI result modal */}
+      {aiOpen && modalGrade && result && (
+        <div className="dcx-overlay" role="dialog" aria-modal="true" onClick={() => setAiOpen(false)}>
+          <div className="dcx-ai-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="dcx-ai-head">
+              <button className="dcx-ai-close" onClick={() => setAiOpen(false)} aria-label="Đóng">
+                <CloseIcon className="h-4 w-4" />
+              </button>
+              <div className="dcx-ai-head-row">
+                <div>
+                  <div className="dcx-ai-band-lbl">Band ước tính (Task {tab}) · Overall {result.overall_band.toFixed(1)}</div>
+                  <div className="dcx-ai-band">{modalGrade.band.toFixed(1)}</div>
+                </div>
+                <span className="dcx-ai-tag">✦ AI đã chấm</span>
+              </div>
+            </div>
+            {result.mock && (
+              <div className="dcx-ai-mock">
+                ⚠️ AI grader chưa cấu hình — đây là điểm <b>mô phỏng</b> để minh hoạ giao diện, không phản ánh chất lượng bài viết.
+              </div>
+            )}
+            <div className="dcx-ai-body">
+              <div className="dcx-ai-bars">
+                {CRITERIA.map((c) => {
+                  const val = modalGrade.criteria[c.key]
+                  return (
+                    <div key={c.key}>
+                      <div className="dcx-ai-bar-hdr">
+                        <span>{c.label}</span>
+                        <span>{Number(val).toFixed(1)}</span>
+                      </div>
+                      <div className="dcx-ai-bar-track">
+                        <div className="dcx-ai-bar-fill" style={{ width: `${Math.max(0, Math.min(9, val)) / 9 * 100}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {modalGrade.feedback && <p className="dcx-ai-fb">{modalGrade.feedback}</p>}
+              {modalGrade.suggestions?.length > 0 && (
+                <div className="dcx-ai-tip">
+                  <b>Gợi ý · </b>
+                  {modalGrade.suggestions[0]}
+                </div>
+              )}
+              <div className="dcx-modal-actions" style={{ marginTop: 20, justifyContent: 'flex-start' }}>
+                <button className="dcx-btn-primary" onClick={() => { setAiOpen(false); setPhase('result') }}>
+                  Xem kết quả đầy đủ
+                </button>
+                <button className="dcx-btn-ghost" onClick={rewrite} disabled={restarting}>
+                  <ArrowLeft className="h-4 w-4" /> {restarting ? 'Đang tạo lượt mới…' : 'Viết lại'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
+function Header({ title }: { title: string }) {
+  return (
+    <header className="dcx-header">
+      <div className="dcx-header-inner">
+        <div className="dcx-logo">
+          <span className="dcx-logo-mark"><span className="dcx-logo-diamond" /></span>
+          <div className="dcx-brand">
+            <span className="dcx-brand-name"><b>IELTS</b>Practice</span>
+            <span className="dcx-subtitle">{title} · IELTS Writing · Task 1 + Task 2</span>
+          </div>
+        </div>
+        <div className="dcx-header-spacer" />
+        <button className="dcx-opts-btn" aria-label="Menu" disabled>
+          <MenuIcon className="h-[18px] w-[18px]" />
+        </button>
+      </div>
+    </header>
+  )
+}
+
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid min-h-screen place-items-center bg-slate-50 px-4 text-center text-slate-700">
-      <div>{children}</div>
+    <div className="dc-exam ct-bw ts-regular">
+      <div className="dcx-center">
+        <div className="dcx-center-card">{children}</div>
+      </div>
     </div>
   )
 }

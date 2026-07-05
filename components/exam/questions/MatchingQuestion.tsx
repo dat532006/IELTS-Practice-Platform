@@ -1,8 +1,9 @@
 // Matching Headings / Information / Features / Endings (M06). W6: dropdown ổn định (drag-drop để sau).
 // answer = string (option KEY). KHÔNG biết đáp án.
+// dc-exam restyle: select bo tròn (.dcx-select); contrast lo qua .themed CSS.
 import type { QuestionComponentProps } from './types'
 
-export function MatchingQuestion({ question, value, onChange, disabled, contrast, hideStatement }: QuestionComponentProps) {
+export function MatchingQuestion({ question, value, onChange, disabled, hideStatement }: QuestionComponentProps) {
   const v = typeof value === 'string' ? value : ''
   const options = Array.isArray(question.options) ? question.options : []
   const selectId = `q-input-${question.id}`
@@ -13,19 +14,15 @@ export function MatchingQuestion({ question, value, onChange, disabled, contrast
   }
 
   return (
-    <div className="space-y-2">
-      {!hideStatement && statement && <p className="font-semibold leading-snug">{statement}</p>}
+    <div>
+      {!hideStatement && statement && <p className="dcx-qstatement" style={{ marginBottom: 8 }}>{statement}</p>}
       <select
         id={selectId}
         value={v}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         aria-label={question.instruction || `Câu ${question.number ?? ''}`}
-        className={`w-full min-w-0 rounded-md border px-3 py-1.5 outline-none ${
-          contrast
-            ? 'border-slate-600 bg-black text-white focus:border-teal-400'
-            : 'border-slate-300 bg-white text-slate-900 focus:border-teal-600'
-        }`}
+        className="dcx-select"
       >
         <option value="">— Chọn —</option>
         {options.map((opt) => (

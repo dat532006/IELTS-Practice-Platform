@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ExamRunner } from '@/components/exam/ExamRunner'
+import { examFontVars } from '@/app/exam-fonts'
+import '../../exam.css'
 
 // W5 — /exam/[id] (M05). Root layout (KHÔNG marketing chrome) — trải nghiệm thi tập trung.
 // Server gate: guest → login (attempt cần owner). Access (free|test_unlocks) + payload do ExamRunner
@@ -12,5 +14,9 @@ export default async function ExamPage({ params }: { params: Promise<{ id: strin
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect(`/login?next=/exam/${id}`)
-  return <ExamRunner testId={id} />
+  return (
+    <div className={examFontVars}>
+      <ExamRunner testId={id} />
+    </div>
+  )
 }

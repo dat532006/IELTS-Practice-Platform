@@ -1,6 +1,6 @@
 // MCQ single (radio) / MCQ multi (checkbox) (M06).
 // answer = string (single) | string[] (multi) gồm option KEY. KHÔNG biết đáp án.
-// W9 parity (capture): option KHÔNG viền ô — radio/checkbox trần; dòng được chọn nền xanh nhạt #E8F0FE.
+// dc-exam restyle: option full-width (.dcx-opt) radio dot / checkbox box tím; contrast lo qua .themed CSS.
 import type { QuestionComponentProps } from './types'
 
 export function ChoiceQuestion({
@@ -8,7 +8,6 @@ export function ChoiceQuestion({
   value,
   onChange,
   disabled,
-  contrast,
   hideStatement,
   multi,
 }: QuestionComponentProps & { multi: boolean }) {
@@ -41,29 +40,24 @@ export function ChoiceQuestion({
   }
 
   const groupName = `q-${question.id}`
-  const optBase = contrast ? 'hover:bg-white/10' : 'hover:bg-slate-50'
-  const optSel = contrast ? 'bg-slate-800' : 'bg-[#E8F0FE]'
 
   if (options.length === 0) {
     return <p className="text-sm text-amber-600">Câu hỏi thiếu lựa chọn.</p>
   }
 
   return (
-    <fieldset className="space-y-0.5" disabled={disabled}>
+    <fieldset style={{ display: 'flex', flexDirection: 'column', gap: 9, border: 0, margin: 0, padding: 0 }} disabled={disabled}>
       <legend className="sr-only">{question.instruction || `Câu ${question.number ?? ''}`}</legend>
-      {!hideStatement && question.prompt && <p className="mb-1 font-semibold leading-snug">{question.prompt}</p>}
-      {multi && question.select_count ? (
-        <p className="text-xs text-slate-500">Chọn {question.select_count} đáp án.</p>
-      ) : null}
+      {!hideStatement && question.prompt && <p className="dcx-qstatement" style={{ marginBottom: 2 }}>{question.prompt}</p>}
+      {multi && question.select_count ? <p className="dcx-opt-hint">Chọn {question.select_count} đáp án.</p> : null}
       {options.map((opt) => {
         const isSel = selected.includes(opt.key)
-        const muted = atMax && !isSel // đủ max + chưa chọn → mờ/khóa (reference làm xám)
+        const muted = atMax && !isSel // đủ max + chưa chọn → mờ/khóa
         return (
           <label
             key={opt.key}
-            className={`flex items-start gap-2.5 rounded px-2 py-1.5 ${isSel ? optSel : optBase} ${
-              muted ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-            }`}
+            className={`dcx-opt${isSel ? ' sel' : ''}${muted ? ' disabled' : ''}`}
+            style={{ alignItems: 'flex-start', width: '100%' }}
           >
             <input
               type={multi ? 'checkbox' : 'radio'}
@@ -72,10 +66,11 @@ export function ChoiceQuestion({
               checked={isSel}
               onChange={() => toggle(opt.key)}
               disabled={disabled || muted}
-              className="mt-1 shrink-0 accent-[#1A73E8]"
+              className="sr-only"
             />
+            <span className={multi ? 'dcx-opt-box' : 'dcx-opt-dot'} style={{ marginTop: 2 }} />
             {/* Capture parity: reference KHÔNG hiển thị prefix chữ cái — chỉ text (key vẫn là giá trị serialize). */}
-            <span className="min-w-0">{opt.text ?? opt.key}</span>
+            <span style={{ minWidth: 0, fontWeight: 500 }}>{opt.text ?? opt.key}</span>
           </label>
         )
       })}

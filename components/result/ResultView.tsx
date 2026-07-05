@@ -90,7 +90,7 @@ function MiniDonut({ correct, total }: { correct: number; total: number }) {
 
 function CategoryCard({ title, label, correct, total }: { title: string; label: string; correct: number; total: number }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-2xl border border-[#efebf4] bg-white p-5 shadow-[0_14px_30px_-24px_rgba(42,39,64,0.4)]">
       <h3 className="font-extrabold">{title}</h3>
       <hr className="mt-3 border-slate-100" />
       <div className="mt-4 flex items-center gap-3">
@@ -200,6 +200,7 @@ export function ResultView({ attemptId }: { attemptId: string }) {
   const minutes = Math.max(1, Math.round((data.time_spent ?? 0) / 60))
 
   return (
+    <div className="dc-exam ct-bw ts-regular">
     <div className="mx-auto max-w-[1240px] px-4 py-8">
       {/* Tiêu đề + back (capture: ← tròn + breadcrumb đậm) */}
       <div className="flex flex-wrap items-center gap-3">
@@ -225,7 +226,7 @@ export function ResultView({ attemptId }: { attemptId: string }) {
       </p>
 
       {/* Phần kiểm tra (capture: 3 cột số liệu + donut band + Thử lại) */}
-      <section className="mt-5 rounded-xl border border-slate-200 bg-white p-6">
+      <section className="mt-5 rounded-3xl border border-[#efebf4] bg-white p-7 shadow-[0_20px_44px_-30px_rgba(42,39,64,0.4)]">
         <h2 className="text-lg font-extrabold">Phần kiểm tra</h2>
         <div className="mt-4 flex flex-wrap items-center gap-6">
           <div className="grid min-w-0 flex-1 gap-6 sm:grid-cols-3">
@@ -257,12 +258,12 @@ export function ResultView({ attemptId }: { attemptId: string }) {
       {/* Chi tiết bài thi (capture: 3 vòng tròn + 4 chỉ số) */}
       <h2 className="mt-7 mb-3 text-lg font-extrabold">Chi tiết bài thi</h2>
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="flex items-center justify-around rounded-xl border border-slate-200 bg-white p-6">
+        <div className="flex items-center justify-around rounded-2xl border border-[#efebf4] bg-white p-6 shadow-[0_14px_30px_-24px_rgba(42,39,64,0.4)]">
           <StatCircle kind="correct" label="Trả lời đúng" value={correct} />
           <StatCircle kind="wrong" label="Trả lời sai" value={wrong} />
           <StatCircle kind="skipped" label="Đã bỏ qua" value={skipped} />
         </div>
-        <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-6 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 rounded-2xl border border-[#efebf4] bg-white p-6 shadow-[0_14px_30px_-24px_rgba(42,39,64,0.4)] sm:grid-cols-2">
           <InfoRow
             icon={<svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>}
             label="Kết quả làm bài"
@@ -305,13 +306,16 @@ export function ResultView({ attemptId }: { attemptId: string }) {
         </Link>
       </div>
     </div>
+    </div>
   )
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4">
-      <div className="max-w-md text-center">{children}</div>
+    <div className="dc-exam ct-bw ts-regular">
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="max-w-md text-center">{children}</div>
+      </div>
     </div>
   )
 }

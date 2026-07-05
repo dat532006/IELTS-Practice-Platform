@@ -7,7 +7,20 @@ import type { AttemptDTO, ExamPayload, SubmitResult } from '@/types/exam'
 import { QuestionRenderer } from '@/components/exam/questions/QuestionRenderer'
 import { MatchingMatrixQuestion } from '@/components/exam/questions/MatchingMatrixQuestion'
 import { ListeningAudioPlayer } from '@/components/exam/ListeningAudioPlayer'
-import { BookmarkFlag } from '@/components/exam/BookmarkFlag'
+import {
+  ClockIcon,
+  MenuIcon,
+  CloseIcon,
+  CheckIcon,
+  ChevronRight,
+  ArrowLeft,
+  ArrowRight,
+  PencilIcon,
+  NoteIcon,
+  TrashIcon,
+  ContrastIcon,
+  FlagIcon,
+} from '@/components/exam/ExamIcons'
 import { isAnswered, renderKindOf, type AnswerValue, type ExamQuestion, type QOption } from '@/components/exam/questions/types'
 import {
   anchorFromRange,
@@ -25,11 +38,14 @@ type Passage = { id: string; number?: number; title?: string; content?: string }
 
 // W9 parity (capture): +'instructions' — màn "Hướng dẫn làm bài kiểm tra" trước khi vào active.
 type Phase = 'loading' | 'locked' | 'notfound' | 'error' | 'instructions' | 'active' | 'submitting' | 'done'
-type Contrast = 'bw' | 'wb' | 'yb' // W9: Black-on-white / White-on-black / Yellow-on-black
-type TextSize = 'base' | 'lg' | 'xl' // W9: Regular / Large / Extra large
+type Contrast = 'bw' | 'wb' | 'yb' // Black-on-white / White-on-black / Yellow-on-black
+type TextSize = 'small' | 'regular' | 'large' // Nhỏ / Vừa / Lớn
 
 // W9 — nhóm câu theo passage (Reading) / section (Listening) để switch như reference.
 type ExamGroup = { key: string | null; passages: Passage[]; questions: ExamQuestion[] }
+
+const CONTRAST_KEY = 'dc-exam:contrast'
+const TEXTSIZE_KEY = 'dc-exam:textSize'
 
 function clock(sec: number): string {
   const s = Math.max(0, Math.floor(sec))
@@ -127,7 +143,7 @@ export function ExamRunner({ testId }: { testId: string }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [showPassage, setShowPassage] = useState(true)
   const [contrast, setContrast] = useState<Contrast>('bw')
-  const [textSize, setTextSize] = useState<TextSize>('base')
+  const [textSize, setTextSize] = useState<TextSize>('regular')
   const [optionsOpen, setOptionsOpen] = useState(false)
   // W9 annotation
   const [highlights, setHighlights] = useState<HighlightAnchor[]>([])
@@ -175,6 +191,21 @@ export function ExamRunner({ testId }: { testId: string }) {
     },
     [flatQs],
   )
+
+  // Persist contrast/text-size (README): đọc lúc mount, ghi khi đổi.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const c = window.localStorage.getItem(CONTRAST_KEY)
+    if (c === 'bw' || c === 'wb' || c === 'yb') setContrast(c)
+    const t = window.localStorage.getItem(TEXTSIZE_KEY)
+    if (t === 'small' || t === 'regular' || t === 'large') setTextSize(t)
+  }, [])
+  useEffect(() => {
+    if (typeof window !== 'undefined') window.localStorage.setItem(CONTRAST_KEY, contrast)
+  }, [contrast])
+  useEffect(() => {
+    if (typeof window !== 'undefined') window.localStorage.setItem(TEXTSIZE_KEY, textSize)
+  }, [textSize])
 
   // Tier0: theo dõi breakpoint lg (chỉ chia cột + kéo divider trên desktop).
   useEffect(() => {
@@ -464,7 +495,6 @@ export function ExamRunner({ testId }: { testId: string }) {
   )
 
   // Render highlight (CSS Highlight API) — chỉ passage đang xem; rebuild khi đổi group/size/contrast.
-  // T2.3: đồng thời tính vị trí icon note (bong bóng) cho highlight CÓ note + recompute khi resize/kéo divider.
   useEffect(() => {
     if (phase !== 'active') return
     const root = passageRootRef.current
@@ -489,68 +519,25 @@ export function ExamRunner({ testId }: { testId: string }) {
     document.getElementById(`q-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [activeGroup, activeQid])
 
-  const sizeCls = textSize === 'lg' ? 'text-lg' : textSize === 'xl' ? 'text-xl' : 'text-base'
-  // Theme theo contrast.
-  const T =
-    contrast === 'wb'
-      ? {
-          root: 'bg-black text-white',
-          head: 'border-slate-700 bg-black',
-          card: 'border-slate-700 bg-black',
-          band: 'border-slate-700 bg-slate-900',
-          subtle: 'text-slate-300',
-          navIdle: 'bg-slate-800 text-slate-100 border-slate-600',
-          footer: 'border-slate-700 bg-slate-900',
-          footAccent: 'bg-slate-800',
-          seg: 'bg-slate-600',
-        }
-      : contrast === 'yb'
-        ? {
-            root: 'bg-black text-[#F2A93B]',
-            head: 'border-[#F2A93B]/30 bg-black',
-            card: 'border-[#F2A93B]/30 bg-black',
-            band: 'border-[#F2A93B]/40 bg-[#2a2200]',
-            subtle: 'text-[#F2A93B]/70',
-            navIdle: 'bg-[#3a2e00] text-[#F2A93B] border-[#F2A93B]/50',
-            footer: 'border-[#F2A93B]/30 bg-[#191400]',
-            footAccent: 'bg-[#2a2200]',
-            seg: 'bg-[#F2A93B]/30',
-          }
-        : {
-            root: 'bg-white text-slate-900',
-            head: 'border-slate-200 bg-white',
-            card: 'border-slate-200 bg-white',
-            band: 'border-[#e7e5dc] bg-[#EEEDE7]',
-            subtle: 'text-slate-500',
-            navIdle: 'bg-white text-slate-700 border-slate-300',
-            footer: 'border-slate-200 bg-[#F5F5F4]',
-            footAccent: 'bg-[#ECECEA]',
-            seg: 'bg-slate-300',
-          }
-  const darkInputs = contrast !== 'bw'
-
   const limited = remaining !== null
   const lowTime = limited && (remaining as number) <= 60
-  // Capture parity: "59 minutes remaining" (EN, theo reference).
-  const timerLabel = !limited
-    ? 'No time limit'
-    : (remaining as number) >= 60
-      ? `${Math.ceil((remaining as number) / 60)} minutes remaining`
-      : `${Math.ceil(remaining as number)} seconds remaining`
+
+  // Root class: scope + contrast + text-size (persisted). data-testid giữ nguyên cho smoke.
+  const rootCls = `dc-exam ct-${contrast} ts-${textSize}`
 
   // ---------- Non-active states ----------
   if (phase === 'loading')
     return (
       <Shell>
-        <p className="text-slate-500">Đang tải đề thi…</p>
+        <p className="rmuted">Đang tải đề thi…</p>
       </Shell>
     )
   if (phase === 'locked')
     return (
       <Shell>
-        <h1 className="text-xl font-bold">Đề thi đang khóa</h1>
-        <p className="mt-2 text-slate-500">Bạn cần mở khóa đề này trước khi làm bài.</p>
-        <Link href={`/tests/${testId}`} className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white">
+        <h1 style={{ fontSize: 22, fontWeight: 800 }}>Đề thi đang khóa</h1>
+        <p className="rmuted" style={{ marginTop: 8 }}>Bạn cần mở khóa đề này trước khi làm bài.</p>
+        <Link href={`/tests/${testId}`} className="dcx-btn-primary" style={{ marginTop: 18 }}>
           Xem chi tiết đề
         </Link>
       </Shell>
@@ -558,8 +545,8 @@ export function ExamRunner({ testId }: { testId: string }) {
   if (phase === 'notfound')
     return (
       <Shell>
-        <h1 className="text-xl font-bold">Không tìm thấy đề thi</h1>
-        <Link href="/products" className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white">
+        <h1 style={{ fontSize: 22, fontWeight: 800 }}>Không tìm thấy đề thi</h1>
+        <Link href="/products" className="dcx-btn-primary" style={{ marginTop: 18 }}>
           Xem bộ đề
         </Link>
       </Shell>
@@ -567,8 +554,8 @@ export function ExamRunner({ testId }: { testId: string }) {
   if (phase === 'error')
     return (
       <Shell>
-        <h1 className="text-xl font-bold">Có lỗi khi tải đề thi</h1>
-        <button onClick={() => location.reload()} className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white">
+        <h1 style={{ fontSize: 22, fontWeight: 800 }}>Có lỗi khi tải đề thi</h1>
+        <button onClick={() => location.reload()} className="dcx-btn-primary" style={{ marginTop: 18 }}>
           Thử lại
         </button>
       </Shell>
@@ -576,28 +563,28 @@ export function ExamRunner({ testId }: { testId: string }) {
   if (phase === 'done')
     return (
       <Shell>
-        <h1 className="text-xl font-bold">Đã nộp bài ✓</h1>
-        <p className="mt-2 text-slate-600">
+        <div className="dcx-modal-icon" style={{ margin: '0 auto 18px' }}>
+          <CheckIcon className="h-7 w-7" />
+        </div>
+        <h1 style={{ fontSize: 24, fontWeight: 800 }}>Đã nộp bài</h1>
+        <p className="rmuted" style={{ marginTop: 8 }}>
           Trạng thái: <b>{result?.status === 'expired' ? 'Hết giờ (tự nộp)' : 'Đã nộp'}</b>
           {result?.time_spent ? ` · Thời gian làm: ${clock(result.time_spent)}` : ''}
         </p>
         {result?.scored && result.raw_score != null && (
-          <p className="mt-2 text-lg font-semibold text-teal-700">
+          <p style={{ marginTop: 8, fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>
             Điểm: {result.raw_score}
             {result.max_score != null ? `/${result.max_score}` : ''}
             {result.band != null ? ` · Band ${result.band}` : ''}
           </p>
         )}
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
+        <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
           {(result?.attempt_id || attempt?.attempt_id) && (
-            <Link
-              href={`/result/${result?.attempt_id ?? attempt?.attempt_id}`}
-              className="inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white"
-            >
+            <Link href={`/result/${result?.attempt_id ?? attempt?.attempt_id}`} className="dcx-btn-primary">
               Xem kết quả chi tiết
             </Link>
           )}
-          <Link href="/products" className="inline-block rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">
+          <Link href="/products" className="dcx-btn-ghost">
             Về danh sách bộ đề
           </Link>
         </div>
@@ -607,41 +594,37 @@ export function ExamRunner({ testId }: { testId: string }) {
   // ---------- Instructions (capture parity: Before_reading) ----------
   if (phase === 'instructions')
     return (
-      <div data-testid="exam-runner" className="flex min-h-screen flex-col bg-white text-slate-900">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-700 text-[10px] font-bold leading-none text-white">
-              IP
+      <div data-testid="exam-runner" className={rootCls}>
+        <header className="dcx-header">
+          <div className="dcx-header-inner">
+            <div className="dcx-logo">
+              <span className="dcx-logo-mark"><span className="dcx-logo-diamond" /></span>
+              <div className="dcx-brand">
+                <span className="dcx-brand-name"><b>IELTS</b>Practice</span>
+                <span className="dcx-subtitle">{payload?.test.title}</span>
+              </div>
             </div>
-            {/* Capture parity (Before_reading): chỉ title — timer hiện sau khi Bắt đầu. */}
-            <div className="min-w-0">
-              <div className="truncate font-semibold leading-tight">{payload?.test.title}</div>
-            </div>
-            <span className="ml-auto px-1 text-2xl leading-none" aria-hidden>
-              ☰
-            </span>
+            <div className="dcx-header-spacer" />
+            <button className="dcx-opts-btn" aria-label="Tùy chọn" disabled>
+              <MenuIcon className="h-[18px] w-[18px]" />
+            </button>
           </div>
         </header>
-        <main className="flex flex-1 items-center justify-center px-4 py-10">
-          <div className="w-full max-w-3xl rounded-2xl bg-white p-8 shadow-[0_8px_40px_rgba(0,0,0,0.10)]">
-            <h1 className="text-center text-3xl font-extrabold">Hướng dẫn làm bài kiểm tra</h1>
-            <h2 className="mt-7 text-xl font-extrabold uppercase">Lưu ý trước khi làm bài kiểm tra</h2>
-            <p className="mt-2 text-sm font-bold">Yêu cầu về thiết bị và trình duyệt:</p>
-            <ul className="mt-2 list-disc space-y-1.5 pl-6 text-sm leading-relaxed">
+        <main className="dcx-center" style={{ minHeight: 'calc(100vh - 66px)' }}>
+          <div className="dcx-center-card" style={{ textAlign: 'left', maxWidth: 720 }}>
+            <h1 style={{ textAlign: 'center', fontSize: 28, fontWeight: 800 }}>Hướng dẫn làm bài kiểm tra</h1>
+            <h2 style={{ marginTop: 24, fontSize: 18, fontWeight: 800, textTransform: 'uppercase' }}>Lưu ý trước khi làm bài</h2>
+            <p style={{ marginTop: 8, fontSize: 14, fontWeight: 700 }}>Yêu cầu về thiết bị và trình duyệt:</p>
+            <ul style={{ marginTop: 8, paddingLeft: 22, lineHeight: 1.7, fontSize: 14 }} className="rmuted">
               <li>
-                Vui lòng sử dụng <b>Google Chrome trên máy tính để bàn hoặc laptop</b> để có trải nghiệm ổn định nhất.
+                Vui lòng dùng <b style={{ color: 'var(--ink)' }}>Google Chrome trên máy tính/laptop</b> để có trải nghiệm ổn định nhất.
               </li>
               <li>
-                Không nên điều chỉnh size chữ (luôn để <b>REGULAR</b>) và Contrast (luôn để <b>Black on White</b>) để có trải nghiệm tốt
-                nhất.
+                Nên để cỡ chữ <b style={{ color: 'var(--ink)' }}>Vừa</b> và tương phản <b style={{ color: 'var(--ink)' }}>Chữ đen trên nền trắng</b>.
               </li>
             </ul>
-            <hr className="mt-12 border-t border-[#F2A93B]" />
-            <div className="mt-5 flex justify-end">
-              <button
-                onClick={() => setPhase('active')}
-                className="rounded-lg border border-[#8B1E1E]/50 px-7 py-2.5 font-semibold text-[#8B1E1E] hover:bg-red-50"
-              >
+            <div style={{ marginTop: 28, display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setPhase('active')} className="dcx-btn-primary">
                 Bắt đầu
               </button>
             </div>
@@ -651,308 +634,286 @@ export function ExamRunner({ testId }: { testId: string }) {
     )
 
   // ---------- Active exam ----------
-  // Capture parity: desktop = KHÓA chiều cao trang (h-screen overflow-hidden) — chỉ 2 cột cuộn bên trong,
-  //   không cuộn ra khoảng trắng; lề ngoài ~1cm (px-6), nội dung phủ gần hết bề rộng như reference 1920px.
   return (
-    <div data-testid="exam-runner" className={`flex min-h-screen flex-col lg:h-screen lg:overflow-hidden ${T.root} ${sizeCls}`}>
-      {/* Toolbar gọn như reference — logo + title + timer (subtitle) + ☰ trần (không viền). */}
-      <header className={`sticky top-0 z-20 shrink-0 border-b ${T.head}`}>
-        <div className="flex w-full items-center gap-3 px-6 py-2">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-700 text-[10px] font-bold leading-none text-white">
-            IP
-          </div>
-          <div className="min-w-0">
-            <div className="truncate font-semibold leading-tight">{payload?.test.title}</div>
-            <div className={`text-xs ${lowTime ? 'font-medium text-red-600' : T.subtle}`}>{timerLabel}</div>
-          </div>
-          <button onClick={() => setOptionsOpen(true)} aria-label="Tùy chọn" title="Tùy chọn" className="ml-auto px-1 text-2xl leading-none">
-            ☰
-          </button>
-        </div>
-      </header>
-
-      {errorMsg && <p className="w-full px-6 pt-2 text-sm text-red-600">{errorMsg}</p>}
-
-      {/* Listening audio */}
-      {isListening && (
-        <div className="w-full shrink-0 px-6 pt-3">
-          <ListeningAudioPlayer audioUrl={payload?.audio_url ?? null} />
-        </div>
-      )}
-
-      {/* Band header passage/section — EN theo capture ("Read the text and answer questions 1–13"). */}
-      {active && (
-        <div className="w-full shrink-0 px-6 pt-3">
-          <div className={`rounded-lg border px-4 py-2.5 ${T.band}`}>
-            <div className="font-bold uppercase">
-              {sectionLabel} {activeGroup + 1}
+    <div data-testid="exam-runner" className={rootCls}>
+      <div className="dcx-shell">
+        {/* Header: logo + tiêu đề + timer pill + Options */}
+        <header className="dcx-header">
+          <div className="dcx-header-inner">
+            <div className="dcx-logo">
+              <span className="dcx-logo-mark"><span className="dcx-logo-diamond" /></span>
+              <div className="dcx-brand">
+                <span className="dcx-brand-name"><b>IELTS</b>Practice</span>
+                <span className="dcx-subtitle">{payload?.test.title}</span>
+              </div>
             </div>
-            <div className={`text-sm ${T.subtle}`}>
-              {isListening ? 'Listen and answer questions' : 'Read the text and answer questions'} {rangeLabel(active.questions)}
+            <div className="dcx-header-spacer" />
+            {limited && (
+              <div className={`dcx-timer${lowTime ? ' low' : ''}`}>
+                <span style={{ color: 'var(--brand)', display: 'flex' }}>
+                  <ClockIcon className="h-[18px] w-[18px]" />
+                </span>
+                <span className="dcx-timer-val">{clock(remaining as number)}</span>
+                <span className="dcx-timer-lbl">còn lại</span>
+              </div>
+            )}
+            <button onClick={() => setOptionsOpen(true)} aria-label="Tùy chọn" title="Tùy chọn" className="dcx-opts-btn">
+              <MenuIcon className="h-[18px] w-[18px]" />
+            </button>
+          </div>
+        </header>
+
+        {errorMsg && <p className="dcx-error">{errorMsg}</p>}
+
+        {/* Listening audio */}
+        {isListening && <ListeningAudioPlayer audioUrl={payload?.audio_url ?? null} />}
+
+        {/* Banner passage/section (EN đề) */}
+        {active && (
+          <div className="dcx-banner">
+            <div className="dcx-banner-row">
+              <span className="dcx-badge">{isListening ? 'Listening' : 'Reading'}</span>
+              <div>
+                <div className="dcx-banner-title">
+                  {sectionLabel} {activeGroup + 1}
+                </div>
+                <div className="dcx-banner-sub">
+                  {isListening ? 'Listen and answer questions' : 'Read the text and answer questions'} {rangeLabel(active.questions)}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* 2 cột borderless + divider CAM kéo được (capture parity); desktop: cuộn TRONG cột, trang không cuộn */}
-      <main ref={mainRef} className="flex w-full flex-1 flex-col px-6 pb-6 pt-4 lg:min-h-0 lg:flex-row lg:gap-0 lg:overflow-hidden lg:pb-2">
-        {showPassage && (
-          <section
-            style={isLg ? { flexBasis: `${splitPct}%`, maxWidth: `${splitPct}%` } : undefined}
-            className="exam-col-scroll mb-6 min-w-0 lg:mb-0 lg:h-full lg:overflow-auto lg:pr-5"
-          >
-            <div ref={passageRootRef} onMouseUp={onPassageMouseUp} onTouchEnd={onPassageMouseUp} className="exam-passage relative">
-              {!active || active.passages.length === 0 ? (
-                <p className={T.subtle}>{sectionLabel} này không có đoạn văn.</p>
-              ) : (
-                active.passages.map((p) => (
-                  <article key={p.id} className="mb-6 last:mb-0">
-                    {p.title && <h2 className="mb-2 font-semibold">{p.title}</h2>}
-                    <p className="whitespace-pre-line text-justify leading-relaxed">{p.content}</p>
-                  </article>
-                ))
-              )}
-              {/* T2.3: icon note (bong bóng) cạnh đoạn có note → bấm mở popup sửa/xóa */}
-              {noteMarkers.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  aria-label="Xem ghi chú"
-                  title="Xem ghi chú"
-                  onMouseUp={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    const anchor = highlights.find((h) => h.id === m.id)
-                    if (anchor) {
-                      setHlPopup(null)
-                      setEditPopup({ x: e.clientX, y: e.clientY, anchor })
-                    }
-                  }}
-                  style={{ left: m.left, top: m.top }}
-                  className="absolute -mt-1 -translate-y-0.5 leading-none"
-                >
-                  {/* Capture parity (note.png): bong bóng note TRẮNG viền tối trên nền highlight maroon */}
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
-                    <path d="M4 4h16v12H10l-6 5V4z" fill="#fff" stroke="#475569" strokeWidth="2" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              ))}
-            </div>
-          </section>
         )}
 
-        {/* Divider dọc CAM + handle ↔ (kéo đổi tỉ lệ) — chỉ desktop */}
-        {showPassage && (
-          <div
-            onPointerDown={onDividerDown}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Kéo để đổi tỉ lệ hai cột"
-            className="relative hidden w-3 shrink-0 cursor-col-resize touch-none select-none lg:flex lg:items-center lg:justify-center"
-          >
-            <div className="h-full w-[3px] rounded bg-[#F2A93B]" />
-            <span
-              className={`absolute flex h-7 w-6 items-center justify-center rounded border text-xs shadow-sm ${
-                darkInputs ? 'border-slate-600 bg-slate-800 text-slate-200' : 'border-slate-300 bg-white text-slate-600'
-              }`}
+        {/* 2 cột + divider kéo */}
+        <main ref={mainRef} className="dcx-split">
+          {showPassage && (
+            <section
+              className="dcx-left"
+              style={isLg ? { flex: `1 1 ${splitPct}%`, maxWidth: `${splitPct}%` } : undefined}
+            >
+              <div
+                ref={passageRootRef}
+                onMouseUp={onPassageMouseUp}
+                onTouchEnd={onPassageMouseUp}
+                className="dcx-passage themed"
+              >
+                {!active || active.passages.length === 0 ? (
+                  <p className="rmuted">{sectionLabel} này không có đoạn văn.</p>
+                ) : (
+                  active.passages.map((p) => (
+                    <article key={p.id} style={{ marginBottom: 20 }}>
+                      {p.title && <div className="dcx-passage-title">{p.title}</div>}
+                      <p className="rtext" style={{ whiteSpace: 'pre-line', textAlign: 'justify' }}>
+                        {p.content}
+                      </p>
+                    </article>
+                  ))
+                )}
+                {noteMarkers.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    aria-label="Xem ghi chú"
+                    title="Xem ghi chú"
+                    onMouseUp={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const anchor = highlights.find((h) => h.id === m.id)
+                      if (anchor) {
+                        setHlPopup(null)
+                        setEditPopup({ x: e.clientX, y: e.clientY, anchor })
+                      }
+                    }}
+                    style={{ left: m.left, top: m.top }}
+                    className="dcx-note-marker"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                      <path d="M4 4h16v12H10l-6 5V4z" fill="#f2724e" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {showPassage && (
+            <div
+              onPointerDown={onDividerDown}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Kéo để đổi tỉ lệ hai cột"
+              className="dcx-divider"
             >
               ↔
-            </span>
-          </div>
-        )}
+            </div>
+          )}
 
-        <section className="exam-col-scroll min-w-0 lg:h-full lg:flex-1 lg:overflow-auto lg:pl-5">
-          {!active || active.questions.length === 0 ? (
-            <p className={T.subtle}>{sectionLabel} này chưa có câu hỏi.</p>
-          ) : (
-            <div className="space-y-7">
-              {blocks.map((block, bi) => (
-                <section key={bi}>
-                  {/* Header block "Questions a–b" + instruction 1 lần (capture parity) */}
-                  <h3 className="text-lg font-extrabold">
-                    {block.qs.length > 1 ? 'Questions' : 'Question'} {rangeLabel(block.qs)}
-                  </h3>
-                  {block.instruction && (
-                    <InstructionText text={block.instruction} className={`mt-1 whitespace-pre-line text-sm ${T.subtle}`} />
-                  )}
-                  <ol className="mt-3 space-y-5">
-                    {block.items.map((item, idx) =>
-                      item.kind === 'matrix' ? (
-                        <li key={`matrix-${item.qs[0].id}`}>
-                          <MatchingMatrixQuestion
-                            questions={item.qs}
-                            options={item.options}
-                            answers={answers}
-                            onAnswer={onAnswerChange}
-                            contrast={darkInputs}
-                            bookmarkedQs={bookmarkedQs}
-                            onToggleBookmark={toggleQuestionBookmark}
-                            activeQid={activeQid}
-                            onActivate={setActiveQid}
-                          />
-                        </li>
-                      ) : (
-                        (() => {
-                          // Capture parity: số câu INLINE với statement (mcq/tfng/matching);
-                          //   gap/diagram/map = số nằm trong ô input (placeholder) → KHÔNG badge ngoài.
-                          const kind = renderKindOf(item.q.type)
-                          const noBadge = kind === 'gap' || kind === 'diagram' || kind === 'map'
-                          const statement =
-                            kind === 'mcq_single' || kind === 'mcq_multi' || kind === 'tfng' || kind === 'ynng' || kind === 'matching'
-                              ? (item.q.statement ?? item.q.prompt)
-                              : undefined
-                          const flagged = bookmarkedQs.includes(item.q.id)
-                          const isActive = activeQid === item.q.id
-                          const flagBtn = (cls: string) => (
-                            <button
-                              type="button"
-                              onClick={() => toggleQuestionBookmark(item.q.id)}
-                              aria-pressed={flagged}
-                              aria-label={flagged ? 'Bỏ đánh dấu câu' : 'Đánh dấu câu'}
-                              title="Đánh dấu câu để xem lại"
-                              className={`${cls} ${flagged ? '' : 'text-slate-400 hover:text-slate-500'}`}
-                            >
-                              <BookmarkFlag filled={flagged} className="h-4 w-4" />
-                            </button>
-                          )
-                          if (noBadge) {
+          <section className="dcx-right">
+            <div className="dcx-qpanel themed">
+              {!active || active.questions.length === 0 ? (
+                <p className="rmuted">{sectionLabel} này chưa có câu hỏi.</p>
+              ) : (
+                blocks.map((block, bi) => (
+                  <section key={bi} className="dcx-qblock">
+                    <div className="dcx-qhead">
+                      {block.qs.length > 1 ? 'Questions' : 'Question'} {rangeLabel(block.qs)}
+                    </div>
+                    {block.instruction && <InstructionText text={block.instruction} className="dcx-qinstr" />}
+                    <div className="dcx-qlist">
+                      {block.items.map((item, idx) =>
+                        item.kind === 'matrix' ? (
+                          <div key={`matrix-${item.qs[0].id}`}>
+                            <MatchingMatrixQuestion
+                              questions={item.qs}
+                              options={item.options}
+                              answers={answers}
+                              onAnswer={onAnswerChange}
+                              bookmarkedQs={bookmarkedQs}
+                              onToggleBookmark={toggleQuestionBookmark}
+                              activeQid={activeQid}
+                              onActivate={setActiveQid}
+                            />
+                          </div>
+                        ) : (
+                          (() => {
+                            const kind = renderKindOf(item.q.type)
+                            const noBadge = kind === 'gap' || kind === 'diagram' || kind === 'map'
+                            const statement =
+                              kind === 'mcq_single' || kind === 'mcq_multi' || kind === 'tfng' || kind === 'ynng' || kind === 'matching'
+                                ? (item.q.statement ?? item.q.prompt)
+                                : undefined
+                            const flagged = bookmarkedQs.includes(item.q.id)
+                            const isActive = activeQid === item.q.id
+                            const flagBtn = (
+                              <button
+                                type="button"
+                                onClick={() => toggleQuestionBookmark(item.q.id)}
+                                aria-pressed={flagged}
+                                aria-label={flagged ? 'Bỏ đánh dấu câu' : 'Đánh dấu câu'}
+                                title="Đánh dấu câu để xem lại"
+                                className={`dcx-flag${flagged ? ' on' : ''}`}
+                              >
+                                <FlagIcon filled={flagged} className="h-[18px] w-[18px]" />
+                              </button>
+                            )
+                            if (noBadge) {
+                              return (
+                                <div
+                                  key={item.q.id}
+                                  id={`q-${item.q.id}`}
+                                  style={{ position: 'relative', scrollMarginTop: 96 }}
+                                  onFocus={() => setActiveQid(item.q.id)}
+                                >
+                                  <div style={{ position: 'absolute', right: 0, top: 0, zIndex: 1 }}>{flagBtn}</div>
+                                  <div style={{ paddingRight: 28 }}>
+                                    <QuestionRenderer
+                                      question={item.q}
+                                      value={answers[item.q.id]}
+                                      onChange={(v) => onAnswerChange(item.q.id, v)}
+                                    />
+                                  </div>
+                                </div>
+                              )
+                            }
                             return (
-                              <li key={item.q.id} id={`q-${item.q.id}`} className="relative scroll-mt-24" onFocus={() => setActiveQid(item.q.id)}>
-                                {flagBtn('absolute right-0 top-0 z-10')}
-                                <div className="pr-7">
+                              <div key={item.q.id} id={`q-${item.q.id}`} style={{ scrollMarginTop: 96 }} onFocus={() => setActiveQid(item.q.id)}>
+                                <div className="dcx-qrow">
+                                  <span className={`dcx-qnum${isActive ? ' active' : ''}`}>{item.q.number ?? idx + 1}</span>
+                                  {statement && <p className="dcx-qstatement">{statement}</p>}
+                                  <span style={statement ? undefined : { marginLeft: 'auto' }}>{flagBtn}</span>
+                                </div>
+                                <div className="dcx-qbody">
                                   <QuestionRenderer
                                     question={item.q}
                                     value={answers[item.q.id]}
                                     onChange={(v) => onAnswerChange(item.q.id, v)}
-                                    contrast={darkInputs}
+                                    hideStatement={statement != null}
                                   />
                                 </div>
-                              </li>
+                              </div>
                             )
-                          }
-                          return (
-                            <li key={item.q.id} id={`q-${item.q.id}`} className="scroll-mt-24" onFocus={() => setActiveQid(item.q.id)}>
-                              <div className="flex items-start gap-2.5">
-                                <span
-                                  className={`flex h-7 min-w-7 shrink-0 items-center justify-center rounded px-1 text-base font-bold ${
-                                    isActive ? 'border-2 border-amber-500' : ''
-                                  }`}
-                                >
-                                  {item.q.number ?? idx + 1}
-                                </span>
-                                {statement && <p className="min-w-0 flex-1 pt-0.5 font-semibold leading-snug">{statement}</p>}
-                                {flagBtn(`${statement ? '' : 'ml-auto'} mt-1 shrink-0`)}
-                              </div>
-                              <div className="mt-2 pl-9">
-                                <QuestionRenderer
-                                  question={item.q}
-                                  value={answers[item.q.id]}
-                                  onChange={(v) => onAnswerChange(item.q.id, v)}
-                                  contrast={darkInputs}
-                                  hideStatement={statement != null}
-                                />
-                              </div>
-                            </li>
-                          )
-                        })()
-                      ),
-                    )}
-                  </ol>
-                </section>
-              ))}
+                          })()
+                        ),
+                      )}
+                    </div>
+                  </section>
+                ))
+              )}
             </div>
-          )}
-        </section>
-      </main>
+          </section>
+        </main>
 
-      {/* Footer nav (capture parity): segment xanh lá phía trên số (answered) + cờ bookmark + ô active viền cam;
-          group khác = label + "x of N"; nút ✓ nộp bài nằm TRONG footer bên phải. */}
-      <footer className={`sticky bottom-0 z-20 shrink-0 border-t ${T.footer}`}>
-        <div className="flex w-full items-stretch px-6">
-          <div className="flex flex-1 items-end gap-2 overflow-x-auto py-1.5">
+        {/* Footer: nav pills theo group + ← → + Nộp bài (capture/prototype parity) */}
+        <footer className="dcx-footer">
+          <div className="dcx-navgroups">
             {groups.map((g, gi) => {
               const gAnswered = g.questions.filter((q) => isAnswered(answers[q.id])).length
               if (gi === activeGroup) {
                 return (
-                  <div key={gi} className="flex items-end gap-1.5">
-                    <span className="shrink-0 pb-1.5 text-xs font-bold uppercase">
+                  <div key={gi} className="dcx-navgroup">
+                    <button
+                      className="dcx-navlabel"
+                      onClick={() => { setActiveGroup(gi); setActiveQid(null) }}
+                    >
                       {sectionLabel} {gi + 1}
-                    </span>
+                    </button>
                     {g.questions.map((q, i) => {
                       const done = isAnswered(answers[q.id])
                       const flagged = bookmarkedQs.includes(q.id)
                       const isActive = activeQid === q.id
                       return (
-                        <div key={q.id} className="flex shrink-0 flex-col items-center gap-1">
-                          <span className={`relative h-1 w-6 rounded-sm ${done ? 'bg-green-600' : T.seg}`}>
-                            {flagged && <BookmarkFlag filled className="absolute -top-2.5 right-0 h-3 w-3" />}
-                          </span>
-                          <a
-                            href={`#q-${q.id}`}
-                            onClick={() => setActiveQid(q.id)}
-                            aria-current={isActive ? 'true' : undefined}
-                            aria-label={`Câu ${q.number ?? i + 1}${done ? ', đã trả lời' : ''}${flagged ? ', đã đánh dấu' : ''}`}
-                            className={`flex h-7 min-w-7 items-center justify-center rounded px-1 text-xs ${T.navIdle} ${
-                              isActive ? 'border-2 border-amber-500 font-bold' : 'border'
-                            }`}
-                          >
-                            {q.number ?? i + 1}
-                          </a>
-                        </div>
+                        <a
+                          key={q.id}
+                          href={`#q-${q.id}`}
+                          onClick={() => setActiveQid(q.id)}
+                          aria-current={isActive ? 'true' : undefined}
+                          aria-label={`Câu ${q.number ?? i + 1}${done ? ', đã trả lời' : ''}${flagged ? ', đã đánh dấu' : ''}`}
+                          className={`dcx-navpill${done ? ' answered' : ''}${isActive ? ' current' : ''}${flagged ? ' flagged' : ''}`}
+                        >
+                          {q.number ?? i + 1}
+                        </a>
                       )
                     })}
+                    {gi < groups.length - 1 && <span className="dcx-navsep" />}
                   </div>
                 )
               }
               return (
-                <div key={gi} className="flex shrink-0 flex-col gap-1">
-                  <span className={`h-1 w-full rounded-sm ${gAnswered === g.questions.length && g.questions.length > 0 ? 'bg-green-600' : T.seg}`} />
-                  <button onClick={() => { setActiveGroup(gi); setActiveQid(null) }} className="px-1 text-xs" title={`Chuyển ${sectionLabel} ${gi + 1}`}>
-                    <span className="font-bold uppercase">
-                      {sectionLabel} {gi + 1}
-                    </span>{' '}
-                    <span className={T.subtle}>
-                      {gAnswered} of {g.questions.length}
-                    </span>
+                <div key={gi} className="dcx-navgroup">
+                  <button className="dcx-navlabel dim" onClick={() => { setActiveGroup(gi); setActiveQid(null) }} title={`Chuyển ${sectionLabel} ${gi + 1}`}>
+                    {sectionLabel} {gi + 1} · {gAnswered}/{g.questions.length}
                   </button>
+                  {gi < groups.length - 1 && <span className="dcx-navsep" />}
                 </div>
               )
             })}
           </div>
-          <button
-            onClick={() => setModalOpen(true)}
-            aria-label="Nộp bài"
-            title="Nộp bài"
-            className={`-mr-6 flex items-center self-stretch px-5 ${T.footAccent}`}
-          >
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M4 12l5 5L20 7" />
-            </svg>
-          </button>
-        </div>
-      </footer>
-
-      {/* ◀▶ chuyển câu (vượt passage) — floating ngay trên footer, góc phải (capture parity) */}
-      <div className="fixed bottom-14 right-3 z-30 flex gap-1.5">
-        <button
-          onClick={() => goToFlat(Math.max(0, (curFlatIdx < 0 ? 0 : curFlatIdx) - 1))}
-          disabled={curFlatIdx <= 0}
-          aria-label="Câu trước"
-          className="flex h-10 w-10 items-center justify-center rounded bg-slate-900 text-lg text-white shadow disabled:opacity-40"
-        >
-          ←
-        </button>
-        <button
-          onClick={() => goToFlat(curFlatIdx < 0 ? 0 : Math.min(flatQs.length - 1, curFlatIdx + 1))}
-          disabled={flatQs.length === 0 || curFlatIdx >= flatQs.length - 1}
-          aria-label="Câu sau"
-          className="flex h-10 w-10 items-center justify-center rounded bg-slate-900 text-lg text-white shadow disabled:opacity-40"
-        >
-          →
-        </button>
+          <div className="dcx-navright">
+            <button
+              onClick={() => goToFlat(Math.max(0, (curFlatIdx < 0 ? 0 : curFlatIdx) - 1))}
+              disabled={curFlatIdx <= 0}
+              aria-label="Câu trước"
+              className="dcx-navbtn"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => goToFlat(curFlatIdx < 0 ? 0 : Math.min(flatQs.length - 1, curFlatIdx + 1))}
+              disabled={flatQs.length === 0 || curFlatIdx >= flatQs.length - 1}
+              aria-label="Câu sau"
+              className="dcx-navbtn"
+            >
+              <ArrowRight className="h-5 w-5" />
+            </button>
+            <button onClick={() => setModalOpen(true)} className="dcx-submit" aria-label="Nộp bài" title="Nộp bài">
+              Nộp bài <CheckIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </footer>
       </div>
 
-      {/* Popup tạo highlight (menu Highlight / Note) */}
+      {/* Popup tạo highlight */}
       {hlPopup && (
         <HighlightCreatePopup
           x={hlPopup.x}
@@ -962,7 +923,7 @@ export function ExamRunner({ testId }: { testId: string }) {
           onCancel={() => setHlPopup(null)}
         />
       )}
-      {/* Popup sửa/xóa highlight (F-c) — menu Highlight/Note/Delete/Delete All (capture parity) */}
+      {/* Popup sửa/xóa highlight */}
       {editPopup && editPopup.anchor.id && (
         <HighlightEditPopup
           x={editPopup.x}
@@ -988,42 +949,35 @@ export function ExamRunner({ testId }: { testId: string }) {
         />
       )}
 
-      {/* Submit modal — capture parity: 1 bước "Are you ready to submit your test?" + ✕ cam + nút amber */}
+      {/* Submit modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
-          <div className={`relative w-full max-w-xl rounded-xl border p-8 shadow-2xl ${T.card}`}>
-            <button
-              onClick={() => setModalOpen(false)}
-              aria-label="Đóng"
-              className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#F2A93B] text-sm font-bold text-white"
-            >
-              ✕
+        <div className="dcx-overlay" role="dialog" aria-modal="true" onClick={() => setModalOpen(false)}>
+          <div className="dcx-modal" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setModalOpen(false)} aria-label="Đóng" className="dcx-modal-close">
+              <CloseIcon className="h-4 w-4" />
             </button>
-            <h3 className="text-center text-3xl font-extrabold leading-snug">Are you ready to submit your test?</h3>
-            <div className={`mt-5 space-y-1 text-center text-sm ${T.subtle}`}>
-              <p>- Once you submit, you will not be able to make any further changes.</p>
-              <p>- Please review your answers carefully before proceeding.</p>
-              <p>- If you are ready, click Submit to complete your test.</p>
-              {answeredCount < questions.length && (
-                <p className="text-xs text-amber-600">
-                  You have answered {answeredCount}/{questions.length} questions — {questions.length - answeredCount} unanswered.
-                </p>
-              )}
+            <div className="dcx-modal-icon">
+              <NoteIcon className="h-8 w-8" />
             </div>
-            <div className="mt-7 flex justify-center gap-3">
-              <button
-                onClick={() => void doSubmit()}
-                className="rounded-lg bg-[#E8A33D] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#d6932f]"
-              >
-                Submit Now
+            <h2 className="dcx-modal-title">Bạn đã sẵn sàng nộp bài?</h2>
+            <p className="dcx-modal-text">
+              Sau khi nộp, bạn sẽ không thể chỉnh sửa câu trả lời.<br />
+              Hãy kiểm tra kỹ đáp án trước khi tiếp tục.
+              {answeredCount < questions.length && (
+                <>
+                  <br />
+                  <span className="warn">
+                    Bạn đã trả lời {answeredCount}/{questions.length} câu — còn {questions.length - answeredCount} câu chưa làm.
+                  </span>
+                </>
+              )}
+            </p>
+            <div className="dcx-modal-actions">
+              <button onClick={() => void doSubmit()} className="dcx-btn-coral">
+                Nộp bài ngay
               </button>
-              <button
-                onClick={() => setModalOpen(false)}
-                className={`rounded-lg border px-5 py-2.5 text-sm font-semibold ${
-                  darkInputs ? 'border-slate-500' : 'border-[#E8A33D] bg-[#FFF8E7] text-slate-800'
-                }`}
-              >
-                Check again
+              <button onClick={() => setModalOpen(false)} className="dcx-btn-ghost">
+                Kiểm tra lại
               </button>
             </div>
           </div>
@@ -1035,21 +989,11 @@ export function ExamRunner({ testId }: { testId: string }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div data-testid="exam-runner" className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="max-w-md text-center">{children}</div>
+    <div data-testid="exam-runner" className="dc-exam ct-bw ts-regular">
+      <div className="dcx-center">
+        <div className="dcx-center-card">{children}</div>
+      </div>
     </div>
-  )
-}
-
-// Hàng menu trong popup highlight (icon + label).
-function PopupRow({ icon, label, onClick, danger }: { icon: string; label: string; onClick: () => void; danger?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-slate-100 ${danger ? 'text-red-600' : 'text-slate-800'}`}
-    >
-      <span className="w-4 text-center">{icon}</span> {label}
-    </button>
   )
 }
 
@@ -1059,13 +1003,11 @@ function PopupFrame({ x, y, width, onCancel, children, label }: { x: number; y: 
   const vh = typeof window !== 'undefined' ? window.innerHeight : 640
   const left = Math.min(Math.max(8, x - width / 2), vw - width - 8)
   const top = Math.min(y + 6, vh - 290)
-  // Đóng bằng onClick (SAU mouseup): nếu đóng ở mousedown, backdrop unmount giữa gesture →
-  //   mouseup rơi xuống passage và tạo lại popup (verified bug).
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onCancel} aria-hidden />
+      <div className="dcx-ctx-backdrop" onClick={onCancel} aria-hidden />
       <div
-        className="fixed z-50 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-900 shadow-xl"
+        className="dcx-ctx"
         style={{ left, top, width }}
         role="dialog"
         aria-label={label}
@@ -1078,30 +1020,36 @@ function PopupFrame({ x, y, width, onCancel, children, label }: { x: number; y: 
   )
 }
 
-// W9 parity (T2.2/capture) — popup tạo highlight: menu Highlight / Note (Note mở ô nhập + Save cam).
+// Popup tạo highlight: Đánh dấu / Ghi chú (Ghi chú mở ô nhập + Lưu).
 function HighlightCreatePopup({ x, y, onHighlight, onSaveNote, onCancel }: { x: number; y: number; onHighlight: () => void; onSaveNote: (note: string) => void; onCancel: () => void }) {
   const [noteMode, setNoteMode] = useState(false)
   const [note, setNote] = useState('')
   return (
-    <PopupFrame x={x} y={y} width={232} onCancel={onCancel} label="Tạo tô sáng">
-      <PopupRow icon="✏️" label="Highlight" onClick={onHighlight} />
-      <PopupRow icon="✎" label="Note" onClick={() => setNoteMode(true)} />
+    <PopupFrame x={x} y={y} width={236} onCancel={onCancel} label="Tạo tô sáng">
+      <button className="dcx-ctx-item" onClick={onHighlight}>
+        <span className="dcx-ctx-ico" style={{ background: '#fff3d6', color: '#c98a1a' }}>
+          <PencilIcon className="h-3.5 w-3.5" />
+        </span>
+        Đánh dấu (Highlight)
+      </button>
+      <button className="dcx-ctx-item" onClick={() => setNoteMode(true)}>
+        <span className="dcx-ctx-ico" style={{ background: '#ffe4d6', color: '#d1502a' }}>
+          <NoteIcon className="h-3.5 w-3.5" />
+        </span>
+        Ghi chú (Note)
+      </button>
       {noteMode && (
-        <div className="mt-1 flex items-center gap-1.5 border-t border-slate-100 px-1 pt-1.5 pb-0.5">
+        <div className="dcx-ctx-noterow">
           <input
             autoFocus
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Text note"
+            placeholder="Nhập ghi chú…"
             maxLength={2000}
-            className="w-full min-w-0 rounded border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-[#E8A33D]"
+            className="dcx-ctx-input"
           />
-          <button
-            onClick={() => onSaveNote(note)}
-            disabled={!note.trim()}
-            className="rounded-md bg-[#E8A33D] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
-          >
-            Save
+          <button onClick={() => onSaveNote(note)} disabled={!note.trim()} className="dcx-ctx-save">
+            Lưu
           </button>
         </div>
       )}
@@ -1109,45 +1057,56 @@ function HighlightCreatePopup({ x, y, onHighlight, onSaveNote, onCancel }: { x: 
   )
 }
 
-// W9 parity (T2.2/F-c/capture) — popup sửa/xóa khi click đoạn đã tô: Highlight / Note(input+Save) / Delete / Delete All (confirm).
+// Popup sửa/xóa: Ghi chú (input+Lưu) / Xoá đánh dấu / Xoá tất cả (confirm).
 function HighlightEditPopup({ x, y, initialNote, onSaveNote, onDelete, onDeleteAll, onCancel }: { x: number; y: number; initialNote: string; onSaveNote: (note: string) => void; onDelete: () => void; onDeleteAll: () => void; onCancel: () => void }) {
   const [note, setNote] = useState(initialNote)
   const [confirmAll, setConfirmAll] = useState(false)
   return (
     <PopupFrame x={x} y={y} width={300} onCancel={onCancel} label="Sửa tô sáng">
-      <PopupRow icon="✏️" label="Highlight" onClick={onCancel} />
-      <div className="flex items-center gap-2 px-2 pt-1 text-sm text-slate-800">
-        <span className="w-4 text-center">✎</span> Note
+      <div className="dcx-ctx-item" style={{ cursor: 'default' }}>
+        <span className="dcx-ctx-ico" style={{ background: '#ffe4d6', color: '#d1502a' }}>
+          <NoteIcon className="h-3.5 w-3.5" />
+        </span>
+        Ghi chú
       </div>
-      <div className="flex items-center gap-1.5 px-1 py-1.5">
+      <div className="dcx-ctx-noterow">
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Text note"
+          placeholder="Nhập ghi chú…"
           maxLength={2000}
-          className="w-full min-w-0 rounded border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-[#E8A33D]"
+          className="dcx-ctx-input"
         />
-        <button onClick={() => onSaveNote(note)} className="rounded-md bg-[#E8A33D] px-3 py-1.5 text-sm font-semibold text-white">
-          Save
+        <button onClick={() => onSaveNote(note)} className="dcx-ctx-save">
+          Lưu
         </button>
       </div>
-      <div className="border-t border-slate-100 pt-1">
-        <PopupRow icon="⌫" label="Delete" onClick={onDelete} danger />
-        {confirmAll ? (
-          <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-slate-700">
-            Xóa tất cả?
-            <button onClick={onDeleteAll} className="font-medium text-red-600 underline">Xóa</button>
-            <button onClick={() => setConfirmAll(false)} className="underline">Hủy</button>
-          </div>
-        ) : (
-          <PopupRow icon="🗑" label="Delete All" onClick={() => setConfirmAll(true)} danger />
-        )}
-      </div>
+      <div className="dcx-ctx-sep" />
+      <button className="dcx-ctx-item danger" onClick={onDelete}>
+        <span className="dcx-ctx-ico" style={{ background: '#fdeae4', color: '#d1502a' }}>
+          <TrashIcon className="h-3.5 w-3.5" />
+        </span>
+        Xoá đánh dấu
+      </button>
+      {confirmAll ? (
+        <div className="dcx-ctx-item" style={{ cursor: 'default', gap: 8, fontSize: 13 }}>
+          Xoá tất cả?
+          <button onClick={onDeleteAll} style={{ color: 'var(--coral-deep)', fontWeight: 700, textDecoration: 'underline' }}>Xoá</button>
+          <button onClick={() => setConfirmAll(false)} style={{ textDecoration: 'underline' }}>Hủy</button>
+        </div>
+      ) : (
+        <button className="dcx-ctx-item danger" onClick={() => setConfirmAll(true)}>
+          <span className="dcx-ctx-ico" style={{ background: '#fdeae4', color: '#d1502a' }}>
+            <TrashIcon className="h-3.5 w-3.5" />
+          </span>
+          Xoá tất cả
+        </button>
+      )}
     </PopupFrame>
   )
 }
 
-// W9 — menu Options (Contrast 3-mode + Text size 3-mức), overlay full-screen (capture: title lớn, icon row).
+// Options menu — Contrast (3 mode) + Text size (3 mức) + toggle Đoạn văn. Overlay full-screen, drill-down.
 function OptionsMenu({
   contrast,
   textSize,
@@ -1165,67 +1124,79 @@ function OptionsMenu({
   onTogglePassage: () => void
   onClose: () => void
 }) {
-  const contrastOpts: { key: Contrast; label: string }[] = [
-    { key: 'bw', label: 'Black on white' },
-    { key: 'wb', label: 'White on black' },
-    { key: 'yb', label: 'Yellow on black' },
-  ]
-  const sizeOpts: { key: TextSize; label: string }[] = [
-    { key: 'base', label: 'Regular' },
-    { key: 'lg', label: 'Large' },
-    { key: 'xl', label: 'Extra large' },
-  ]
   const [sub, setSub] = useState<null | 'contrast' | 'size'>(null)
-  // T1.5: theme overlay theo contrast hiện tại (trước đây hardcode trắng → chói ở dark mode).
-  const dark = contrast !== 'bw'
-  const rootTheme = contrast === 'yb' ? 'bg-black text-[#F2A93B]' : contrast === 'wb' ? 'bg-black text-white' : 'bg-white text-slate-900'
-  // Hàng đã chọn = pill sáng #F6F6F6 + chữ tối (đọc rõ ở mọi mode); hàng khác hover theo nền.
-  const rowCls = (selected: boolean) =>
-    `flex w-full items-center gap-3 rounded-md px-4 py-3 text-left text-base ${selected ? 'bg-[#F6F6F6] font-bold text-slate-900' : dark ? 'hover:bg-white/10' : 'hover:bg-slate-50'}`
-  const navRowCls = `flex w-full items-center gap-3 rounded-md px-4 py-3 text-left text-base font-semibold ${dark ? 'hover:bg-white/10' : 'hover:bg-slate-50'}`
-  // T2.1: drill-down (root → submenu) như reference.
-  const title = sub === 'contrast' ? 'Contrast' : sub === 'size' ? 'Text size' : 'Options'
+  const title = sub === 'contrast' ? 'Độ tương phản' : sub === 'size' ? 'Cỡ chữ' : 'Options'
+  const contrastOpts: { key: Contrast; label: string; sw: React.CSSProperties }[] = [
+    { key: 'bw', label: 'Chữ đen trên nền trắng', sw: { background: '#fff', color: '#111', border: '1px solid #ddd' } },
+    { key: 'wb', label: 'Chữ trắng trên nền đen', sw: { background: '#15131f', color: '#fff' } },
+    { key: 'yb', label: 'Chữ vàng trên nền đen', sw: { background: '#000', color: '#ffd60a' } },
+  ]
+  const sizeOpts: { key: TextSize; label: string; fs: number }[] = [
+    { key: 'small', label: 'Nhỏ (Small)', fs: 14 },
+    { key: 'regular', label: 'Vừa (Regular)', fs: 17 },
+    { key: 'large', label: 'Lớn (Large)', fs: 20 },
+  ]
   return (
-    <div className={`fixed inset-0 z-40 overflow-auto ${rootTheme}`} role="dialog" aria-modal="true" aria-label="Tùy chọn">
-      <div className="mx-auto max-w-2xl px-6 py-8">
-        <div className="relative flex items-center justify-center">
-          {sub && (
-            <button onClick={() => setSub(null)} className="absolute left-0 flex items-center gap-1 text-base font-bold">‹ Options</button>
-          )}
-          <h2 className="text-4xl font-extrabold">{title}</h2>
-          <button onClick={onClose} aria-label="Đóng" className={`absolute right-0 flex h-10 w-10 items-center justify-center rounded-full border text-lg ${dark ? 'border-current' : 'border-slate-300'}`}>✕</button>
-        </div>
+    <div className="dcx-opt-overlay" role="dialog" aria-modal="true" aria-label="Tùy chọn">
+      {sub && (
+        <button className="dcx-opt-back" onClick={() => setSub(null)}>‹ Options</button>
+      )}
+      <button className="dcx-opt-close" onClick={onClose} aria-label="Đóng">
+        <CloseIcon className="h-4 w-4" />
+      </button>
+      <div className="dcx-opt-wrap">
+        <h2 className="dcx-opt-h2">{title}</h2>
 
         {sub === null && (
-          <div className="mt-10 space-y-1">
-            <button onClick={() => setSub('contrast')} className={navRowCls}>
-              <span aria-hidden>◐</span>
-              <span className="flex-1">Contrast</span> <span className="opacity-60">›</span>
+          <>
+            <button className="dcx-opt-row" onClick={() => setSub('contrast')}>
+              <span className="dcx-opt-row-l">
+                <span className="dcx-opt-row-ico" style={{ background: '#efe9ff', color: 'var(--brand)' }}>
+                  <ContrastIcon className="h-5 w-5" />
+                </span>
+                <span className="dcx-opt-row-label">Độ tương phản</span>
+              </span>
+              <span className="dcx-opt-chevron"><ChevronRight className="h-5 w-5" /></span>
             </button>
-            <button onClick={() => setSub('size')} className={navRowCls}>
-              <span aria-hidden className="text-sm font-extrabold">Aa</span>
-              <span className="flex-1">Text size</span> <span className="opacity-60">›</span>
+            <button className="dcx-opt-row" onClick={() => setSub('size')}>
+              <span className="dcx-opt-row-l">
+                <span className="dcx-opt-row-ico" style={{ background: '#ffe4d6', color: 'var(--coral-deep)', fontSize: 15 }}>Aa</span>
+                <span className="dcx-opt-row-label">Cỡ chữ</span>
+              </span>
+              <span className="dcx-opt-chevron"><ChevronRight className="h-5 w-5" /></span>
             </button>
-            <button onClick={onTogglePassage} className={navRowCls}>
-              <span aria-hidden>¶</span>
-              <span className="flex-1">Đoạn văn</span> <span className="opacity-60">{showPassage ? 'Đang hiện' : 'Đang ẩn'}</span>
+            <button className="dcx-opt-row" onClick={onTogglePassage}>
+              <span className="dcx-opt-row-l">
+                <span className="dcx-opt-row-ico" style={{ background: '#e7f7ee', color: 'var(--green)' }}>¶</span>
+                <span className="dcx-opt-row-label">Đoạn văn</span>
+              </span>
+              <span style={{ color: 'var(--muted)', fontWeight: 700 }}>{showPassage ? 'Đang hiện' : 'Đang ẩn'}</span>
             </button>
-          </div>
+          </>
         )}
+
         {sub === 'contrast' && (
-          <div className="mt-10 space-y-1">
+          <div>
             {contrastOpts.map((o) => (
-              <button key={o.key} onClick={() => onContrast(o.key)} className={rowCls(contrast === o.key)}>
-                <span className="w-5 text-lg">{contrast === o.key ? '✓' : ''}</span> <span className="font-semibold">{o.label}</span>
+              <button key={o.key} className="dcx-opt-choice" onClick={() => onContrast(o.key)}>
+                <span className="dcx-opt-check" style={{ opacity: contrast === o.key ? 1 : 0 }}>
+                  <CheckIcon className="h-4 w-4" />
+                </span>
+                <span className="dcx-opt-swatch" style={o.sw}>A</span>
+                <span className="dcx-opt-choice-label">{o.label}</span>
               </button>
             ))}
           </div>
         )}
+
         {sub === 'size' && (
-          <div className="mt-10 space-y-1">
+          <div>
             {sizeOpts.map((o) => (
-              <button key={o.key} onClick={() => onTextSize(o.key)} className={rowCls(textSize === o.key)}>
-                <span className="w-5 text-lg">{textSize === o.key ? '✓' : ''}</span> <span className="font-semibold">{o.label}</span>
+              <button key={o.key} className="dcx-opt-choice" onClick={() => onTextSize(o.key)}>
+                <span className="dcx-opt-check" style={{ opacity: textSize === o.key ? 1 : 0 }}>
+                  <CheckIcon className="h-4 w-4" />
+                </span>
+                <span className="dcx-opt-choice-label" style={{ fontSize: o.fs }}>{o.label}</span>
               </button>
             ))}
           </div>
