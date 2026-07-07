@@ -33,6 +33,14 @@ const actions = [
     iconBg: '#FFF3DC',
     iconDot: '#ECA22B',
   },
+  {
+    href: '/admin/grants',
+    title: 'Cấp quyền',
+    desc: 'Cấp trực tiếp VOL cho 1 tài khoản (email) — không cần key, không trừ xu.',
+    cta: 'Cấp quyền →',
+    iconBg: '#E7F7EE',
+    iconDot: '#1E9E63',
+  },
 ]
 
 export default function AdminDashboard() {
