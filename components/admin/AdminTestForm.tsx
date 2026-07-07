@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import Link from 'next/link'
 
 // W12 — Admin test form (M11). LUẬT THÉP #2: đáp án nhập ở Ô RIÊNG → build vào answer_keys, KHÔNG vào questions.
@@ -11,6 +11,23 @@ type Passage = { id: string; title: string; content: string }
 type QField = { id: string; number: string; type: string; prompt: string; answers: string; points: string }
 
 const Q_TYPES = ['gap_filling', 'mcq', 'tfng', 'ynng', 'matching', 'short_answer']
+
+// Map tên loại câu OCR/IELTS chuẩn → 6 type của form (giảm gõ tay khi import). Không khớp → 'gap_filling'.
+const TYPE_ALIAS: Record<string, string> = {
+  mcq_single: 'mcq', mcq_multi: 'mcq', multiple_choice: 'mcq', multi_select: 'mcq',
+  true_false_notgiven: 'tfng', tf_ng: 'tfng', tfng: 'tfng',
+  yes_no_notgiven: 'ynng', yn_ng: 'ynng', ynng: 'ynng',
+  matching_headings: 'matching', matching_information: 'matching', matching_features: 'matching',
+  matching_sentence_endings: 'matching', matching_paragraphs: 'matching', matching: 'matching',
+  summary_completion: 'gap_filling', sentence_completion: 'gap_filling', note_completion: 'gap_filling',
+  table_completion: 'gap_filling', flowchart_completion: 'gap_filling', form_completion: 'gap_filling',
+  gap_filling: 'gap_filling', fill_blank: 'gap_filling',
+  short_answer: 'short_answer',
+}
+function normType(t: unknown): string {
+  const k = String(t ?? '').toLowerCase().trim()
+  return TYPE_ALIAS[k] ?? (Q_TYPES.includes(k) ? k : 'gap_filling')
+}
 const SKILLS: { id: TestType; label: string }[] = [
   { id: 'reading', label: 'Reading' },
   { id: 'listening', label: 'Listening' },
@@ -50,6 +67,10 @@ export function AdminTestForm() {
   const [preview, setPreview] = useState<{ test: unknown; answer_keys: unknown } | null>(null)
   const [busy, setBusy] = useState('')
   const [mediaMsg, setMediaMsg] = useState('')
+  const [showImport, setShowImport] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importMsg, setImportMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
 
   const setP = (i: number, patch: Partial<Passage>) => setPassages((ps) => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)))
   const setQ = (i: number, patch: Partial<QField>) => setQuestions((qs) => qs.map((q, j) => (j === i ? { ...q, ...patch } : q)))
@@ -72,6 +93,96 @@ export function AdminTestForm() {
       questions: qOut,
       answer_keys: Object.keys(answer_keys).length ? answer_keys : undefined,
     }
+  }
+
+  // Nạp test.draft.json (từ pipeline scan) → đổ đầy state. Map body→content, reverse answer_keys→ô đáp án, chuẩn hoá type.
+  function importDraft(rawText: string) {
+    setImportMsg(null)
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(rawText)
+    } catch {
+      setImportMsg({ tone: 'err', text: 'JSON không hợp lệ — kiểm tra lại nội dung dán/tải.' })
+      return
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      setImportMsg({ tone: 'err', text: 'File phải là một object đề (test.draft.json).' })
+      return
+    }
+    const data = parsed as Record<string, unknown>
+    const str = (v: unknown) => (typeof v === 'string' ? v : '')
+
+    if (str(data.title)) setTitle(str(data.title))
+    if (data.type === 'reading' || data.type === 'listening' || data.type === 'writing') setType(data.type)
+    if (str(data.slug)) setSlug(str(data.slug))
+    if (typeof data.is_free === 'boolean') setIsFree(data.is_free)
+    const dsec = Number(data.duration_sec)
+    if (Number.isFinite(dsec) && dsec > 0) setDurationMin(String(Math.round(dsec / 60)))
+
+    const ak =
+      data.answer_keys && typeof data.answer_keys === 'object' && !Array.isArray(data.answer_keys)
+        ? (data.answer_keys as Record<string, unknown>)
+        : {}
+
+    const ps = Array.isArray(data.passages) ? data.passages : []
+    const mappedP: Passage[] = ps.map((raw, i) => {
+      const p = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+      return { id: String(p.id ?? uid('p')), title: str(p.title) || `Passage ${i + 1}`, content: str(p.body) || str(p.content) }
+    })
+
+    const qs = Array.isArray(data.questions) ? data.questions : []
+    const mappedQ: QField[] = qs.map((raw, i) => {
+      const q = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+      const id = String(q.id ?? uid('q'))
+      const keyRaw = ak[id]
+      const key = keyRaw && typeof keyRaw === 'object' ? (keyRaw as Record<string, unknown>) : null
+      const answers = key && Array.isArray(key.answers) ? key.answers.map((a) => String(a)).join(', ') : str(q.answers)
+      const points = key && key.points != null ? String(key.points) : '1'
+      const numRaw = q.number
+      const number = String(typeof numRaw === 'number' || typeof numRaw === 'string' ? numRaw : i + 1)
+      return { id, number, type: normType(q.type), prompt: str(q.prompt), answers, points }
+    })
+
+    if (mappedP.length) setPassages(mappedP)
+    if (mappedQ.length) setQuestions(mappedQ)
+
+    const noAns = mappedQ.filter((q) => !q.answers.trim()).length
+    const bits = [`nạp ${mappedP.length} passage · ${mappedQ.length} câu`]
+    if (noAns) bits.push(`${noAns} câu CHƯA có đáp án (gõ tay ở ô 🔒)`)
+    setImportMsg({ tone: 'ok', text: `✓ Đã ${bits.join(' · ')}. Rà lại type + đáp án rồi Lưu.` })
+    setShowImport(false)
+    setShowPreview(true)
+  }
+
+  function onImportFile(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    f.text().then((t) => { setImportText(t); importDraft(t) }).catch(() => setImportMsg({ tone: 'err', text: 'Không đọc được file.' }))
+  }
+
+  // Kiểm lỗi hiển thị trước khi publish (dựng từ state hiện tại — không cần lưu).
+  function lintIssues(): { level: 'error' | 'warn'; text: string }[] {
+    const out: { level: 'error' | 'warn'; text: string }[] = []
+    if (!title.trim()) out.push({ level: 'error', text: 'Chưa có tiêu đề đề.' })
+    if (type !== 'writing') {
+      if (passages.length === 0) out.push({ level: 'warn', text: 'Chưa có passage nào.' })
+      passages.forEach((p, i) => {
+        if (!p.content.trim()) out.push({ level: 'warn', text: `Passage ${i + 1} ("${p.title || '—'}") đang trống.` })
+      })
+    }
+    if (questions.length === 0) out.push({ level: 'warn', text: 'Chưa có câu hỏi nào.' })
+    const seen = new Map<number, number>()
+    questions.forEach((q, i) => {
+      const lbl = `Câu ${q.number || i + 1}`
+      if (!q.prompt.trim()) out.push({ level: 'warn', text: `${lbl}: nội dung câu hỏi trống.` })
+      if (!q.answers.trim()) out.push({ level: 'warn', text: `${lbl}: chưa có đáp án.` })
+      const n = Number(q.number)
+      if (!Number.isInteger(n) || n < 1) out.push({ level: 'error', text: `${lbl}: số câu không hợp lệ.` })
+      else seen.set(n, (seen.get(n) ?? 0) + 1)
+    })
+    for (const [n, c] of seen) if (c > 1) out.push({ level: 'error', text: `Số câu ${n} bị trùng (${c} lần).` })
+    return out
   }
 
   async function submit() {
@@ -154,6 +265,42 @@ export function AdminTestForm() {
         <span className="rounded-full bg-[#EFEBF2] px-2.5 py-[5px] text-[12px] font-extrabold text-[#8B8398]">
           {created ? created.status : 'chưa lưu'}
         </span>
+      </div>
+
+      {/* Import JSON (từ pipeline scan đề) */}
+      <div className="mt-4 rounded-[13px] border border-[#D9CFFF] bg-[#FBFAFF] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-[13px] font-extrabold text-[#5B43C7]">Nhập từ JSON (file test.draft.json từ tool scan)</div>
+          <div className="flex items-center gap-2">
+            <label className="cursor-pointer rounded-[9px] border border-[#D9CFFF] bg-white px-3 py-1.5 text-[12.5px] font-bold text-[#5B43C7] transition hover:bg-[#F4F1FB]">
+              Chọn file .json
+              <input type="file" accept="application/json,.json" hidden onChange={onImportFile} />
+            </label>
+            <button type="button" onClick={() => setShowImport((v) => !v)} className="rounded-[9px] px-3 py-1.5 text-[12.5px] font-bold text-[#6A48D6]">
+              {showImport ? 'Ẩn ô dán' : 'Dán JSON'}
+            </button>
+          </div>
+        </div>
+        {showImport && (
+          <div className="mt-3">
+            <textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              rows={5}
+              placeholder="Dán nội dung test.draft.json vào đây…"
+              className={`${inputCls} font-mono text-xs`}
+            />
+            <button type="button" onClick={() => importDraft(importText)} className="mt-2 rounded-[9px] bg-[#7C5CE6] px-4 py-2 text-[13px] font-bold text-white transition hover:bg-[#6A48D6]">
+              Nạp vào form →
+            </button>
+          </div>
+        )}
+        {importMsg && (
+          <p className={`mt-2 text-[12.5px] font-bold ${importMsg.tone === 'ok' ? 'text-[#1E9E63]' : 'text-[#D24A4A]'}`}>{importMsg.text}</p>
+        )}
+        <p className="mt-2 text-[11.5px] font-semibold leading-[1.5] text-[#9088A2]">
+          Đổ đầy tiêu đề · passages · câu hỏi. ⚠️ <b>answer_keys từ OCR thường rỗng</b> — bắt buộc gõ tay ở ô 🔒 mỗi câu (key sai = chấm sai).
+        </p>
       </div>
 
       {/* meta row */}
@@ -306,6 +453,109 @@ export function AdminTestForm() {
         </div>
       </div>
 
+      {/* Preview + kiểm lỗi (dựng từ state, không cần lưu) */}
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setShowPreview((v) => !v)}
+          className="rounded-[11px] border border-[#E4DEEE] bg-white px-4 py-2.5 text-sm font-bold text-[#2A2740] transition hover:border-[#CCC3DC]"
+        >
+          {showPreview ? 'Ẩn xem trước' : '👁 Xem trước & kiểm lỗi'}
+        </button>
+        {showPreview &&
+          (() => {
+            const n = lintIssues()
+            const hasErr = n.some((i) => i.level === 'error')
+            return (
+              <span className="text-[12.5px] font-extrabold" style={{ color: hasErr ? '#D24A4A' : n.length ? '#C98A1A' : '#1E9E63' }}>
+                {n.length ? `${n.length} điểm cần kiểm tra` : '✓ Không phát hiện lỗi'}
+              </span>
+            )
+          })()}
+      </div>
+
+      {showPreview &&
+        (() => {
+          const issues = lintIssues()
+          const sortedQ = [...questions].sort((a, b) => (Number(a.number) || 0) - (Number(b.number) || 0))
+          return (
+            <div className="mt-3 rounded-[13px] border border-[#E4DEEE] bg-[#FBFAFE] p-5">
+              {issues.length > 0 ? (
+                <div className="mb-4 rounded-[10px] border border-[#F1D9A8] bg-[#FFF9EC] p-3">
+                  <div className="text-[12.5px] font-extrabold text-[#A87614]">⚠️ {issues.length} điểm cần kiểm tra trước khi publish</div>
+                  <ul className="mt-2 flex flex-col gap-1">
+                    {issues.map((it, k) => (
+                      <li key={k} className="text-[12.5px] font-semibold" style={{ color: it.level === 'error' ? '#D24A4A' : '#B5791A' }}>
+                        {it.level === 'error' ? '⛔' : '•'} {it.text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="mb-4 rounded-[10px] border border-[#BFE9CF] bg-[#EAF9F0] p-3 text-[13px] font-bold text-[#1E7A48]">
+                  ✓ Không phát hiện lỗi hiển thị. Vẫn nên rà đáp án lần cuối.
+                </div>
+              )}
+
+              <div className="rounded-[12px] border border-[#ECE9F2] bg-white p-5">
+                <div className="text-[19px] font-extrabold tracking-[-0.02em] text-[#2A2740]">{title || '(chưa có tiêu đề)'}</div>
+                <div className="mt-1.5 flex flex-wrap gap-2 text-[11.5px] font-bold">
+                  <span className="rounded-full bg-[#F0ECFF] px-2.5 py-1 text-[#5B43C7]">{type}</span>
+                  <span className="rounded-full bg-[#EEF0F4] px-2.5 py-1 text-[#5B6270]">{durationMin} phút</span>
+                  <span className="rounded-full px-2.5 py-1" style={{ background: isFree ? '#E7F7EE' : '#FFF3DC', color: isFree ? '#1E9E63' : '#A87614' }}>
+                    {isFree ? 'Miễn phí' : 'Tính phí'}
+                  </span>
+                </div>
+
+                {passages.map((p, i) => (
+                  <div key={p.id} className="mt-4">
+                    <div className="text-[14px] font-extrabold text-[#2A2740]">{p.title || `Passage ${i + 1}`}</div>
+                    {p.content.trim() ? (
+                      <p className="mt-1.5 whitespace-pre-wrap text-[13.5px] leading-[1.7] text-[#3B364A]">{p.content}</p>
+                    ) : (
+                      <p className="mt-1.5 text-[13px] italic text-[#C0392B]">— passage trống —</p>
+                    )}
+                  </div>
+                ))}
+
+                <div className="mt-5 text-[13px] font-extrabold uppercase tracking-[0.04em] text-[#9088A2]">Câu hỏi ({sortedQ.length})</div>
+                <div className="mt-2 flex flex-col gap-2.5">
+                  {sortedQ.map((q) => {
+                    const chip = TYPE_CHIP[q.type] ?? { bg: '#F0ECFF', color: '#5B43C7' }
+                    return (
+                      <div key={q.id} className="rounded-[10px] border border-[#EFEBF2] bg-[#FCFBFE] p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-[24px] min-w-[24px] items-center justify-center rounded-[7px] bg-[#2A2740] px-1.5 text-[12px] font-extrabold text-white">
+                            {q.number || '?'}
+                          </span>
+                          <span className="rounded-[6px] px-2 py-0.5 text-[11px] font-extrabold" style={{ background: chip.bg, color: chip.color }}>
+                            {q.type}
+                          </span>
+                        </div>
+                        <div className={`mt-2 text-[13.5px] ${q.prompt.trim() ? 'text-[#2A2740]' : 'italic text-[#C0392B]'}`}>
+                          {q.prompt.trim() || '— chưa có nội dung câu hỏi —'}
+                        </div>
+                        <div className="mt-2 flex items-center gap-2 text-[12.5px]">
+                          <span className="font-extrabold text-[#1E9E63]">🔒 Đáp án:</span>
+                          {q.answers.trim() ? (
+                            <span className="font-mono font-bold text-[#157A4B]">{q.answers}</span>
+                          ) : (
+                            <span className="italic text-[#C0392B]">chưa nhập</span>
+                          )}
+                          <span className="ml-auto text-[#9088A2]">{q.points || '1'} điểm</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <p className="mt-2 text-[11.5px] font-semibold text-[#9088A2]">
+                Xem trước dựng từ dữ liệu đang nhập (chưa lưu). Đáp án chỉ hiện ở màn admin để bạn rà — không gửi ra client thi thật.
+              </p>
+            </div>
+          )
+        })()}
+
       {error && <p aria-live="assertive" className="mt-4 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
 
       {/* footer actions */}
@@ -327,7 +577,7 @@ export function AdminTestForm() {
           </p>
           <div className="mt-3 flex flex-wrap gap-2.5">
             <button type="button" onClick={doPreview} disabled={busy === 'preview'} className="rounded-[11px] border border-[#E4DEEE] bg-white px-4 py-2.5 text-sm font-bold text-[#2A2740] hover:border-[#CCC3DC]">
-              Preview đề
+              Xem JSON đã lưu (server)
             </button>
             <button
               type="button"
