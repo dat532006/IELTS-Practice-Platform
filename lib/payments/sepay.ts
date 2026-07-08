@@ -15,9 +15,13 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 //   → không bao giờ đặt 'failed'; user chuyển muộn sau khi pending bị reconcile đánh 'expired'
 //   → webhook đến muộn vẫn credit (F1). Docs: https://docs.sepay.vn/tich-hop-webhooks.html
 
+// Env luôn .trim() — khoảng trắng/xuống dòng dính khi copy-paste vào Vercel từng làm qr.sepay.vn
+//   từ chối acc ("Tài khoản ngân hàng phải chứa chữ hoặc số", 2026-07-08) và sẽ phá cả HMAC.
+const env = (name: string): string => (process.env[name] ?? '').trim()
+
 export function sepayConfigured(): boolean {
-  const hasAuth = !!process.env.SEPAY_WEBHOOK_SECRET || !!process.env.SEPAY_API_KEY
-  return hasAuth && !!process.env.SEPAY_BANK_ACCOUNT && !!process.env.SEPAY_BANK_CODE
+  const hasAuth = !!env('SEPAY_WEBHOOK_SECRET') || !!env('SEPAY_API_KEY')
+  return hasAuth && !!env('SEPAY_BANK_ACCOUNT') && !!env('SEPAY_BANK_CODE')
 }
 
 function tsEqual(a: string, b: string): boolean {
@@ -33,7 +37,7 @@ function tsEqual(a: string, b: string): boolean {
 
 // Verify header "Authorization: Apikey <key>" (timing-safe). Thiếu/sai/không cấu hình → false.
 function verifySepayApiKey(headers: Headers): boolean {
-  const expected = process.env.SEPAY_API_KEY
+  const expected = env('SEPAY_API_KEY')
   const m = (headers.get('authorization') ?? '').match(/^Apikey\s+(.+)$/i)
   if (!expected || !m) return false
   return tsEqual(m[1], expected)
@@ -43,7 +47,7 @@ function verifySepayApiKey(headers: Headers): boolean {
 //   header `X-SePay-Signature: sha256=<hex>`. Timestamp lệch quá ±5 phút → reject (chống replay).
 const SEPAY_TS_TOLERANCE_SEC = 300
 function verifySepayHmac(headers: Headers, rawBody: string): boolean {
-  const secret = process.env.SEPAY_WEBHOOK_SECRET
+  const secret = env('SEPAY_WEBHOOK_SECRET')
   if (!secret) return false
   const sigHeader = headers.get('x-sepay-signature') ?? ''
   const ts = headers.get('x-sepay-timestamp') ?? ''
@@ -57,7 +61,7 @@ function verifySepayHmac(headers: Headers, rawBody: string): boolean {
 
 // Verify webhook: HMAC ưu tiên khi SEPAY_WEBHOOK_SECRET set; fallback API key. Cả hai fail → false.
 export function verifySepayWebhook(headers: Headers, rawBody: string): boolean {
-  if (process.env.SEPAY_WEBHOOK_SECRET) return verifySepayHmac(headers, rawBody)
+  if (env('SEPAY_WEBHOOK_SECRET')) return verifySepayHmac(headers, rawBody)
   return verifySepayApiKey(headers)
 }
 
@@ -88,16 +92,19 @@ export function extractTopupRef(body: SepayWebhookBody): string | null {
 
 // VietQR image từ dịch vụ công khai của SePay (chỉ nhận acc/bank/amount/des — KHÔNG secret).
 export function buildSepayQrUrl(input: { amountVnd: number; ref: string }): string {
-  const acc = process.env.SEPAY_BANK_ACCOUNT ?? ''
-  const bank = process.env.SEPAY_BANK_CODE ?? ''
-  const p = new URLSearchParams({ acc, bank, amount: String(input.amountVnd), des: input.ref })
+  const p = new URLSearchParams({
+    acc: env('SEPAY_BANK_ACCOUNT'),
+    bank: env('SEPAY_BANK_CODE'),
+    amount: String(input.amountVnd),
+    des: input.ref,
+  })
   return `https://qr.sepay.vn/img?${p.toString()}`
 }
 
 export function sepayBankInfo(): { account: string; bank: string; name: string | null } {
   return {
-    account: process.env.SEPAY_BANK_ACCOUNT ?? '',
-    bank: process.env.SEPAY_BANK_CODE ?? '',
-    name: process.env.SEPAY_ACCOUNT_NAME ?? null,
+    account: env('SEPAY_BANK_ACCOUNT'),
+    bank: env('SEPAY_BANK_CODE'),
+    name: env('SEPAY_ACCOUNT_NAME') || null,
   }
 }
