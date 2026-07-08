@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { buildSepayQrUrl, sepayBankInfo, sepayConfigured } from '@/lib/payments/sepay'
+import { sepayBankInfo, sepayConfigured } from '@/lib/payments/sepay'
 import { TopupQrPanel } from '@/components/payment/TopupQrPanel'
 import { PaymentDisclaimer } from '@/components/payment/PaymentDisclaimer'
 
@@ -57,7 +57,8 @@ export default async function TopupQrPage({
           amountCoins={txn.amount_coins ?? txn.amount_vnd / 1000}
           initialStatus={txn.status}
           expiresAt={txn.expires_at}
-          qrUrl={buildSepayQrUrl({ amountVnd: txn.amount_vnd, ref })}
+          // Proxy same-origin (adblock/DNS phía client chặn qr.sepay.vn không làm hỏng trang).
+          qrUrl={`/api/payment/qr-image?ref=${ref}`}
           bank={sepayBankInfo()}
         />
       </div>

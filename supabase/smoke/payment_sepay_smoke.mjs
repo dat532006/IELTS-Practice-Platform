@@ -101,13 +101,21 @@ const run = async () => {
   {
     const own = await fetch(`${BASE}/payment/qr?ref=${ref}`, { headers: { Cookie: USER.cookie } })
     const html = await own.text()
-    check('owner mở QR → 200 + memo + qr.sepay.vn + số TK', own.status === 200 && html.includes(ref) && html.includes('qr.sepay.vn') && html.includes(process.env.SEPAY_BANK_ACCOUNT))
+    check('owner mở QR → 200 + memo + ảnh proxy same-origin + số TK', own.status === 200 && html.includes(ref) && html.includes('/api/payment/qr-image?ref=') && html.includes(process.env.SEPAY_BANK_ACCOUNT))
     check('QR page KHÔNG lộ secret webhook', !html.includes(AUTH_SECRET))
     const other = await fetch(`${BASE}/payment/qr?ref=${ref}`, { headers: { Cookie: OTHER.cookie } })
     const otherHtml = await other.text()
-    check('user khác mở QR → không thấy giao dịch (RLS)', !otherHtml.includes('qr.sepay.vn') || other.status === 404)
+    check('user khác mở QR → không thấy giao dịch (RLS)', !otherHtml.includes('/api/payment/qr-image') || other.status === 404)
     const badRef = await fetch(`${BASE}/payment/qr?ref=TOPUP-zzz`, { headers: { Cookie: USER.cookie } })
     check('ref sai định dạng → 404', badRef.status === 404)
+
+    // Proxy ảnh QR (same-origin, chống adblock/DNS client chặn qr.sepay.vn) — owner-only.
+    const img = await fetch(`${BASE}/api/payment/qr-image?ref=${ref}`, { headers: { Cookie: USER.cookie } })
+    check('qr-image owner → 200 image/png', img.status === 200 && (img.headers.get('content-type') ?? '').includes('image'), `got ${img.status} ${img.headers.get('content-type')}`)
+    const imgOther = await fetch(`${BASE}/api/payment/qr-image?ref=${ref}`, { headers: { Cookie: OTHER.cookie } })
+    check('qr-image user khác → 404', imgOther.status === 404)
+    const imgGuest = await fetch(`${BASE}/api/payment/qr-image?ref=${ref}`)
+    check('qr-image guest → 401', imgGuest.status === 401)
   }
 
   console.log('\n— status endpoint (owner-only) —')
