@@ -7,6 +7,7 @@ import { vndToCoins, COIN_VND_RATE, MIN_TOPUP_VND, MAX_TOPUP_VND } from '@/lib/p
 import { getGatewayMode } from '@/lib/payments/gateway'
 import { buildVnpayPayUrl, vnpayConfigured } from '@/lib/payments/vnpay'
 import { createMomoPayment, momoConfigured } from '@/lib/payments/momo'
+import { sepayConfigured } from '@/lib/payments/sepay'
 import { extractTrustedClientIp } from '@/lib/rate-limit/ai-ip'
 import { SITE_URL } from '@/lib/site'
 
@@ -75,10 +76,12 @@ export async function POST(request: Request) {
   }
 
   // live: provider phải có creds TRƯỚC khi insert (thiếu → 503, không tạo pending rác).
+  //   'bank' = chuyển khoản VietQR qua SePay (A1-alt) — không cần merchant gateway.
   if (mode === 'live') {
     const configured =
       (parsed.data.provider === 'vnpay' && vnpayConfigured()) ||
-      (parsed.data.provider === 'momo' && momoConfigured())
+      (parsed.data.provider === 'momo' && momoConfigured()) ||
+      (parsed.data.provider === 'bank' && sepayConfigured())
     if (!configured) {
       return fail('PAYMENT_NOT_CONFIGURED', 'Cổng thanh toán này chưa sẵn sàng', { status: 503 })
     }
@@ -123,6 +126,9 @@ export async function POST(request: Request) {
       return fail('PAYMENT_GATEWAY_ERROR', 'Không kết nối được cổng thanh toán, vui lòng thử lại', { status: 502 })
     }
     redirect_url = momo.payUrl
+  } else if (mode === 'live' && parsed.data.provider === 'bank') {
+    // SePay: KHÔNG redirect ra ngoài — trang QR nội bộ hiển thị VietQR + poll trạng thái.
+    redirect_url = `/payment/qr?ref=${provider_txn_id}`
   } else {
     // sandbox (mặc định) — placeholder như cũ, đủ chạy end-to-end smoke; KHÔNG phải production.
     redirect_url = `https://sandbox.payments.local/pay?provider=${parsed.data.provider}&ref=${provider_txn_id}&amount=${parsed.data.amount_vnd}`
