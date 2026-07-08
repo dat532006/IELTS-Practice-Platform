@@ -8,17 +8,28 @@ import { FishBone } from '@/components/brand/FishBone'
 // W16 — Trang nạp coin (M08). Fixed-rate 1.000 VND = 1 coin. Client CHỈ gửi { amount_vnd, provider };
 //   server tự tính coin (preview chỉ để hiển thị). Layout theo design "Purchase & Admin.dc.html" frame 1.
 const QUICK_VND = [60_000, 100_000, 200_000, 500_000]
-const PROVIDERS = [
+const ALL_PROVIDERS = [
   { id: 'vnpay', label: 'VNPay', mono: 'V', tint: '#E4EEFF', fg: '#2A63C7' },
   { id: 'momo', label: 'MoMo', mono: 'M', tint: '#FBE3F0', fg: '#C2186A' },
-  { id: 'bank', label: 'Chuyển khoản', mono: 'B', tint: '#E5F4EC', fg: '#1E9E63' },
+  { id: 'bank', label: 'Bank', mono: 'B', tint: '#E5F4EC', fg: '#1E9E63' },
 ] as const
+type ProviderId = (typeof ALL_PROVIDERS)[number]['id']
+
+// Chip hiển thị theo NEXT_PUBLIC_PAYMENT_PROVIDERS (vd "bank" | "bank,momo,vnpay") — Owner đóng
+//   VNPay/MoMo tới khi có merchant (2026-07-08). Không phải secret; mặc định chỉ Bank (SePay live).
+//   Server vẫn tự guard: provider chưa cấu hình → 503 dù client có gửi gì.
+const ENABLED_IDS = (process.env.NEXT_PUBLIC_PAYMENT_PROVIDERS ?? 'bank')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+const PROVIDERS = ALL_PROVIDERS.filter((p) => ENABLED_IDS.includes(p.id))
+const PROVIDER_LIST = PROVIDERS.length > 0 ? PROVIDERS : ALL_PROVIDERS.filter((p) => p.id === 'bank')
 
 const vnd = (n: number) => (Number.isFinite(n) ? n : 0).toLocaleString('vi-VN')
 
 export default function PricingPage() {
   const [amount, setAmount] = useState(100_000)
-  const [provider, setProvider] = useState<(typeof PROVIDERS)[number]['id']>('vnpay')
+  const [provider, setProvider] = useState<ProviderId>(PROVIDER_LIST[0].id)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -77,8 +88,8 @@ export default function PricingPage() {
           </span>
           <h1 className="mt-4 text-[32px] font-extrabold leading-[1.06] tracking-[-0.025em]">Nạp xương cá</h1>
           <p className="mt-2.5 max-w-[34em] text-[15px] leading-[1.6] text-[#5C5670]">
-            Thanh toán được xác minh ở <b className="text-[#2A2740]">server</b> qua VNPay / MoMo / chuyển khoản. Số
-            xương cá do server tính — preview chỉ để hiển thị.
+            Thanh toán được xác minh ở <b className="text-[#2A2740]">server</b>. Số xương cá do server tính — preview
+            chỉ để hiển thị.
           </p>
 
           {/* Quick select */}
@@ -125,7 +136,7 @@ export default function PricingPage() {
           {/* Providers */}
           <div className="mt-6 text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[#9088A2]">Cổng thanh toán</div>
           <div className="mt-2.5 flex flex-wrap gap-[11px]">
-            {PROVIDERS.map((p) => {
+            {PROVIDER_LIST.map((p) => {
               const sel = provider === p.id
               return (
                 <button
