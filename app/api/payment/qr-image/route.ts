@@ -32,12 +32,18 @@ export async function GET(request: Request) {
       // QR là hàm thuần của (acc,bank,amount,des) — cache theo URL upstream vô hại.
       next: { revalidate: 3600 },
     })
-    if (!upstream.ok) return NextResponse.json({ message: 'qr upstream error' }, { status: 502 })
+    // qr.sepay.vn trả LỖI dạng text với HTTP 200 (vd "Tài khoản ngân hàng phải chứa chữ hoặc số")
+    //   → chỉ stream khi content-type là ảnh thật; còn lại 502 + log để thấy nguyên nhân ở server.
+    const upstreamType = upstream.headers.get('content-type') ?? ''
+    if (!upstream.ok || !upstreamType.startsWith('image/')) {
+      console.error(`[payment/qr-image] upstream không trả ảnh (status=${upstream.status}, type=${upstreamType})`)
+      return NextResponse.json({ message: 'qr upstream error' }, { status: 502 })
+    }
     const png = await upstream.arrayBuffer()
     return new NextResponse(png, {
       status: 200,
       headers: {
-        'content-type': upstream.headers.get('content-type') ?? 'image/png',
+        'content-type': upstreamType,
         'cache-control': 'private, max-age=300', // QR của phiên — cache riêng tư, ngắn
       },
     })
