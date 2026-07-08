@@ -56,51 +56,14 @@
 }
 .dc-home .ann-sep { opacity: .5; margin: 0 10px; }
 
-/* ── Nav ── */
-.dc-home header {
-  position: sticky; top: 0; z-index: 50;
-  backdrop-filter: saturate(180%) blur(12px);
-  background: rgba(251, 249, 255, .8);
-  border-bottom: 1px solid rgba(42, 39, 64, .07);
-}
-.dc-home .nav-inner {
-  width: min(1200px, 93vw); margin: 0 auto;
-  display: flex; align-items: center; gap: 28px; height: 72px;
-}
-.dc-home .logo {
-  display: flex; align-items: center; gap: 10px;
-  font-weight: 800; font-size: 20px; letter-spacing: -.02em; flex: none;
-}
-.dc-home .logo-mark {
-  display: flex; align-items: center; justify-content: center;
-  background: var(--brand); border-radius: 11px;
-  width: 36px; height: 36px;
-  box-shadow: 0 6px 16px rgba(124, 92, 230, .34);
-}
-.dc-home .logo-mark-sm { width: 32px; height: 32px; border-radius: 10px; box-shadow: none; }
-.dc-home .logo-diamond { width: 13px; height: 13px; border-radius: 4px; background: #fff; transform: rotate(45deg); display: block; }
-.dc-home .logo-diamond-sm { width: 11px; height: 11px; border-radius: 3px; }
-.dc-home .logo-brand { color: var(--brand); }
-.dc-home nav {
-  display: flex; align-items: center; gap: 22px;
-  font-size: 14.5px; font-weight: 600; color: #564f6b; flex: 1;
-}
-.dc-home nav a { transition: color .15s; }
-.dc-home nav a:hover { color: var(--brand); }
-.dc-home .nav-soon { display: inline-flex; align-items: center; gap: 6px; color: #a8a2ba; cursor: not-allowed; }
+/* ── Nav ──
+   2026-07-08: header landing dùng chung components/layout/Header (Tailwind) — các rule
+   header/nav/logo/hdr-actions cũ đã gỡ để không đè style component chung (vd `nav { display:flex }`
+   phá `hidden md:flex`). Giữ .badge-soon vì SkillTabs còn dùng. */
 .dc-home .badge-soon {
   font-size: 9px; font-weight: 800; text-transform: uppercase;
   background: #efebf4; color: #9d96ae; border-radius: 5px; padding: 2px 5px;
 }
-.dc-home .hdr-actions { display: flex; align-items: center; gap: 14px; flex: none; }
-.dc-home .btn-login { font-size: 14.5px; font-weight: 700; color: #2a2740; transition: color .15s; }
-.dc-home .btn-login:hover { color: var(--brand); }
-.dc-home .btn-start {
-  font-size: 14.5px; font-weight: 700; color: #fff;
-  background: var(--brand); padding: 10px 18px; border-radius: 11px;
-  box-shadow: 0 8px 20px rgba(124, 92, 230, .26); transition: background .15s;
-}
-.dc-home .btn-start:hover { background: var(--brand-deep); }
 
 /* ── Hero ── */
 .dc-home .hero {
@@ -434,33 +397,10 @@
 .dc-home .btn-send:hover { background: var(--brand-deep); }
 .dc-home .lead-thanks { margin-top: 20px; color: #c8c2da; font-size: 15px; font-weight: 600; }
 
-/* ── Footer ── */
-.dc-home footer { border-top: 1px solid #ebe6f2; background: rgba(255, 255, 255, .5); }
-.dc-home .footer-inner {
-  width: min(1200px, 93vw); margin: 0 auto; padding: 54px 0 30px;
-  display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 32px;
-}
-.dc-home .footer-desc { font-size: 14px; color: #857f96; line-height: 1.6; margin-top: 14px; max-width: 24em; }
-.dc-home .footer-col-title { font-size: 13px; font-weight: 800; color: #2a2740; text-transform: uppercase; letter-spacing: .04em; }
-.dc-home .footer-links { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
-.dc-home .footer-links a { font-size: 14px; color: #6a6480; font-weight: 600; transition: color .15s; }
-.dc-home .footer-links a:hover { color: var(--brand); }
-.dc-home .footer-bottom { border-top: 1px solid #ebe6f2; }
-.dc-home .footer-bottom-inner {
-  width: min(1200px, 93vw); margin: 0 auto; padding: 20px 0;
-  display: flex; justify-content: space-between; flex-wrap: wrap;
-  gap: 10px; font-size: 13px; color: #9d96ae; font-weight: 600;
-}
-.dc-home .footer-legal { display: flex; gap: 20px; }
-.dc-home .footer-legal a { transition: color .15s; }
-.dc-home .footer-legal a:hover { color: var(--brand); }
+/* ── Footer ──
+   2026-07-08: footer landing dùng chung components/layout/SiteFooter (Tailwind) — rule .footer-* cũ đã gỡ. */
 
-@media (max-width: 900px) {
-  .dc-home .footer-inner { grid-template-columns: 1fr 1fr; }
-  .dc-home nav { display: none; }
-}
 @media (max-width: 500px) {
-  .dc-home .footer-inner { grid-template-columns: 1fr; }
   .dc-home .ai-inner, .dc-home .skill-panel { padding: 28px; }
   .dc-home .lead-inner { padding: 36px 24px; }
 }

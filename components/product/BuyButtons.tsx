@@ -54,7 +54,7 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
       }
       const code = body?.meta?.error_code ?? 'INTERNAL'
       if (res.status === 401) setErr({ code: 'UNAUTHORIZED', msg: 'Bạn cần đăng nhập để mua.' })
-      else if (code === 'INSUFFICIENT_COINS') setErr({ code, msg: 'Bạn không đủ coin để mua bộ đề này.' })
+      else if (code === 'INSUFFICIENT_COINS') setErr({ code, msg: 'Bạn không đủ xương cá để mua bộ đề này.' })
       else setErr({ code, msg: body?.message ?? 'Không mua được, vui lòng thử lại.' })
     } catch {
       setErr({ code: 'NETWORK', msg: 'Lỗi mạng, vui lòng thử lại.' })
@@ -100,7 +100,7 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
             href="/pricing"
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-[13px] bg-[#2A2740] p-[15px] text-[15.5px] font-bold text-white transition hover:bg-[#17152A]"
           >
-            Nạp thêm coin →
+            Nạp thêm xương cá →
           </Link>
           <div className="mt-[11px] text-center text-[12.5px] font-semibold text-[#A8A2BA]">
             Sau khi nạp, quay lại đây để mua ngay
@@ -135,7 +135,7 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
           {err.msg}
           {err.code === 'INSUFFICIENT_COINS' && (
             <Link href="/pricing" className="ml-1 font-medium text-[#6A48D6] underline">
-              Nạp coin →
+              Nạp xương cá →
             </Link>
           )}
           {err.code === 'UNAUTHORIZED' && (

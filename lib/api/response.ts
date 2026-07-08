@@ -22,6 +22,8 @@ export const ERROR_CODES = {
   CODE_SOLD_OUT: 'CODE_SOLD_OUT',
   PAYMENT_SIGNATURE_INVALID: 'PAYMENT_SIGNATURE_INVALID',
   PAYMENT_AMOUNT_MISMATCH: 'PAYMENT_AMOUNT_MISMATCH', // W16: paid_vnd != transactions.amount_vnd → KHÔNG credit
+  PAYMENT_NOT_CONFIGURED: 'PAYMENT_NOT_CONFIGURED', // A1: gateway mode=disabled hoặc provider chưa có creds (live)
+  PAYMENT_GATEWAY_ERROR: 'PAYMENT_GATEWAY_ERROR', // A1: gọi cổng thật (vd MoMo create) thất bại → 502
   UNAUTHORIZED: 'UNAUTHORIZED',
   FORBIDDEN: 'FORBIDDEN',
   EXAM_LOCKED: 'EXAM_LOCKED', // W4: premium payload chưa unlock (is_free=false & không có test_unlocks)

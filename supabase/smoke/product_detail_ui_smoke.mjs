@@ -61,7 +61,8 @@ const run = async () => {
     check('guest detail → "Mục lục đề"', text.includes('Mục lục đề'))
     check('guest detail → tên đề premium trong mục lục', text.includes('Reading Premium 1'))
     check('guest detail → premium badge "Khóa"', text.includes('Khóa'))
-    check('guest detail → CTA mua (not owned)', text.includes('Mua bằng coin') && text.includes('coins') && text.includes('100'))
+    // 2026-07-08 Owner chốt brand currency = "xương cá" (PR #23) — sync assertion khỏi "Mua bằng coin".
+    check('guest detail → CTA mua (not owned)', text.includes('Mua bằng xương cá') && text.includes('100'))
     check('guest detail → KHÔNG badge "Đã sở hữu"', !text.includes('Đã sở hữu'))
     check('guest detail → KHÔNG link /exam/ (mục lục chỉ /tests/)', !text.includes('/exam/'))
     check('guest detail → KHÔNG lộ passage premium', !text.includes(PREMIUM_PASSAGE))
@@ -141,7 +142,7 @@ async function authedStates() {
     // --- Phase A: LOCKED_AUTH (đã login, chưa mở khóa) ---
     {
       const d = await getHtml(`/products/${PRODUCT_SLUG}`, Cookie)
-      check('authed not-owned → CTA "Mua bằng coin"', d.text.includes('Mua bằng coin'))
+      check('authed not-owned → CTA "Mua bằng xương cá"', d.text.includes('Mua bằng xương cá'))
       check('authed not-owned → KHÔNG "Đã sở hữu"', !d.text.includes('Đã sở hữu'))
       check('authed not-owned → premium test "Khóa"', d.text.includes('Khóa'))
 
@@ -164,7 +165,7 @@ async function authedStates() {
       check('owned detail → badge "Đã sở hữu"', d.text.includes('Đã sở hữu'))
       // Copy panel owned đổi ở W16 (redesign violet): "Đã sở hữu bộ đề" + "Bạn đã mở khoá toàn bộ bộ đề."
       check('owned detail → panel "Đã sở hữu bộ đề"', d.text.includes('Đã sở hữu bộ đề') && d.text.includes('đã mở khoá toàn bộ'))
-      check('owned detail → KHÔNG "Mua bằng coin"', !d.text.includes('Mua bằng coin'))
+      check('owned detail → KHÔNG "Mua bằng xương cá"', !d.text.includes('Mua bằng xương cá'))
       check('owned detail → premium test badge "Đã mở"', d.text.includes('Đã mở'))
       check('owned detail → KHÔNG lộ passage', !d.text.includes(PREMIUM_PASSAGE))
 

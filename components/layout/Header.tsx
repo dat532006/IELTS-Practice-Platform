@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getHeaderProfile, invalidateHeaderProfile } from '@/lib/auth/client-profile'
 import { MAIN_NAV } from '@/lib/nav'
 import { Logo } from '@/components/brand/Logo'
 import { FishBone } from '@/components/brand/FishBone'
@@ -14,26 +15,14 @@ export function Header() {
   const [avatar, setAvatar] = useState<string | null>(null)
 
   useEffect(() => {
-    const supabase = createClient()
     let active = true
-    supabase.auth
-      .getUser()
-      .then(async ({ data }) => {
-        if (!active || !data.user) return
-        setEmail(data.user.email ?? null)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('coins, avatar')
-          .eq('id', data.user.id)
-          .single()
-        if (active) {
-          setCoins(profile?.coins ?? 0)
-          setAvatar(profile?.avatar ?? null)
-        }
-      })
-      .catch(() => {
-        /* chưa đăng nhập / chưa cấu hình env — render trạng thái logged-out */
-      })
+    // Cached promise (lib/auth/client-profile): remount giữa landing ↔ marketing không refetch.
+    getHeaderProfile().then((p) => {
+      if (!active) return
+      setEmail(p.email)
+      setCoins(p.coins)
+      setAvatar(p.avatar)
+    })
     return () => {
       active = false
     }
@@ -42,6 +31,7 @@ export function Header() {
   async function logout() {
     const supabase = createClient()
     await supabase.auth.signOut()
+    invalidateHeaderProfile()
     window.location.href = '/'
   }
 
@@ -83,7 +73,7 @@ export function Header() {
                 href="/dashboard"
                 className="hidden text-[14px] font-bold text-[#2A2740] transition hover:text-[#7C5CE6] sm:inline"
               >
-                Bảng điều khiển
+                Dashboard
               </Link>
               <span
                 title="Số dư xương cá"
@@ -95,7 +85,7 @@ export function Header() {
                 onClick={logout}
                 className="text-[14px] font-bold text-[#2A2740] transition hover:text-[#7C5CE6]"
               >
-                Đăng xuất
+                Log out
               </button>
               <Link
                 href="/account"
@@ -109,13 +99,13 @@ export function Header() {
           ) : (
             <>
               <Link href="/login" className="text-[14px] font-bold text-[#2A2740] transition hover:text-[#7C5CE6]">
-                Đăng nhập
+                Log in
               </Link>
               <Link
                 href="/register"
                 className="rounded-[11px] bg-[#7C5CE6] px-[18px] py-2.5 text-[14px] font-bold text-white shadow-[0_8px_20px_rgba(124,92,230,0.26)] transition hover:bg-[#6A48D6]"
               >
-                Thi thử ngay
+                Start free
               </Link>
             </>
           )}

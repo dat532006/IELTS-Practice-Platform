@@ -2,6 +2,9 @@
 
 import { useState, type ChangeEvent } from 'react'
 import Link from 'next/link'
+import { ExamRunner } from '@/components/exam/ExamRunner'
+import { examFontVars } from '@/app/exam-fonts'
+import type { ExamPayload } from '@/types/exam'
 
 // W12 — Admin test form (M11). LUẬT THÉP #2: đáp án nhập ở Ô RIÊNG → build vào answer_keys, KHÔNG vào questions.
 //   Guard thật ở server (admin layout + /api/admin/* requireAdmin); form chỉ gọi API. KHÔNG import scoring/secret.
@@ -71,6 +74,19 @@ export function AdminTestForm() {
   const [importText, setImportText] = useState('')
   const [importMsg, setImportMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null)
   const [showPreview, setShowPreview] = useState(false)
+  // Preview GIAO DIỆN THI thật (2026-07-08): dựng ExamPayload local từ state → ExamRunner preview mode.
+  //   KHÔNG gửi answer_keys vào payload (đúng luật thép #2 — payload thi không bao giờ mang đáp án).
+  const [examPreview, setExamPreview] = useState<{ payload: ExamPayload; durationSec: number } | null>(null)
+
+  function openExamPreview() {
+    const payload: ExamPayload = {
+      test: { id: '__admin_preview__', title: title || '(Chưa có tiêu đề)', skill: type, is_free: isFree },
+      passages: passages.map((p) => ({ id: p.id, title: p.title, content: p.content })),
+      questions: questions.map((q) => ({ id: q.id, number: Number(q.number) || 0, type: q.type, prompt: q.prompt })),
+      audio_url: null, // audio ký URL chỉ sau access guard — preview không phát audio
+    }
+    setExamPreview({ payload, durationSec: Math.max(1, Number(durationMin) || 60) * 60 })
+  }
 
   const setP = (i: number, patch: Partial<Passage>) => setPassages((ps) => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)))
   const setQ = (i: number, patch: Partial<QField>) => setQuestions((qs) => qs.map((q, j) => (j === i ? { ...q, ...patch } : q)))
@@ -462,6 +478,15 @@ export function AdminTestForm() {
         >
           {showPreview ? 'Ẩn xem trước' : '👁 Xem trước & kiểm lỗi'}
         </button>
+        <button
+          type="button"
+          onClick={openExamPreview}
+          disabled={type === 'writing'}
+          title={type === 'writing' ? 'Preview giao diện thi hiện hỗ trợ Reading/Listening' : 'Mở đề trong giao diện làm bài thật để soát định dạng'}
+          className="rounded-[11px] border border-[#D9CFF2] bg-[#F6F2FF] px-4 py-2.5 text-sm font-bold text-[#5B43C7] transition hover:border-[#B9A7E6] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          🖥 Xem giao diện thi
+        </button>
         {showPreview &&
           (() => {
             const n = lintIssues()
@@ -598,6 +623,22 @@ export function AdminTestForm() {
           {preview && (
             <pre className="mt-3 max-h-72 overflow-auto rounded-[10px] bg-[#2A2740] p-3 text-xs text-slate-100">{JSON.stringify(preview, null, 2)}</pre>
           )}
+        </div>
+      )}
+
+      {/* Preview giao diện thi thật (fullscreen overlay) — ExamRunner preview mode, KHÔNG API/attempt */}
+      {examPreview && (
+        <div className="fixed inset-0 z-[100] overflow-auto bg-[#F4F1F8]">
+          <button
+            type="button"
+            onClick={() => setExamPreview(null)}
+            className="fixed right-4 top-3 z-[110] rounded-[11px] bg-[#2A2740] px-4 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#17152A]"
+          >
+            ✕ Đóng preview
+          </button>
+          <div className={examFontVars}>
+            <ExamRunner testId="__admin_preview__" preview={examPreview} />
+          </div>
         </div>
       )}
     </div>

@@ -90,7 +90,7 @@ export default function DashboardPage() {
           href="/pricing"
           className="rounded-[12px] bg-[#7C5CE6] px-4 py-2.5 text-[14px] font-bold text-white shadow-[0_12px_24px_-12px_rgba(124,92,230,0.5)] hover:bg-[#6A48D6]"
         >
-          Nạp coin
+          Nạp xương cá
         </Link>
       </div>
 

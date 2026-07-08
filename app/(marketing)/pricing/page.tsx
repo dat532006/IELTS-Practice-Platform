@@ -47,7 +47,7 @@ export default function PricingPage() {
       })
       const body = await res.json().catch(() => null)
       if (!res.ok) {
-        if (res.status === 401) setError('Bạn cần đăng nhập để nạp coin.')
+        if (res.status === 401) setError('Bạn cần đăng nhập để nạp xương cá.')
         else setError(body?.message ?? 'Không khởi tạo được thanh toán.')
         return
       }
@@ -73,12 +73,12 @@ export default function PricingPage() {
         <div className="px-6 py-9 sm:px-10">
           <span className="inline-flex items-center gap-2 rounded-full bg-[#F0ECFF] px-3.5 py-2 text-[12.5px] font-bold text-[#6A48D6]">
             <span className="block h-[7px] w-[7px] rounded-full bg-[#7C5CE6]" />
-            Tỷ giá cố định {vnd(COIN_VND_RATE)} VND = 1 coin
+            Tỷ giá cố định {vnd(COIN_VND_RATE)} VND = 1 xương cá
           </span>
-          <h1 className="mt-4 text-[32px] font-extrabold leading-[1.06] tracking-[-0.025em]">Nạp coin</h1>
+          <h1 className="mt-4 text-[32px] font-extrabold leading-[1.06] tracking-[-0.025em]">Nạp xương cá</h1>
           <p className="mt-2.5 max-w-[34em] text-[15px] leading-[1.6] text-[#5C5670]">
             Thanh toán được xác minh ở <b className="text-[#2A2740]">server</b> qua VNPay / MoMo / chuyển khoản. Số
-            coin do server tính — preview chỉ để hiển thị.
+            xương cá do server tính — preview chỉ để hiển thị.
           </p>
 
           {/* Quick select */}
@@ -159,7 +159,7 @@ export default function PricingPage() {
             </div>
             {valid && (
               <div className="mt-1.5 text-right font-mono text-[12.5px] font-semibold text-[#A8A2BA]">
-                {vnd(amount)} VND = {previewCoins} coins
+                {vnd(amount)} VND = {previewCoins} xương cá
               </div>
             )}
           </div>
@@ -183,7 +183,7 @@ export default function PricingPage() {
                 : 'cursor-not-allowed bg-[#D8D2E4] shadow-none'
             }`}
           >
-            {loading ? 'Đang chuyển đến cổng thanh toán…' : valid ? `Nạp ${vnd(amount)} VND →` : 'Nạp coin'}
+            {loading ? 'Đang chuyển đến cổng thanh toán…' : valid ? `Nạp ${vnd(amount)} VND →` : 'Nạp xương cá'}
           </button>
           <div className="mt-3.5 text-center text-[12.5px] font-semibold text-[#A8A2BA]">
             🔒 Chuyển hướng tới cổng thanh toán an toàn
