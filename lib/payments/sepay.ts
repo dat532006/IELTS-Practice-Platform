@@ -1,34 +1,64 @@
 import 'server-only'
-import { timingSafeEqual } from 'node:crypto'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 
 // A1-alt — SePay adapter (chuyển khoản VietQR + webhook biến động số dư, provider='bank').
 //   SePay KHÔNG phải cổng thanh toán: user chuyển khoản thẳng vào TK ngân hàng Owner (QR pre-fill
 //   số tiền + nội dung = provider_txn_id); SePay bắn webhook khi tiền vào; server khớp mã trong
 //   nội dung CK + số tiền rồi credit qua settleVerifiedTopup (idempotent, amount fail-closed).
-// Env (server-only): SEPAY_API_KEY (auth webhook — SePay gửi header "Authorization: Apikey <key>"),
+// Env (server-only): auth webhook chọn 1 trong 2 (HMAC ưu tiên nếu set cả hai):
+//   • SEPAY_WEBHOOK_SECRET — HMAC-SHA256 (khuyến nghị của SePay): header `X-SePay-Signature:
+//     sha256=<hex>` + `X-SePay-Timestamp` (Unix giây); chuỗi ký = `{timestamp}.{raw_body}` trên RAW
+//     body bytes (developer.sepay.vn/vi/sepay-webhooks/xac-thuc). Chống giả mạo + replay (±5 phút).
+//   • SEPAY_API_KEY — header "Authorization: Apikey <key>" (đơn giản hơn, secret lộ trên mỗi request).
 //   SEPAY_BANK_ACCOUNT + SEPAY_BANK_CODE (+ SEPAY_ACCOUNT_NAME tùy chọn) cho VietQR.
 // Bất biến giữ nguyên (payment_redeem_contract §3): bank transfer KHÔNG có notification thất bại
 //   → không bao giờ đặt 'failed'; user chuyển muộn sau khi pending bị reconcile đánh 'expired'
 //   → webhook đến muộn vẫn credit (F1). Docs: https://docs.sepay.vn/tich-hop-webhooks.html
 
 export function sepayConfigured(): boolean {
-  return !!process.env.SEPAY_API_KEY && !!process.env.SEPAY_BANK_ACCOUNT && !!process.env.SEPAY_BANK_CODE
+  const hasAuth = !!process.env.SEPAY_WEBHOOK_SECRET || !!process.env.SEPAY_API_KEY
+  return hasAuth && !!process.env.SEPAY_BANK_ACCOUNT && !!process.env.SEPAY_BANK_CODE
 }
 
-// Verify header "Authorization: Apikey <key>" (timing-safe). Thiếu/sai/không cấu hình → false.
-export function verifySepayAuth(headers: Headers): boolean {
-  const expected = process.env.SEPAY_API_KEY
-  const auth = headers.get('authorization') ?? ''
-  const m = auth.match(/^Apikey\s+(.+)$/i)
-  if (!expected || !m) return false
-  const got = Buffer.from(m[1], 'utf8')
-  const want = Buffer.from(expected, 'utf8')
-  if (got.length !== want.length) return false
+function tsEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a, 'utf8')
+  const bb = Buffer.from(b, 'utf8')
+  if (ba.length !== bb.length) return false
   try {
-    return timingSafeEqual(got, want)
+    return timingSafeEqual(ba, bb)
   } catch {
     return false
   }
+}
+
+// Verify header "Authorization: Apikey <key>" (timing-safe). Thiếu/sai/không cấu hình → false.
+function verifySepayApiKey(headers: Headers): boolean {
+  const expected = process.env.SEPAY_API_KEY
+  const m = (headers.get('authorization') ?? '').match(/^Apikey\s+(.+)$/i)
+  if (!expected || !m) return false
+  return tsEqual(m[1], expected)
+}
+
+// HMAC-SHA256 theo spec SePay: sig = hex(HMAC(secret, `${X-SePay-Timestamp}.${raw_body}`));
+//   header `X-SePay-Signature: sha256=<hex>`. Timestamp lệch quá ±5 phút → reject (chống replay).
+const SEPAY_TS_TOLERANCE_SEC = 300
+function verifySepayHmac(headers: Headers, rawBody: string): boolean {
+  const secret = process.env.SEPAY_WEBHOOK_SECRET
+  if (!secret) return false
+  const sigHeader = headers.get('x-sepay-signature') ?? ''
+  const ts = headers.get('x-sepay-timestamp') ?? ''
+  const m = sigHeader.match(/^(?:sha256=)?([0-9a-f]{64})$/i)
+  if (!m || !/^\d{1,12}$/.test(ts)) return false
+  const skew = Math.abs(Math.floor(Date.now() / 1000) - Number(ts))
+  if (skew > SEPAY_TS_TOLERANCE_SEC) return false
+  const expected = createHmac('sha256', secret).update(`${ts}.${rawBody}`, 'utf8').digest('hex')
+  return tsEqual(m[1].toLowerCase(), expected)
+}
+
+// Verify webhook: HMAC ưu tiên khi SEPAY_WEBHOOK_SECRET set; fallback API key. Cả hai fail → false.
+export function verifySepayWebhook(headers: Headers, rawBody: string): boolean {
+  if (process.env.SEPAY_WEBHOOK_SECRET) return verifySepayHmac(headers, rawBody)
+  return verifySepayApiKey(headers)
 }
 
 export type SepayWebhookBody = {

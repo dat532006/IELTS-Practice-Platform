@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { verifySepayAuth, extractTopupRef, sepayConfigured, type SepayWebhookBody } from '@/lib/payments/sepay'
+import { verifySepayWebhook, extractTopupRef, sepayConfigured, type SepayWebhookBody } from '@/lib/payments/sepay'
 import { settleVerifiedTopup } from '@/lib/payments/settle'
 
 // A1-alt — SePay webhook (biến động số dư, provider='bank'). SePay yêu cầu response HTTP 200/201
@@ -14,13 +14,17 @@ const ACK = () => NextResponse.json({ success: true })
 
 export async function POST(request: Request) {
   if (!sepayConfigured()) return NextResponse.json({ success: false, message: 'not configured' }, { status: 503 })
-  if (!verifySepayAuth(request.headers)) {
+
+  // HMAC ký trên RAW body bytes (`{timestamp}.{raw_body}`) → PHẢI đọc text() trước rồi mới parse;
+  //   request.json() sẽ mất raw chính xác (spec developer.sepay.vn — xác thực webhook).
+  const rawBody = await request.text()
+  if (!verifySepayWebhook(request.headers, rawBody)) {
     return NextResponse.json({ success: false, message: 'unauthorized' }, { status: 401 })
   }
 
   let body: SepayWebhookBody
   try {
-    body = (await request.json()) as SepayWebhookBody
+    body = JSON.parse(rawBody) as SepayWebhookBody
   } catch {
     return NextResponse.json({ success: false, message: 'invalid json' }, { status: 400 })
   }
