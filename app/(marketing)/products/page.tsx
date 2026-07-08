@@ -58,7 +58,7 @@ export default async function ProductsPage({
     <div className="mx-auto max-w-6xl px-4 py-10 text-[#2A2740]">
       <h1 className="text-[32px] font-extrabold tracking-[-0.03em]">Bộ đề</h1>
       <p className="mt-1.5 text-[15px] font-semibold text-[#6A6480]">
-        {total} bộ đề · nội dung gốc trên giao diện thi thật
+        {total} bộ đề · 100% đề đã ra thi thật · giao diện chuẩn thi thật
       </p>
 
       <div className="mt-[22px]">
@@ -69,7 +69,9 @@ export default async function ProductsPage({
 
       {cards.length === 0 ? (
         <p className="mt-12 text-center text-[15px] font-semibold text-[#9D96AE]">
-          Không có bộ đề khớp bộ lọc.
+          {params.skill && ['reading', 'listening', 'writing'].includes(params.skill)
+            ? `Chưa có bộ đề ${params.skill.charAt(0).toUpperCase() + params.skill.slice(1)} — nội dung đang được bổ sung.`
+            : 'Không có bộ đề khớp bộ lọc.'}
         </p>
       ) : (
         <>

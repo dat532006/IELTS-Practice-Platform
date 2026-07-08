@@ -106,7 +106,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
                 Đăng nhập để mở khóa
               </Link>
               <p className="mt-2 text-xs text-slate-400">
-                Đây là đề trả phí — đăng nhập rồi mua bộ đề bằng coin để mở khóa.
+                Đây là đề trả phí — đăng nhập rồi mua bộ đề bằng xương cá để mở khóa.
               </p>
             </>
           ) : (
@@ -120,7 +120,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
                 {meta.product ? `Mua bộ đề "${meta.product.title}" →` : 'Xem bộ đề chứa đề này →'}
               </Link>
               <p className="mt-2 text-xs text-slate-400">
-                Đề trả phí — mua bộ đề bằng coin, mở khóa ngay sau khi thanh toán.{' '}
+                Đề trả phí — mua bộ đề bằng xương cá, mở khóa ngay sau khi thanh toán.{' '}
                 <Link href="/products" className="text-teal-700 hover:underline">
                   Xem tất cả bộ đề
                 </Link>

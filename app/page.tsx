@@ -4,13 +4,12 @@ import { Plus_Jakarta_Sans, Newsreader } from 'next/font/google'
 import { createClient } from '@/lib/supabase/server'
 import { getProductCatalog } from '@/lib/products/queries'
 import { COIN_VND_RATE } from '@/lib/payments/topup-constants'
-import { LEGAL_PAGES, LEGAL_SLUGS } from '@/lib/legal'
 import { LandingProductCard, type LandingProduct } from '@/components/landing/LandingProductCard'
-import { LandingHeaderActions } from '@/components/landing/LandingHeaderActions'
 import { SkillTabs } from '@/components/landing/SkillTabs'
 import { LeadForm } from '@/components/landing/LeadForm'
 import { FishBone } from '@/components/brand/FishBone'
-import { Mascot } from '@/components/brand/Mascot'
+import { Header } from '@/components/layout/Header'
+import { SiteFooter } from '@/components/layout/SiteFooter'
 import './home.css'
 
 // Fonts from the design (Plus Jakarta Sans + Newsreader italic), exposed as CSS
@@ -32,7 +31,7 @@ const newsreader = Newsreader({
 export const metadata: Metadata = {
   title: 'IELTSPractice — Prep for IELTS, just like the real exam.',
   description:
-    'Original IELTS tests on a real exam interface, with server-side scoring and AI Writing feedback mapped to the official band descriptors.',
+    'Real past-exam IELTS questions on a true exam interface, with server-side scoring and AI Writing feedback mapped to the official band descriptors.',
 }
 
 // Prediction packs CHƯA có thật (content pipeline A4) → coming_soon, KHÔNG số liệu bịa, KHÔNG link.
@@ -92,36 +91,15 @@ export default async function LandingPage() {
     <div className={`dc-home ${jakarta.variable} ${newsreader.variable}`}>
       {/* ANNOUNCEMENT */}
       <div className="announcement">
-        <span>100% original tests</span>
+        <span>100% real past-exam questions</span>
         <span className="ann-sep">·</span>
         <span>Real exam interface</span>
         <span className="ann-sep">·</span>
         <span>AI-graded Writing by band descriptor</span>
       </div>
 
-      {/* NAV */}
-      <header>
-        <div className="nav-inner">
-          <Link href="/" className="logo">
-            <Mascot size={38} />
-            <span>
-              <span className="logo-brand">IELTS</span>Practice
-            </span>
-          </Link>
-          <nav>
-            <Link href="/products?skill=reading">Reading</Link>
-            <Link href="/products?skill=listening">Listening</Link>
-            <Link href="/products?skill=writing">Writing</Link>
-            <Link href="/free">Free tests</Link>
-            <Link href="/prediction">Prediction</Link>
-            <Link href="/pricing">Pricing</Link>
-            <span className="nav-soon">
-              Speaking<span className="badge-soon">soon</span>
-            </span>
-          </nav>
-          <LandingHeaderActions />
-        </div>
-      </header>
+      {/* NAV — header dùng chung toàn site (2026-07-08): hết remount/khác chrome khi điều hướng / ↔ trang khác */}
+      <Header />
 
       {/* HERO */}
       <section className="hero">
@@ -159,7 +137,7 @@ export default async function LandingPage() {
           {/* FE-F03: bỏ số liệu bịa (10,000+/4.8) — chỉ claim tính chất sản phẩm có thật. */}
           <div className="hero-stats">
             <span>
-              <span className="stat-num">100%</span> original tests
+              <span className="stat-num">100%</span> real past-exam questions
             </span>
             <span className="stat-sep" />
             <span>
@@ -260,8 +238,9 @@ export default async function LandingPage() {
             <div className="feat-icon" style={{ background: '#F0ECFF' }}>
               <span className="feat-dot" style={{ background: '#7C5CE6' }} />
             </div>
-            <h3 className="feat-title">100% original tests</h3>
-            <p className="feat-body">Written in-house, never copied, and matched to the latest exam format.</p>
+            {/* Owner chốt 2026-07-08: claim = "100% đã ra thi thật" (đồng bộ trang Giới thiệu/Content.txt). */}
+            <h3 className="feat-title">100% real past-exam questions</h3>
+            <p className="feat-body">Curated from questions that appeared in real IELTS exams, matched to the latest format.</p>
           </div>
           <div className="feat-card">
             <div className="feat-icon" style={{ background: '#FFEDE6' }}>
@@ -540,61 +519,8 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer>
-        <div className="footer-inner">
-          <div>
-            <Link href="/" className="logo" style={{ fontSize: '19px' }}>
-              <Mascot size={30} />
-              <span>
-                <span className="logo-brand">IELTS</span>Practice
-              </span>
-            </Link>
-            <p className="footer-desc">
-              Original IELTS tests on a real exam interface, with server-side scoring and AI Writing feedback.
-            </p>
-          </div>
-          <div>
-            <div className="footer-col-title">Skills</div>
-            <div className="footer-links">
-              <Link href="/products?skill=reading">Reading</Link>
-              <Link href="/products?skill=listening">Listening</Link>
-              <Link href="/products?skill=writing">Writing</Link>
-              <span className="nav-soon">Speaking (soon)</span>
-            </div>
-          </div>
-          <div>
-            <div className="footer-col-title">Explore</div>
-            <div className="footer-links">
-              <Link href="/free">Free tests</Link>
-              <Link href="/prediction">Prediction</Link>
-              <Link href="/products">Hot collections</Link>
-              <Link href="/pricing">Pricing</Link>
-            </div>
-          </div>
-          <div>
-            <div className="footer-col-title">Account</div>
-            <div className="footer-links">
-              <Link href="/login">Log in</Link>
-              <Link href="/register">Start free</Link>
-              <Link href="/pricing">Top up coins</Link>
-            </div>
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <div className="footer-bottom-inner">
-            <span>© 2026 IELTSPractice. All rights reserved.</span>
-            {/* FE-F06: đủ 7 trang pháp lý (yêu cầu merchant review) — đồng bộ Footer (marketing). */}
-            <div className="footer-legal">
-              {LEGAL_SLUGS.map((slug) => (
-                <Link key={slug} href={`/legal/${slug}`}>
-                  {LEGAL_PAGES[slug].title}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      </footer>
+      {/* FOOTER — dùng chung toàn site (phương án B, 2026-07-08) */}
+      <SiteFooter />
     </div>
   )
 }

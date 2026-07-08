@@ -69,42 +69,55 @@ export async function getProductCatalog(
     pageSize = PAGE_SIZE_MAX
   }
   if (pageSize < 1) pageSize = PAGE_SIZE_DEFAULT
-  const countQuery = applyCatalogFilters(
-    supabase.from('product_search').select('product_id', { count: 'exact', head: true }),
-    params,
-  )
-  const { count, error: countError } = await countQuery
-  if (countError) throw new Error(countError.message)
+
+  // 1 round-trip: data + count trong CÙNG query (count: 'exact' không head) — trước đây 2 query
+  //   tuần tự (count rồi data) làm SSR /products chậm gấp đôi (nav-lag fix 2026-07-08).
+  //   Sort + range vào chain mới (KHÔNG gán lại sau .order — tránh lệch type builder).
+  //   Tie-breaker cho pagination ổn định.
+  const fetchPage = async (p: number) => {
+    const from = (p - 1) * pageSize
+    const query = applyCatalogFilters(
+      supabase
+        .from('product_search')
+        .select(
+          'product_id, slug, title, description, thumbnail, price_coins, skills, difficulties, test_count, has_free_test, attempts_total',
+          { count: 'exact' },
+        ),
+      params,
+    )
+    const ordered =
+      params.sort === 'hot'
+        ? query.order('attempts_total', { ascending: false })
+        : query.order('created_at', { ascending: false })
+    return ordered
+      .order('sort_order', { ascending: true })
+      .order('product_id', { ascending: true })
+      .range(from, from + pageSize - 1)
+  }
+
+  let { data, count, error } = await fetchPage(page)
+  if (error && error.code === 'PGRST103') {
+    // Range vượt tổng → PostgREST 416: lấy count riêng để biết totalPages rồi clamp bên dưới.
+    const head = await applyCatalogFilters(
+      supabase.from('product_search').select('product_id', { count: 'exact', head: true }),
+      params,
+    )
+    if (head.error) throw new Error(head.error.message)
+    count = head.count
+    data = []
+    error = null
+  }
+  if (error) throw new Error(error.message)
   const total = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   if (page > totalPages) {
+    // Trang vượt tổng (hiếm — chỉ khi client tự gõ page lớn): clamp + query lại đúng 1 lần.
     warnings.push(`page bị clamp về ${totalPages}`)
     page = totalPages
+    const retry = await fetchPage(page)
+    if (retry.error) throw new Error(retry.error.message)
+    data = retry.data
   }
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
-
-  const query = applyCatalogFilters(
-    supabase
-      .from('product_search')
-      .select(
-        'product_id, slug, title, description, thumbnail, price_coins, skills, difficulties, test_count, has_free_test, attempts_total',
-      ),
-    params,
-  )
-
-  // Sort + range vào chain mới (KHÔNG gán lại `query` sau .order — tránh lệch type
-  //   PostgrestFilterBuilder → PostgrestTransformBuilder). Tie-breaker cho pagination ổn định.
-  const ordered =
-    params.sort === 'hot'
-      ? query.order('attempts_total', { ascending: false })
-      : query.order('created_at', { ascending: false })
-
-  const { data, error } = await ordered
-    .order('sort_order', { ascending: true })
-    .order('product_id', { ascending: true })
-    .range(from, to)
-  if (error) throw new Error(error.message)
 
   const rows = (data ?? []) as unknown as SearchRow[]
   const items: ProductListItem[] = rows.map((r) => ({
