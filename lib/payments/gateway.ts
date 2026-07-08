@@ -41,3 +41,14 @@ export function getWebhookAdapter(provider: WebhookProvider): WebhookAdapter {
 export function isSandboxOnly(): boolean {
   return Object.values(ADAPTERS).every((a) => a.scheme === 'sandbox-hmac')
 }
+
+// A1 (2026-07-08) — chế độ cổng thanh toán, Owner set qua env PAYMENT_GATEWAY_MODE:
+//   • 'sandbox' (mặc định — hành vi cũ, dev/smoke): create trả redirect placeholder; webhook sandbox HMAC hoạt động.
+//   • 'live': create build payUrl THẬT (VNPay/MoMo — cần VNPAY_*/MOMO_* env); webhook sandbox BỊ TẮT
+//     (chống dùng sandbox HMAC để credit khi đã live); IPN thật đi qua /api/payment/webhook/{vnpay,momo}.
+//   • 'disabled': chặn tạo topup (503) — dùng khi chưa có merchant để user thật không gặp redirect chết (S-01).
+export type GatewayMode = 'sandbox' | 'live' | 'disabled'
+export function getGatewayMode(): GatewayMode {
+  const m = process.env.PAYMENT_GATEWAY_MODE
+  return m === 'live' || m === 'disabled' ? m : 'sandbox'
+}

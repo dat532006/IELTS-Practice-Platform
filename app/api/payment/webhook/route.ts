@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getWebhookAdapter } from '@/lib/payments/gateway'
+import { getWebhookAdapter, getGatewayMode } from '@/lib/payments/gateway'
 import { ok, fail } from '@/lib/api/response'
 
 // POST /api/payment/webhook — provider gọi (KHÔNG user session). Theo payment_redeem_contract §3.
@@ -15,6 +15,11 @@ const WebhookSchema = z.object({
 })
 
 export async function POST(request: Request) {
+  // A1 — chế độ live: route sandbox này BỊ TẮT (chống dùng sandbox HMAC để credit khi cổng thật đã bật;
+  //   IPN thật đi qua /api/payment/webhook/{vnpay,momo} với scheme chữ ký riêng từng provider).
+  if (getGatewayMode() === 'live') {
+    return fail('NOT_FOUND', 'Không tồn tại', { status: 404 })
+  }
   let raw: unknown
   try { raw = await request.json() } catch { return fail('VALIDATION_ERROR', 'Body JSON không hợp lệ', { status: 400 }) }
   const parsed = WebhookSchema.safeParse(raw)
