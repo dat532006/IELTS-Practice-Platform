@@ -5,14 +5,27 @@ import { WRITING_GRADER_SYSTEM_PROMPT } from '@/lib/ai/ielts-writing-rubric'
 
 // ============================================================
 // W10/W11 — Writing AI grader (M07). SERVER-ONLY.
-// LUẬT THÉP: ANTHROPIC_API_KEY chỉ server env (KHÔNG NEXT_PUBLIC_, KHÔNG log, KHÔNG ra client).
+// LUẬT THÉP: ANTHROPIC_API_KEY / OPENAI_API_KEY chỉ server env (KHÔNG NEXT_PUBLIC_, KHÔNG log, KHÔNG ra client).
 //   AI output KHÔNG tin tuyệt đối → Zod parse + validate band [0..9]/step 0.5; fail = KHÔNG dùng.
 //   KHÔNG tin overall do AI trả (server compute ở lib/exam/writing.ts).
 // W11: prompt caching cho stable rubric/system block + optional bounded error_highlights.
+// A2 (2026-07-08, Owner quyết): thêm adapter OpenAI (fetch thuần, không thêm SDK). Chọn provider:
+//   WRITING_AI_PROVIDER=openai|anthropic; không set → tự chọn theo key có sẵn (anthropic ưu tiên).
+//   Cả 2 provider ĐI QUA CÙNG validateAiGradeOutput — schema/band rule không đổi.
 // ============================================================
 
 const MODEL = process.env.WRITING_GRADER_MODEL || 'claude-opus-4-8'
+const OPENAI_MODEL = process.env.WRITING_GRADER_OPENAI_MODEL || 'gpt-4o-mini'
 const MAX_TOKENS = 4000
+
+type AiProvider = 'anthropic' | 'openai'
+function selectProvider(): AiProvider {
+  const p = process.env.WRITING_AI_PROVIDER
+  if (p === 'openai' || p === 'anthropic') return p
+  if (process.env.ANTHROPIC_API_KEY) return 'anthropic'
+  if (process.env.OPENAI_API_KEY) return 'openai'
+  return 'anthropic' // không key nào: non-prod đã mock ở trên; prod → nhánh live throw → AI_UNAVAILABLE (fail-loud F5)
+}
 
 const ErrorHighlight = z.object({
   quote: z.string().min(1).max(240),
@@ -143,28 +156,30 @@ function mockGrade(input: GraderInput): RawAiGrade {
 //   (Tên KHÔNG bắt đầu bằng "use" để tránh eslint react-hooks/rules-of-hooks hiểu nhầm là React hook.)
 function mockEnabled(): boolean {
   if (process.env.WRITING_GRADER_MOCK === '1') return true
-  if (process.env.ANTHROPIC_API_KEY) return false
+  if (process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY) return false
   return process.env.NODE_ENV !== 'production'
 }
 
-export async function gradeWriting(input: GraderInput): Promise<GradeOutcome> {
-  if (mockEnabled()) {
-    const grade = validateAiGradeOutput(mockGrade(input))
-    return grade ? { ok: true, grade, mock: true } : { ok: false, code: 'AI_INVALID_OUTPUT' }
-  }
+function buildUserContent(input: GraderInput, toolNote: string): string {
+  return [
+    `TASK 1 PROMPT:\n${input.task1_prompt}`,
+    `TASK 1 RESPONSE:\n${input.task1_text}`,
+    `TASK 2 PROMPT:\n${input.task2_prompt}`,
+    `TASK 2 RESPONSE:\n${input.task2_text}`,
+    toolNote,
+  ].join('\n\n')
+}
 
-  // ---- LIVE: Anthropic SDK (tool use + adaptive thinking). Secret chỉ ở env. ----
-  // W11 prompt caching: stable rubric/system text is first and marked ephemeral; essay remains variable user content.
+// ---- LIVE: Anthropic SDK (tool use + adaptive thinking). Secret chỉ ở env. ----
+// W11 prompt caching: stable rubric/system text is first and marked ephemeral; essay remains variable user content.
+async function gradeWithAnthropic(input: GraderInput): Promise<GradeOutcome> {
   try {
     const { default: Anthropic } = await import('@anthropic-ai/sdk')
     const client = new Anthropic() // đọc ANTHROPIC_API_KEY từ env (server-only)
-    const userContent = [
-      `TASK 1 PROMPT:\n${input.task1_prompt}`,
-      `TASK 1 RESPONSE:\n${input.task1_text}`,
-      `TASK 2 PROMPT:\n${input.task2_prompt}`,
-      `TASK 2 RESPONSE:\n${input.task2_text}`,
+    const userContent = buildUserContent(
+      input,
       `Call the ${GRADE_TOOL} tool with the grade. All bands in 0..9, steps of 0.5. Include up to 12 short error_highlights per task when useful; omit the field if there are no specific highlights.`,
-    ].join('\n\n')
+    )
 
     const res = await client.messages.create({
       model: MODEL,
@@ -186,4 +201,106 @@ export async function gradeWriting(input: GraderInput): Promise<GradeOutcome> {
     // KHÔNG log secret/chi tiết provider. Fail an toàn.
     return { ok: false, code: 'AI_UNAVAILABLE' }
   }
+}
+
+// ---- LIVE: OpenAI (A2) — fetch thuần tới /v1/chat/completions + Structured Outputs (json_schema strict).
+// KHÔNG thêm SDK dependency. Strict mode yêu cầu mọi field required → error_highlights bắt buộc là
+// mảng (rỗng được); maxItems không dùng trong schema (một số phiên bản API từ chối keyword) —
+// giới hạn 8 suggestions/12 highlights vẫn được ENFORCE bởi Zod sau parse (AiGradeSchema).
+const OPENAI_ERROR_HIGHLIGHT = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    quote: { type: 'string', description: 'Exact short quote (≤240 chars) from the candidate response containing the issue.' },
+    type: { type: 'string', enum: ['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar'] },
+    suggestion: { type: 'string', description: 'Concrete correction or improvement suggestion.' },
+  },
+  required: ['quote', 'type', 'suggestion'],
+}
+const OPENAI_TASK_JSON = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    band: { type: 'number' },
+    criteria: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        task_response: { type: 'number' },
+        coherence_cohesion: { type: 'number' },
+        lexical_resource: { type: 'number' },
+        grammar: { type: 'number' },
+      },
+      required: ['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar'],
+    },
+    feedback: { type: 'string' },
+    suggestions: { type: 'array', items: { type: 'string' } },
+    error_highlights: { type: 'array', items: OPENAI_ERROR_HIGHLIGHT },
+  },
+  required: ['band', 'criteria', 'feedback', 'suggestions', 'error_highlights'],
+}
+const OPENAI_GRADE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: { task1: OPENAI_TASK_JSON, task2: OPENAI_TASK_JSON },
+  required: ['task1', 'task2'],
+}
+
+async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) return { ok: false, code: 'AI_UNAVAILABLE' } // fail-loud, không mock âm thầm (F5)
+  try {
+    const userContent = buildUserContent(
+      input,
+      'Return the grade as JSON. All bands in 0..9, steps of 0.5. At most 8 suggestions and 12 error_highlights per task; use an empty array when there are no specific highlights.',
+    )
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        max_tokens: MAX_TOKENS,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userContent },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'ielts_writing_grade', strict: true, schema: OPENAI_GRADE_SCHEMA },
+        },
+      }),
+    })
+    if (!res.ok) return { ok: false, code: 'AI_UNAVAILABLE' }
+    const body = (await res.json().catch(() => null)) as {
+      choices?: { message?: { content?: string | null; refusal?: string | null } }[]
+      usage?: { prompt_tokens?: number; completion_tokens?: number }
+    } | null
+    const msg = body?.choices?.[0]?.message
+    if (!msg || msg.refusal) return { ok: false, code: 'AI_UNAVAILABLE' }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(msg.content ?? '')
+    } catch {
+      return { ok: false, code: 'AI_INVALID_OUTPUT' }
+    }
+    const grade = validateAiGradeOutput(parsed)
+    if (!grade) return { ok: false, code: 'AI_INVALID_OUTPUT' }
+    return {
+      ok: true,
+      grade,
+      mock: false,
+      usage: { input_tokens: body?.usage?.prompt_tokens, output_tokens: body?.usage?.completion_tokens },
+    }
+  } catch {
+    // KHÔNG log secret/chi tiết provider. Fail an toàn.
+    return { ok: false, code: 'AI_UNAVAILABLE' }
+  }
+}
+
+export async function gradeWriting(input: GraderInput): Promise<GradeOutcome> {
+  if (mockEnabled()) {
+    const grade = validateAiGradeOutput(mockGrade(input))
+    return grade ? { ok: true, grade, mock: true } : { ok: false, code: 'AI_INVALID_OUTPUT' }
+  }
+  return selectProvider() === 'openai' ? gradeWithOpenAi(input) : gradeWithAnthropic(input)
 }

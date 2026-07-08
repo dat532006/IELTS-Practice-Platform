@@ -131,7 +131,16 @@ function buildBlocks(qs: ExamQuestion[]): QBlock[] {
   return raw.map((b) => ({ ...b, items: buildRenderItems(b.qs) }))
 }
 
-export function ExamRunner({ testId }: { testId: string }) {
+// `preview` (admin authoring, 2026-07-08): render payload LOCAL trong giao diện thi thật để soát định
+//   dạng đề — KHÔNG start attempt, KHÔNG fetch payload, KHÔNG API nào được gọi (submit/autosave/
+//   annotation đều guard `!attempt`, attempt luôn null ở preview). Timer hiển thị tĩnh, không đếm.
+export function ExamRunner({
+  testId,
+  preview,
+}: {
+  testId: string
+  preview?: { payload: ExamPayload; durationSec: number }
+}) {
   const router = useRouter()
   const [phase, setPhase] = useState<Phase>('loading')
   const [attempt, setAttempt] = useState<AttemptDTO | null>(null)
@@ -275,6 +284,16 @@ export function ExamRunner({ testId }: { testId: string }) {
   // --- Boot ---
   useEffect(() => {
     let alive = true
+    // Preview (admin): payload local, KHÔNG attempt/API — vào màn hướng dẫn như thi thật, timer tĩnh.
+    if (preview) {
+      setPayload(preview.payload)
+      baseRemainingRef.current = -1 // không đếm ngược
+      setRemaining(preview.durationSec > 0 ? preview.durationSec : null)
+      setPhase('instructions')
+      return () => {
+        alive = false
+      }
+    }
     ;(async () => {
       try {
         const sr = await fetch(`/api/exam/${testId}/start`, { method: 'POST' })
@@ -317,7 +336,7 @@ export function ExamRunner({ testId }: { testId: string }) {
     return () => {
       alive = false
     }
-  }, [testId, router])
+  }, [testId, router, preview])
 
   // --- Timer ---
   useEffect(() => {
@@ -906,9 +925,20 @@ export function ExamRunner({ testId }: { testId: string }) {
             >
               <ArrowRight className="h-5 w-5" />
             </button>
-            <button onClick={() => setModalOpen(true)} className="dcx-submit" aria-label="Nộp bài" title="Nộp bài">
-              Nộp bài <CheckIcon className="h-4 w-4" />
-            </button>
+            {preview ? (
+              <span
+                className="dcx-submit"
+                aria-disabled="true"
+                title="Chế độ xem trước — không nộp bài được"
+                style={{ opacity: 0.55, cursor: 'not-allowed' }}
+              >
+                👁 Xem trước
+              </span>
+            ) : (
+              <button onClick={() => setModalOpen(true)} className="dcx-submit" aria-label="Nộp bài" title="Nộp bài">
+                Nộp bài <CheckIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </footer>
       </div>
