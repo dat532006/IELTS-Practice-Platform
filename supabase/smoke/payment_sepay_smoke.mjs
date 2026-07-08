@@ -8,6 +8,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { createHmac } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 
 const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:3240'
@@ -38,12 +39,26 @@ async function signIn(url, anon, service, email) {
   if (error || !data?.session) throw new Error('signIn fail: ' + (error?.message ?? 'no session'))
   return { admin, cookie: ssrCookie(url, data.session), id: data.session.user.id }
 }
-// Webhook SePay: POST JSON + header "Authorization: Apikey <key>".
-async function sepayHook(body, key) {
+// Webhook SePay — auth theo env (khớp server): SEPAY_WEBHOOK_SECRET → HMAC-SHA256 spec SePay
+//   (X-SePay-Signature: sha256=<hex(HMAC(secret, `${ts}.${raw}`))> + X-SePay-Timestamp);
+//   không có secret → Apikey header. `authOverride` cho case chữ ký sai/timestamp cũ.
+function sepayHeaders(raw, over = {}) {
+  // 'secret'/'key' có mặt trong `over` (kể cả null) = override tường minh — null nghĩa là KHÔNG gửi auth.
+  const secret = 'secret' in over ? over.secret : process.env.SEPAY_WEBHOOK_SECRET
+  if (secret) {
+    const ts = over.ts ?? Math.floor(Date.now() / 1000)
+    const sig = createHmac('sha256', secret).update(`${ts}.${raw}`, 'utf8').digest('hex')
+    return { 'x-sepay-signature': `sha256=${sig}`, 'x-sepay-timestamp': String(ts) }
+  }
+  const key = 'key' in over ? over.key : process.env.SEPAY_API_KEY
+  return key ? { authorization: `Apikey ${key}` } : {}
+}
+async function sepayHook(body, over = {}) {
+  const raw = JSON.stringify(body)
   const r = await fetch(`${BASE}/api/payment/webhook/sepay`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...(key ? { authorization: `Apikey ${key}` } : {}) },
-    body: JSON.stringify(body),
+    headers: { 'content-type': 'application/json', ...sepayHeaders(raw, over) },
+    body: raw,
   })
   let b = null; try { b = await r.json() } catch { /* */ }
   return { status: r.status, body: b }
@@ -52,12 +67,18 @@ async function sepayHook(body, key) {
 const run = async () => {
   loadEnvLocal()
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL, anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const service = process.env.SUPABASE_SERVICE_ROLE_KEY, KEY = process.env.SEPAY_API_KEY
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const HMAC = process.env.SEPAY_WEBHOOK_SECRET, KEY = process.env.SEPAY_API_KEY
+  const AUTH_SECRET = HMAC || KEY // để check leak + case sai auth
   if (!url || !anon || !service) { console.log('SKIP: thiếu env Supabase'); return finish() }
-  if (process.env.PAYMENT_GATEWAY_MODE !== 'live' || !KEY || !process.env.SEPAY_BANK_ACCOUNT) {
-    console.log('BLOCKED — environment: cần PAYMENT_GATEWAY_MODE=live + SEPAY_API_KEY/SEPAY_BANK_ACCOUNT/SEPAY_BANK_CODE (dummy) cho server lẫn smoke')
+  if (process.env.PAYMENT_GATEWAY_MODE !== 'live' || !AUTH_SECRET || !process.env.SEPAY_BANK_ACCOUNT) {
+    console.log('BLOCKED — environment: cần PAYMENT_GATEWAY_MODE=live + (SEPAY_WEBHOOK_SECRET hoặc SEPAY_API_KEY) + SEPAY_BANK_ACCOUNT/SEPAY_BANK_CODE (dummy) cho server lẫn smoke')
     return finish()
   }
+  console.log(`(auth mode: ${HMAC ? 'HMAC-SHA256' : 'API Key'})`)
+  // Case auth SAI theo đúng mode server đang chạy.
+  const WRONG_AUTH = HMAC ? { secret: HMAC + 'wrong' } : { key: (KEY ?? '') + 'wrong' }
+  const NO_AUTH = { secret: null, key: null }
 
   const USER = await signIn(url, anon, service, 'sepay-user@test.dev')
   const OTHER = await signIn(url, anon, service, 'sepay-other@test.dev')
@@ -81,7 +102,7 @@ const run = async () => {
     const own = await fetch(`${BASE}/payment/qr?ref=${ref}`, { headers: { Cookie: USER.cookie } })
     const html = await own.text()
     check('owner mở QR → 200 + memo + qr.sepay.vn + số TK', own.status === 200 && html.includes(ref) && html.includes('qr.sepay.vn') && html.includes(process.env.SEPAY_BANK_ACCOUNT))
-    check('QR page KHÔNG lộ SEPAY_API_KEY', !html.includes(KEY))
+    check('QR page KHÔNG lộ secret webhook', !html.includes(AUTH_SECRET))
     const other = await fetch(`${BASE}/payment/qr?ref=${ref}`, { headers: { Cookie: OTHER.cookie } })
     const otherHtml = await other.text()
     check('user khác mở QR → không thấy giao dịch (RLS)', !otherHtml.includes('qr.sepay.vn') || other.status === 404)
@@ -106,25 +127,29 @@ const run = async () => {
     content: `CT DEN ${ref} GD 123`, referenceCode: 'FT123', accountNumber: process.env.SEPAY_BANK_ACCOUNT, ...over,
   })
   {
-    const noKey = await sepayHook(hook(), null)
-    check('thiếu Apikey → 401', noKey.status === 401, `got ${noKey.status}`)
-    const wrongKey = await sepayHook(hook(), KEY + 'x')
-    check('sai Apikey → 401', wrongKey.status === 401)
-    const outFlow = await sepayHook(hook({ transferType: 'out' }), KEY)
+    const noAuth = await sepayHook(hook(), NO_AUTH)
+    check('thiếu auth → 401', noAuth.status === 401, `got ${noAuth.status}`)
+    const wrongAuth = await sepayHook(hook(), WRONG_AUTH)
+    check('sai chữ ký/key → 401', wrongAuth.status === 401)
+    if (HMAC) {
+      const stale = await sepayHook(hook(), { ts: Math.floor(Date.now() / 1000) - 600 })
+      check('HMAC timestamp cũ >5 phút → 401 (chống replay)', stale.status === 401)
+    }
+    const outFlow = await sepayHook(hook({ transferType: 'out' }))
     check("transferType='out' → ACK, không credit", outFlow.status === 200 && outFlow.body?.success === true)
-    const mismatch = await sepayHook(hook({ transferAmount: 90000 }), KEY)
+    const mismatch = await sepayHook(hook({ transferAmount: 90000 }))
     check('lệch tiền → ACK (đối soát tay), KHÔNG credit', mismatch.status === 200)
     const { data: p0 } = await a.from('profiles').select('coins').eq('id', USER.id).single()
     check('coins vẫn 0 sau các webhook hỏng', p0?.coins === 0, `coins=${p0?.coins}`)
 
-    const good = await sepayHook(hook(), KEY)
-    check('đúng key + đúng tiền + mã trong content → ACK', good.status === 200 && good.body?.success === true)
+    const good = await sepayHook(hook())
+    check('auth đúng + đúng tiền + mã trong content → ACK', good.status === 200 && good.body?.success === true)
     const { data: p1 } = await a.from('profiles').select('coins').eq('id', USER.id).single()
     check('credited +100 xương cá', p1?.coins === 100, `coins=${p1?.coins}`)
     const { data: row } = await a.from('transactions').select('status').eq('provider_txn_id', ref).single()
     check("row → 'success'", row?.status === 'success')
 
-    const replay = await sepayHook(hook(), KEY)
+    const replay = await sepayHook(hook())
     check('SePay retry/replay → ACK, không credit lần 2', replay.status === 200)
     const { data: p2 } = await a.from('profiles').select('coins').eq('id', USER.id).single()
     check('coins giữ 100 sau replay', p2?.coins === 100, `coins=${p2?.coins}`)
@@ -135,7 +160,7 @@ const run = async () => {
 
   console.log('\n— webhook: content KHÔNG có mã / mã UPPERCASE —')
   {
-    const noRef = await sepayHook(hook({ id: 999002, content: 'chuyen tien an trua' }), KEY)
+    const noRef = await sepayHook(hook({ id: 999002, content: 'chuyen tien an trua' }))
     check('không có mã TOPUP → ACK (ngoài luồng)', noRef.status === 200 && noRef.body?.success === true)
 
     // Mã bị ngân hàng UPPERCASE + mất dấu '-' vẫn khớp (extractTopupRef linh hoạt).
@@ -144,7 +169,7 @@ const run = async () => {
       body: JSON.stringify({ amount_vnd: 60000, provider: 'bank' }),
     })
     const ref2 = (await cr2.json())?.data?.provider_txn_id
-    const upper = await sepayHook(hook({ id: 999003, transferAmount: 60000, content: `CK ${ref2.replace('-', ' ').toUpperCase()} tks` }), KEY)
+    const upper = await sepayHook(hook({ id: 999003, transferAmount: 60000, content: `CK ${ref2.replace('-', ' ').toUpperCase()} tks` }))
     check('mã UPPERCASE/mất gạch vẫn credit', upper.status === 200)
     const { data: p3 } = await a.from('profiles').select('coins').eq('id', USER.id).single()
     check('coins = 160 sau lần nạp 2', p3?.coins === 160, `coins=${p3?.coins}`)
