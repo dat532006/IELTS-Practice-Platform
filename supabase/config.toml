@@ -223,7 +223,9 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# BẬT để test luồng OTP đăng ký ở LOCAL (mã 6 số về Mailpit http://127.0.0.1:54324).
+#   Chỉ ảnh hưởng `supabase start` local — prod do dashboard điều khiển riêng.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -242,6 +244,12 @@ otp_expiry = 3600
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
+
+# Template email xác nhận đăng ký (OTP mã 6 số). Nội dung phải chứa {{ .Token }} — cùng file
+#   dán vào Supabase dashboard prod (Authentication → Emails → Confirm signup) để prod đồng bộ.
+[auth.email.template.confirmation]
+subject = "Mã xác nhận đăng ký — IELTS Practice Platform"
+content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
