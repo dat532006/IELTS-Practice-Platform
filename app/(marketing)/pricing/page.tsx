@@ -87,10 +87,6 @@ export default function PricingPage() {
             Tỷ giá cố định {vnd(COIN_VND_RATE)} VND = 1 xương cá
           </span>
           <h1 className="mt-4 text-[32px] font-extrabold leading-[1.06] tracking-[-0.025em]">Nạp xương cá</h1>
-          <p className="mt-2.5 max-w-[34em] text-[15px] leading-[1.6] text-[#5C5670]">
-            Thanh toán được xác minh ở <b className="text-[#2A2740]">server</b>. Số xương cá do server tính — preview
-            chỉ để hiển thị.
-          </p>
 
           {/* Quick select */}
           <div className="mt-7 text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[#9088A2]">Chọn nhanh</div>
