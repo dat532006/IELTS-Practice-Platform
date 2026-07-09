@@ -52,6 +52,9 @@ export const AnswerKeyEntrySchema = z.object({
   answers: z.array(z.string().min(1).max(200)).min(1).max(20),
   match: z.enum(['ci', 'exact']).optional(),
   points: z.number().int().positive().max(20).optional(),
+  // P3 (review evidence): giải thích/đáp án chi tiết. SERVER-ONLY — chỉ rời server qua review DTO
+  //   (owner + attempt submitted|expired), giống correct_answers. KHÔNG ảnh hưởng scoring.
+  explanation: z.string().max(4000).optional(),
 })
 
 export type AnswerKeyEntry = z.infer<typeof AnswerKeyEntrySchema>

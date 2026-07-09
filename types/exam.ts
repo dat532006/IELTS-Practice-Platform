@@ -53,6 +53,7 @@ export type ReviewItem = {
   user_answer: string | string[] | null // từ attempt.answers[qid]; thiếu → null
   correct_answers: string[] // đáp án chấp nhận (hiển thị); chỉ owner + terminal mới nhận
   is_correct: boolean
+  explanation?: string // P3: giải thích/evidence — admin author ở answer_keys; chỉ owner + terminal (cùng đường correct_answers)
 }
 
 export type ResultDTO = {

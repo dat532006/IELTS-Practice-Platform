@@ -46,6 +46,8 @@ export function buildReviewItems(
       user_answer: answerForDisplay(ans[qid]),
       correct_answers: entry.answers, // string[] hợp lệ; KHÔNG kèm points/match
       is_correct: isAnswerCorrect(ans[qid], entry),
+      // P3: giải thích chỉ đính khi có (đã qua owner+terminal guard ở getResult, giống correct_answers).
+      ...(entry.explanation ? { explanation: entry.explanation } : {}),
     })
   }
   // sắp theo number nếu có (ổn định cho UI), giữ nguyên thứ tự key khi thiếu number.
