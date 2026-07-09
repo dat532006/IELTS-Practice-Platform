@@ -2,6 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { AnswerKeyEntrySchema } from '@/lib/scoring/score-reading'
+import { sanitizePassages } from '@/lib/sanitize/passage-html'
 
 // ============================================================
 // W12 — Admin test content orchestration (M11/M05). SERVER-ONLY.
@@ -55,7 +56,8 @@ function buildRow(input: TestInput) {
     difficulty: input.difficulty ?? null,
     duration_sec: input.duration_sec ?? null,
     question_types: input.question_types ?? null,
-    passages: input.passages ?? [],
+    // Passage rich-text (HTML admin soạn) → sanitize allowlist TRƯỚC khi lưu (không tin markup thô).
+    passages: sanitizePassages(input.passages ?? []),
     questions: input.questions.map((q) => stripAnswerFields(q as Record<string, unknown>)),
   }
 }

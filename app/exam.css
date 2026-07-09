@@ -300,6 +300,18 @@
 }
 /* Thân bài: mỗi đoạn thụt đầu dòng như bản in (Owner ref 2026-07-09). */
 .dc-exam .dcx-passage .dcx-para { text-indent: 1.6em; }
+/* Rich passage (HTML admin soạn WYSIWYG, đã sanitize server) — cùng hệ chữ đề thi. */
+.dc-exam .dcx-passage .dcx-rich h2 { font-weight: 800; font-size: 20px; text-align: center; margin: 0 0 4px; }
+.dc-exam .dcx-passage .dcx-rich h3 { font-weight: 400; font-size: 16px; text-align: center; color: #4a4560; margin: 0 0 18px; }
+.dc-exam .dcx-passage .dcx-rich p { margin: 0 0 15px; text-align: justify; text-indent: 1.6em; }
+.dc-exam .dcx-passage .dcx-rich p[style*='center'],
+.dc-exam .dcx-passage .dcx-rich p[style*='right'] { text-indent: 0; }
+.dc-exam .dcx-passage .dcx-rich ul,
+.dc-exam .dcx-passage .dcx-rich ol { margin: 0 0 15px; padding-left: 1.8em; }
+.dc-exam .dcx-passage .dcx-rich ul { list-style: disc; }
+.dc-exam .dcx-passage .dcx-rich ol { list-style: decimal; }
+.dc-exam .dcx-passage .dcx-rich li { margin: 3px 0; }
+.dc-exam .dcx-passage .dcx-rich u { text-decoration: underline; }
 .dc-exam .rmuted { color: #6a6480; }
 .dc-exam .dcx-passage p { margin: 0 0 15px; }
 .dc-exam .dcx-passage p:last-child { margin-bottom: 0; }
@@ -1390,6 +1402,7 @@
 .dc-exam.ct-wb .themed { background: #15131f !important; color: #f4f2fb !important; }
 .dc-exam.ct-wb .themed .rmuted,
 .dc-exam.ct-wb .themed .dcx-qinstr,
+.dc-exam.ct-wb .themed .dcx-rich h3,
 .dc-exam.ct-wb .themed .dcx-passage-sub { color: #b9b3cc !important; }
 .dc-exam.ct-wb .themed .dcx-gap-input { background: #22202e; color: #fff; border-color: #4a4560; }
 .dc-exam.ct-wb .themed .dcx-opt { background: #201e2c; border-color: #3b3650; color: #f4f2fb; }
@@ -1401,6 +1414,7 @@
 .dc-exam.ct-yb .themed { background: #0b0b0b !important; color: #ffd60a !important; }
 .dc-exam.ct-yb .themed .rmuted,
 .dc-exam.ct-yb .themed .dcx-qinstr,
+.dc-exam.ct-yb .themed .dcx-rich h3,
 .dc-exam.ct-yb .themed .dcx-passage-sub { color: #e8c33a !important; }
 .dc-exam.ct-yb .themed .dcx-gap-input { background: #161616; color: #ffd60a; border-color: #5a5220; }
 .dc-exam.ct-yb .themed .dcx-opt { background: #161616; border-color: #5a5220; color: #ffd60a; }

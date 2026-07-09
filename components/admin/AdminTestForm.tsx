@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import Link from 'next/link'
+import { RichTextEditor, plainToHtml, looksRich } from './RichTextEditor'
 import { ExamRunner } from '@/components/exam/ExamRunner'
 import { examFontVars } from '@/app/exam-fonts'
 import type { ExamPayload } from '@/types/exam'
@@ -271,7 +272,10 @@ export function AdminTestForm() {
     const ps = Array.isArray(data.passages) ? data.passages : []
     const mappedP: Passage[] = ps.map((raw) => {
       const p = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-      const out: Passage = { id: String(p.id ?? uid('p')), title: str(p.title), content: str(p.body) || str(p.content) }
+      // OCR draft là text thuần → bọc thành <p> cho editor WYSIWYG; nếu đã là HTML thì giữ nguyên.
+      const rawContent = str(p.body) || str(p.content)
+      const content = rawContent && !looksRich(rawContent) ? plainToHtml(rawContent) : rawContent
+      const out: Passage = { id: String(p.id ?? uid('p')), title: str(p.title), content }
       if (str(p.subtitle)) out.subtitle = str(p.subtitle)
       return out
     })
@@ -519,26 +523,22 @@ export function AdminTestForm() {
           {passages.map((p, i) => (
             <div key={p.id} className="rounded-[13px] border border-[#E4DEEE] bg-white p-4">
               <div className="flex items-center gap-2">
-                <input className={inputCls} value={p.title} onChange={(e) => setP(i, { title: e.target.value })} placeholder="Tiêu đề bài đọc — IN ĐẬM, căn giữa (VD: Sweet Trouble). Bỏ trống nếu không có." />
+                <input className={inputCls} value={p.title} onChange={(e) => setP(i, { title: e.target.value })} placeholder="Nhãn passage cho thanh chuyển (VD: Passage 1) — không hiển thị trong bài đọc" />
                 {passages.length > 1 && (
                   <button type="button" onClick={() => setPassages((ps) => ps.filter((_, j) => j !== i))} className="text-[12.5px] font-bold text-[#D08585]">
                     Xoá
                   </button>
                 )}
               </div>
-              {/* Phụ đề (tuỳ chọn) — render in nghiêng dưới tiêu đề trên đề thi (.dcx-passage-sub), như dòng "Problems in the…" ở reference */}
-              <input
-                className={`${inputCls} mt-2`}
-                value={p.subtitle ?? ''}
-                onChange={(e) => setP(i, { subtitle: e.target.value || undefined })}
-                placeholder="Phụ đề — không in đậm, căn giữa (VD: Problems in the Australian sugar industry). Tuỳ chọn."
-              />
-              <AutoGrowTextarea
-                className={`${inputCls} mt-2 leading-[1.75]`}
-                value={p.content}
-                onChange={(e) => setP(i, { content: e.target.value })}
-                placeholder="Dán toàn bộ nội dung passage — ô tự giãn theo độ dài, không phải cuộn trong ô. Cách nhau 1 dòng trống giữa các đoạn để hiển thị đúng như đề thật."
-              />
+              {/* Soạn nội dung passage kiểu Word (WYSIWYG): tiêu đề/phụ đề/đoạn/đậm-nghiêng/căn lề/danh sách bằng
+                  nút bấm. Xuất HTML → server sanitize allowlist trước khi tới thí sinh. Dán từ Word được dọn sạch. */}
+              <div className="mt-2">
+                <RichTextEditor
+                  value={p.content}
+                  onChange={(html) => setP(i, { content: html })}
+                  placeholder="Soạn nội dung bài đọc ở đây. Dùng nút 'Tiêu đề' / 'Phụ đề' cho 2 dòng đầu (căn giữa), rồi gõ hoặc dán các đoạn ở dưới."
+                />
+              </div>
             </div>
           ))}
         </div>
@@ -806,7 +806,11 @@ export function AdminTestForm() {
                     <div className="text-[14px] font-extrabold text-[#2A2740]">{p.title || `Passage ${i + 1}`}</div>
                     {p.subtitle?.trim() && <div className="text-[12.5px] italic text-[#857F96]">{p.subtitle}</div>}
                     {p.content.trim() ? (
-                      <p className="mt-1.5 whitespace-pre-wrap text-[13.5px] leading-[1.7] text-[#3B364A]">{p.content}</p>
+                      looksRich(p.content) ? (
+                        <div className="dcx-rich mt-1.5 text-[13.5px] leading-[1.7] text-[#3B364A]" dangerouslySetInnerHTML={{ __html: p.content }} />
+                      ) : (
+                        <p className="mt-1.5 whitespace-pre-wrap text-[13.5px] leading-[1.7] text-[#3B364A]">{p.content}</p>
+                      )
                     ) : (
                       <p className="mt-1.5 text-[13px] italic text-[#C0392B]">— passage trống —</p>
                     )}
