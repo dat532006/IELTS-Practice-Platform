@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ChangeEvent } from 'react'
+import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import Link from 'next/link'
 import { ExamRunner } from '@/components/exam/ExamRunner'
 import { examFontVars } from '@/app/exam-fonts'
@@ -10,7 +10,7 @@ import type { ExamPayload } from '@/types/exam'
 //   Guard thật ở server (admin layout + /api/admin/* requireAdmin); form chỉ gọi API. KHÔNG import scoring/secret.
 //   Layout theo design frame 6; logic/data flow GIỮ NGUYÊN (chỉ thay markup).
 type TestType = 'reading' | 'listening' | 'writing'
-type Passage = { id: string; title: string; content: string }
+type Passage = { id: string; title: string; subtitle?: string; content: string }
 type QOpt = { key: string; text: string }
 // QField mang đủ field renderer (M06) hỗ trợ: đáp án tách sang `answers`/`points`/`explanation` (→ answer_keys),
 //   còn lại đi vào tests.questions. instruction/passage_id điều khiển gom nhóm + header "Questions a–b".
@@ -144,6 +144,35 @@ const labelCls = 'block text-[12.5px] font-extrabold text-[#6A6480] mb-1.5'
 const inputCls =
   'w-full rounded-[11px] border border-[#E4DEEE] bg-white px-3.5 py-3 text-sm text-[#2A2740] focus:border-[#7C5CE6] focus:outline-none'
 
+// Textarea tự giãn theo nội dung — passage dài (700–900 từ) không phải nhét vào ô 4 dòng rồi cuộn (Owner UX 2026-07-09).
+//   Không cắt nội dung, không scroll trong ô: cao = max(minHeight, scrollHeight). Ép textAlign left (khỏi lệch phải).
+function AutoGrowTextarea(props: {
+  value: string
+  onChange: (e: ChangeEvent<HTMLTextAreaElement>) => void
+  className?: string
+  placeholder?: string
+  minHeight?: number
+}) {
+  const { value, onChange, className, placeholder, minHeight = 220 } = props
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.max(minHeight, el.scrollHeight)}px`
+  }, [value, minHeight])
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={onChange}
+      className={className}
+      placeholder={placeholder}
+      style={{ minHeight, textAlign: 'left', overflow: 'hidden', resize: 'none' }}
+    />
+  )
+}
+
 export function AdminTestForm() {
   const [title, setTitle] = useState('')
   const [type, setType] = useState<TestType>('reading')
@@ -172,7 +201,7 @@ export function AdminTestForm() {
   function openExamPreview() {
     const payload: ExamPayload = {
       test: { id: '__admin_preview__', title: title || '(Chưa có tiêu đề)', skill: type, is_free: isFree },
-      passages: passages.map((p) => ({ id: p.id, title: p.title, content: p.content })),
+      passages: passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), content: p.content })),
       questions: questions.map(emitQuestion), // rich fields (options/instruction/image/x/y) để preview đúng format thi
       audio_url: null, // audio ký URL chỉ sau access guard — preview không phát audio
     }
@@ -204,7 +233,7 @@ export function AdminTestForm() {
       slug: slug.trim() || undefined,
       is_free: isFree,
       duration_sec: Math.max(1, Number(durationMin) || 60) * 60,
-      passages: passages.map((p) => ({ id: p.id, title: p.title, content: p.content })),
+      passages: passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), content: p.content })),
       questions: qOut,
       answer_keys: Object.keys(answer_keys).length ? answer_keys : undefined,
     }
@@ -242,7 +271,9 @@ export function AdminTestForm() {
     const ps = Array.isArray(data.passages) ? data.passages : []
     const mappedP: Passage[] = ps.map((raw, i) => {
       const p = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-      return { id: String(p.id ?? uid('p')), title: str(p.title) || `Passage ${i + 1}`, content: str(p.body) || str(p.content) }
+      const out: Passage = { id: String(p.id ?? uid('p')), title: str(p.title) || `Passage ${i + 1}`, content: str(p.body) || str(p.content) }
+      if (str(p.subtitle)) out.subtitle = str(p.subtitle)
+      return out
     })
 
     const qs = Array.isArray(data.questions) ? data.questions : []
@@ -412,10 +443,10 @@ export function AdminTestForm() {
         </div>
         {showImport && (
           <div className="mt-3">
-            <textarea
+            <AutoGrowTextarea
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
-              rows={5}
+              minHeight={120}
               placeholder="Dán nội dung test.draft.json vào đây…"
               className={`${inputCls} font-mono text-xs`}
             />
@@ -495,12 +526,18 @@ export function AdminTestForm() {
                   </button>
                 )}
               </div>
-              <textarea
-                className={`${inputCls} mt-2 min-h-[96px] leading-[1.65]`}
-                rows={4}
+              {/* Phụ đề (tuỳ chọn) — render in nghiêng dưới tiêu đề trên đề thi (.dcx-passage-sub), như dòng "Problems in the…" ở reference */}
+              <input
+                className={`${inputCls} mt-2 italic`}
+                value={p.subtitle ?? ''}
+                onChange={(e) => setP(i, { subtitle: e.target.value || undefined })}
+                placeholder="Phụ đề (tuỳ chọn) — VD: Problems in the Australian sugar industry"
+              />
+              <AutoGrowTextarea
+                className={`${inputCls} mt-2 leading-[1.75]`}
                 value={p.content}
                 onChange={(e) => setP(i, { content: e.target.value })}
-                placeholder="Nội dung passage…"
+                placeholder="Dán toàn bộ nội dung passage — ô tự giãn theo độ dài, không phải cuộn trong ô. Cách nhau 1 dòng trống giữa các đoạn để hiển thị đúng như đề thật."
               />
             </div>
           ))}
@@ -686,9 +723,9 @@ export function AdminTestForm() {
                   {/* Giải thích (P3) — chỉ hiện ở review sau nộp (owner + đã nộp); server-only cùng answer_keys */}
                   <div className="mt-2.5">
                     <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#157A4B]">💡 Giải thích (xem chi tiết sau nộp)</span>
-                    <textarea
+                    <AutoGrowTextarea
                       className="mt-1 w-full rounded-[8px] border border-[#D6EFE0] bg-white px-3 py-2 text-[12.5px] leading-[1.5] text-[#2A2740] outline-none"
-                      rows={2}
+                      minHeight={64}
                       value={q.explanation ?? ''}
                       onChange={(e) => setQ(i, { explanation: e.target.value || undefined })}
                       placeholder="Câu evidence trong passage (+ dịch) → hiện khi thí sinh xem chi tiết. Bỏ trống nếu chưa có."
@@ -767,6 +804,7 @@ export function AdminTestForm() {
                 {passages.map((p, i) => (
                   <div key={p.id} className="mt-4">
                     <div className="text-[14px] font-extrabold text-[#2A2740]">{p.title || `Passage ${i + 1}`}</div>
+                    {p.subtitle?.trim() && <div className="text-[12.5px] italic text-[#857F96]">{p.subtitle}</div>}
                     {p.content.trim() ? (
                       <p className="mt-1.5 whitespace-pre-wrap text-[13.5px] leading-[1.7] text-[#3B364A]">{p.content}</p>
                     ) : (
