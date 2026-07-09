@@ -293,7 +293,9 @@
 .dc-exam .dcx-passage-sub {
   font-family: var(--font-newsreader), 'Newsreader', serif;
   font-style: italic;
+  font-size: 15px;
   color: #6a6480;
+  margin: 2px 0 12px;
 }
 .dc-exam .rmuted { color: #6a6480; }
 .dc-exam .dcx-passage p { margin: 0 0 15px; }

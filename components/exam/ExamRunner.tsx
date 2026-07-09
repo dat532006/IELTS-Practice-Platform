@@ -34,7 +34,7 @@ import {
 } from '@/lib/exam/highlight-anchor'
 
 // Shape payload (BE trả `unknown` → cast + guard). KHÔNG có đáp án đúng (guard server).
-type Passage = { id: string; number?: number; title?: string; content?: string }
+type Passage = { id: string; number?: number; title?: string; subtitle?: string; content?: string }
 
 // W9 parity (capture): +'instructions' — màn "Hướng dẫn làm bài kiểm tra" trước khi vào active.
 type Phase = 'loading' | 'locked' | 'notfound' | 'error' | 'instructions' | 'active' | 'submitting' | 'done'
@@ -723,6 +723,7 @@ export function ExamRunner({
                   active.passages.map((p) => (
                     <article key={p.id} style={{ marginBottom: 20 }}>
                       {p.title && <div className="dcx-passage-title">{p.title}</div>}
+                      {p.subtitle && <div className="dcx-passage-sub">{p.subtitle}</div>}
                       <p className="rtext" style={{ whiteSpace: 'pre-line', textAlign: 'justify' }}>
                         {p.content}
                       </p>
