@@ -288,15 +288,18 @@
 }
 .dc-exam .dcx-passage-title {
   font-weight: 800;
-  font-size: 17px;
+  font-size: 20px;
+  text-align: center;
 }
 .dc-exam .dcx-passage-sub {
-  font-family: var(--font-newsreader), 'Newsreader', serif;
-  font-style: italic;
-  font-size: 15px;
-  color: #6a6480;
-  margin: 2px 0 12px;
+  font-weight: 400;
+  font-size: 16px;
+  color: #4a4560;
+  text-align: center;
+  margin: 4px 0 18px;
 }
+/* Thân bài: mỗi đoạn thụt đầu dòng như bản in (Owner ref 2026-07-09). */
+.dc-exam .dcx-passage .dcx-para { text-indent: 1.6em; }
 .dc-exam .rmuted { color: #6a6480; }
 .dc-exam .dcx-passage p { margin: 0 0 15px; }
 .dc-exam .dcx-passage p:last-child { margin-bottom: 0; }

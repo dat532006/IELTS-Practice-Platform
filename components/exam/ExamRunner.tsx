@@ -720,15 +720,28 @@ export function ExamRunner({
                 {!active || active.passages.length === 0 ? (
                   <p className="rmuted">{sectionLabel} này không có đoạn văn.</p>
                 ) : (
-                  active.passages.map((p) => (
-                    <article key={p.id} style={{ marginBottom: 20 }}>
-                      {p.title && <div className="dcx-passage-title">{p.title}</div>}
-                      {p.subtitle && <div className="dcx-passage-sub">{p.subtitle}</div>}
-                      <p className="rtext" style={{ whiteSpace: 'pre-line', textAlign: 'justify' }}>
-                        {p.content}
-                      </p>
-                    </article>
-                  ))
+                  active.passages.map((p) => {
+                    // Tách thân bài thành từng đoạn (blank line HOẶC xuống dòng) → mỗi đoạn 1 <p> để thụt
+                    //   đầu dòng riêng như bản in (.dcx-para). 1 <p> pre-line không thụt được từng đoạn.
+                    const paras = (p.content ?? '').split(/\n{2,}|\n/).map((s) => s.trim()).filter(Boolean)
+                    return (
+                      <article key={p.id} style={{ marginBottom: 20 }}>
+                        {p.title && <div className="dcx-passage-title">{p.title}</div>}
+                        {p.subtitle && <div className="dcx-passage-sub">{p.subtitle}</div>}
+                        {paras.length > 0 ? (
+                          paras.map((para, k) => (
+                            <p key={k} className="rtext dcx-para" style={{ textAlign: 'justify' }}>
+                              {para}
+                            </p>
+                          ))
+                        ) : (
+                          <p className="rtext" style={{ whiteSpace: 'pre-line', textAlign: 'justify' }}>
+                            {p.content}
+                          </p>
+                        )}
+                      </article>
+                    )
+                  })
                 )}
                 {noteMarkers.map((m) => (
                   <button

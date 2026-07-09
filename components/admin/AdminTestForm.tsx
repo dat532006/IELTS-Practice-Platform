@@ -179,7 +179,7 @@ export function AdminTestForm() {
   const [slug, setSlug] = useState('')
   const [isFree, setIsFree] = useState(true)
   const [durationMin, setDurationMin] = useState('60')
-  const [passages, setPassages] = useState<Passage[]>([{ id: 'p1', title: 'Passage 1', content: '' }])
+  const [passages, setPassages] = useState<Passage[]>([{ id: 'p1', title: '', content: '' }])
   const [questions, setQuestions] = useState<QField[]>([
     { id: 'q1', number: '1', type: 'gap_filling', prompt: '', answers: '', points: '1' },
   ])
@@ -269,9 +269,9 @@ export function AdminTestForm() {
         : {}
 
     const ps = Array.isArray(data.passages) ? data.passages : []
-    const mappedP: Passage[] = ps.map((raw, i) => {
+    const mappedP: Passage[] = ps.map((raw) => {
       const p = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-      const out: Passage = { id: String(p.id ?? uid('p')), title: str(p.title) || `Passage ${i + 1}`, content: str(p.body) || str(p.content) }
+      const out: Passage = { id: String(p.id ?? uid('p')), title: str(p.title), content: str(p.body) || str(p.content) }
       if (str(p.subtitle)) out.subtitle = str(p.subtitle)
       return out
     })
@@ -509,7 +509,7 @@ export function AdminTestForm() {
           <div className="text-[14px] font-extrabold text-[#2A2740]">Passage</div>
           <button
             type="button"
-            onClick={() => setPassages((ps) => [...ps, { id: uid('p'), title: `Passage ${ps.length + 1}`, content: '' }])}
+            onClick={() => setPassages((ps) => [...ps, { id: uid('p'), title: '', content: '' }])}
             className="text-[12.5px] font-bold text-[#6A48D6]"
           >
             + Thêm passage
@@ -519,7 +519,7 @@ export function AdminTestForm() {
           {passages.map((p, i) => (
             <div key={p.id} className="rounded-[13px] border border-[#E4DEEE] bg-white p-4">
               <div className="flex items-center gap-2">
-                <input className={inputCls} value={p.title} onChange={(e) => setP(i, { title: e.target.value })} placeholder="Tiêu đề passage" />
+                <input className={inputCls} value={p.title} onChange={(e) => setP(i, { title: e.target.value })} placeholder="Tiêu đề bài đọc — IN ĐẬM, căn giữa (VD: Sweet Trouble). Bỏ trống nếu không có." />
                 {passages.length > 1 && (
                   <button type="button" onClick={() => setPassages((ps) => ps.filter((_, j) => j !== i))} className="text-[12.5px] font-bold text-[#D08585]">
                     Xoá
@@ -528,10 +528,10 @@ export function AdminTestForm() {
               </div>
               {/* Phụ đề (tuỳ chọn) — render in nghiêng dưới tiêu đề trên đề thi (.dcx-passage-sub), như dòng "Problems in the…" ở reference */}
               <input
-                className={`${inputCls} mt-2 italic`}
+                className={`${inputCls} mt-2`}
                 value={p.subtitle ?? ''}
                 onChange={(e) => setP(i, { subtitle: e.target.value || undefined })}
-                placeholder="Phụ đề (tuỳ chọn) — VD: Problems in the Australian sugar industry"
+                placeholder="Phụ đề — không in đậm, căn giữa (VD: Problems in the Australian sugar industry). Tuỳ chọn."
               />
               <AutoGrowTextarea
                 className={`${inputCls} mt-2 leading-[1.75]`}
@@ -604,9 +604,9 @@ export function AdminTestForm() {
                     title="Gán câu vào Passage/Section (để chuyển nhóm đúng như đề thật)"
                   >
                     <option value="">— Passage/Section: chưa gán —</option>
-                    {passages.map((p) => (
+                    {passages.map((p, pi) => (
                       <option key={p.id} value={p.id}>
-                        {p.title || p.id}
+                        {p.title || `Passage ${pi + 1}`}
                       </option>
                     ))}
                   </select>
