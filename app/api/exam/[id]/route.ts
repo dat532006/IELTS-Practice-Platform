@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getSignedAudioUrl, hasTestUnlock } from '@/lib/exam/access'
 import { ok, fail } from '@/lib/api/response'
 import { isUuid } from '@/lib/utils'
+import { sanitizePassages } from '@/lib/sanitize/passage-html'
 import type { ExamPayload, ExamSkill } from '@/types/exam'
 
 // Metadata đủ để guard — cột public (RLS published-only). KHÔNG có passages/questions ở bước này.
@@ -59,7 +60,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const warnings = audioWarning ? [audioWarning] : []
     const payload: ExamPayload = {
       test: { id: test.id, title: test.title, skill: test.type, is_free: test.is_free },
-      passages: payloadRow.passages,
+      // Defense-in-depth: sanitize passage HTML lần nữa trên đường ra client (kể cả data ghi thẳng DB).
+      passages: sanitizePassages(payloadRow.passages),
       questions: payloadRow.questions,
       audio_url,
     }

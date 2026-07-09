@@ -35,6 +35,9 @@ import {
 
 // Shape payload (BE trả `unknown` → cast + guard). KHÔNG có đáp án đúng (guard server).
 type Passage = { id: string; number?: number; title?: string; subtitle?: string; content?: string }
+// Passage content là HTML rich (admin soạn WYSIWYG, đã sanitize server) hay plain text? → chọn nhánh render.
+//   Chỉ nhận diện thẻ trong allowlist (khớp lib/sanitize/passage-html) → tránh false-positive "a < b".
+const RICH_RE = /<(\/?)(p|br|strong|b|em|i|u|s|h2|h3|ul|ol|li|span|div)(\s|>|\/)/i
 
 // W9 parity (capture): +'instructions' — màn "Hướng dẫn làm bài kiểm tra" trước khi vào active.
 type Phase = 'loading' | 'locked' | 'notfound' | 'error' | 'instructions' | 'active' | 'submitting' | 'done'
@@ -721,9 +724,18 @@ export function ExamRunner({
                   <p className="rmuted">{sectionLabel} này không có đoạn văn.</p>
                 ) : (
                   active.passages.map((p) => {
-                    // Tách thân bài thành từng đoạn (blank line HOẶC xuống dòng) → mỗi đoạn 1 <p> để thụt
-                    //   đầu dòng riêng như bản in (.dcx-para). 1 <p> pre-line không thụt được từng đoạn.
-                    const paras = (p.content ?? '').split(/\n{2,}|\n/).map((s) => s.trim()).filter(Boolean)
+                    const raw = p.content ?? ''
+                    // Rich: HTML admin soạn WYSIWYG (đã sanitize server, cả lúc lưu lẫn lúc trả) → render trực tiếp,
+                    //   giữ heading/căn lề/danh sách admin đặt. Highlight neo node-path+quote vẫn chạy trên text node.
+                    if (RICH_RE.test(raw)) {
+                      return (
+                        <article key={p.id} style={{ marginBottom: 20 }}>
+                          <div className="dcx-rich rtext" dangerouslySetInnerHTML={{ __html: raw }} />
+                        </article>
+                      )
+                    }
+                    // Legacy plain text: tiêu đề/phụ đề căn giữa + tách đoạn thụt đầu dòng như bản in (.dcx-para).
+                    const paras = raw.split(/\n{2,}|\n/).map((s) => s.trim()).filter(Boolean)
                     return (
                       <article key={p.id} style={{ marginBottom: 20 }}>
                         {p.title && <div className="dcx-passage-title">{p.title}</div>}
@@ -736,7 +748,7 @@ export function ExamRunner({
                           ))
                         ) : (
                           <p className="rtext" style={{ whiteSpace: 'pre-line', textAlign: 'justify' }}>
-                            {p.content}
+                            {raw}
                           </p>
                         )}
                       </article>
