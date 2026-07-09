@@ -11,21 +11,63 @@ import type { ExamPayload } from '@/types/exam'
 //   Layout theo design frame 6; logic/data flow GIỮ NGUYÊN (chỉ thay markup).
 type TestType = 'reading' | 'listening' | 'writing'
 type Passage = { id: string; title: string; content: string }
-type QField = { id: string; number: string; type: string; prompt: string; answers: string; points: string }
+type QOpt = { key: string; text: string }
+// QField mang đủ field renderer (M06) hỗ trợ: đáp án tách sang `answers`/`points`/`explanation` (→ answer_keys),
+//   còn lại đi vào tests.questions. instruction/passage_id điều khiển gom nhóm + header "Questions a–b".
+type QField = {
+  id: string
+  number: string
+  type: string
+  prompt: string
+  answers: string
+  points: string
+  // rich authoring (P2) — tùy chọn, chỉ emit khi có giá trị
+  passage_id?: string
+  instruction?: string
+  statement?: string
+  options?: QOpt[]
+  select_count?: string
+  image?: string
+  x?: string
+  y?: string
+  // review evidence (P3) — vào answer_keys entry, KHÔNG vào questions
+  explanation?: string
+}
 
-const Q_TYPES = ['gap_filling', 'mcq', 'tfng', 'ynng', 'matching', 'short_answer']
+const Q_TYPES = ['gap_filling', 'mcq', 'mcq_multi', 'tfng', 'ynng', 'matching', 'short_answer', 'diagram', 'map']
+
+// question.type (form) → answer_keys entry.type hợp lệ (ALLOWED_KEY_TYPES, score-reading.ts).
+//   Bắt buộc cho mcq_multi (chấm theo SET) + diagram/map (single-value đúng nhãn).
+const KEY_TYPE: Record<string, string> = {
+  gap_filling: 'gap_filling',
+  short_answer: 'short_answer',
+  mcq: 'mcq',
+  mcq_multi: 'mcq_multi',
+  tfng: 'tfng',
+  ynng: 'ynng',
+  matching: 'matching',
+  diagram: 'diagram_label',
+  map: 'map_labelling',
+}
+// Loại câu cần bank options (hiện editor options). matching cũng dùng options làm bank ghép.
+const NEEDS_OPTIONS = new Set(['mcq', 'mcq_multi', 'matching'])
+const NEEDS_IMAGE = new Set(['diagram', 'map'])
 
 // Map tên loại câu OCR/IELTS chuẩn → 6 type của form (giảm gõ tay khi import). Không khớp → 'gap_filling'.
 const TYPE_ALIAS: Record<string, string> = {
-  mcq_single: 'mcq', mcq_multi: 'mcq', multiple_choice: 'mcq', multi_select: 'mcq',
+  mcq_single: 'mcq', multiple_choice: 'mcq', mcq: 'mcq',
+  mcq_multi: 'mcq_multi', multi_select: 'mcq_multi', multiple_answer: 'mcq_multi',
   true_false_notgiven: 'tfng', tf_ng: 'tfng', tfng: 'tfng',
   yes_no_notgiven: 'ynng', yn_ng: 'ynng', ynng: 'ynng',
   matching_headings: 'matching', matching_information: 'matching', matching_features: 'matching',
-  matching_sentence_endings: 'matching', matching_paragraphs: 'matching', matching: 'matching',
+  matching_sentence_endings: 'matching', matching_paragraphs: 'matching', matching_endings: 'matching', matching: 'matching',
   summary_completion: 'gap_filling', sentence_completion: 'gap_filling', note_completion: 'gap_filling',
   table_completion: 'gap_filling', flowchart_completion: 'gap_filling', form_completion: 'gap_filling',
   gap_filling: 'gap_filling', fill_blank: 'gap_filling',
   short_answer: 'short_answer',
+  // Diagram/map label (renderer M06 hỗ trợ ảnh overlay + dòng chấm)
+  diagram_label: 'diagram', diagram: 'diagram',
+  map_labelling: 'map', plan_map_diagram: 'map', map: 'map', plan: 'map',
 }
 function normType(t: unknown): string {
   const k = String(t ?? '').toLowerCase().trim()
@@ -40,13 +82,62 @@ const TYPE_CHIP: Record<string, { bg: string; color: string }> = {
   tfng: { bg: '#FFEDE6', color: '#C7542F' },
   ynng: { bg: '#FFEDE6', color: '#C7542F' },
   mcq: { bg: '#FFF3DC', color: '#A87614' },
+  mcq_multi: { bg: '#FFF3DC', color: '#A87614' },
   gap_filling: { bg: '#F0ECFF', color: '#5B43C7' },
   matching: { bg: '#F0ECFF', color: '#5B43C7' },
   short_answer: { bg: '#F0ECFF', color: '#5B43C7' },
+  diagram: { bg: '#E4F3FF', color: '#1F6FB2' },
+  map: { bg: '#E4F3FF', color: '#1F6FB2' },
 }
 
 function uid(p: string) {
   return p + Math.random().toString(36).slice(2, 7)
+}
+
+// Câu render-only cho tests.questions / preview — KHÔNG kèm đáp án (answers/points/explanation tách answer_keys).
+//   Chỉ emit field có giá trị → giữ payload gọn, khớp shape ExamQuestion (M06).
+function emitQuestion(q: QField): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: q.id, number: Number(q.number) || 0, type: q.type, prompt: q.prompt }
+  if (q.passage_id?.trim()) out.passage_id = q.passage_id.trim()
+  if (q.instruction?.trim()) out.instruction = q.instruction.trim()
+  if (q.statement?.trim()) out.statement = q.statement.trim()
+  if (NEEDS_OPTIONS.has(q.type) && Array.isArray(q.options)) {
+    const opts = q.options
+      .map((o, i) => {
+        const key = o.key.trim() || String.fromCharCode(65 + i) // A,B,C… nếu admin bỏ trống key
+        const text = o.text.trim()
+        return { key, text: text || key }
+      })
+      .filter((o) => o.text || o.key)
+    if (opts.length) out.options = opts
+  }
+  if (q.type === 'mcq_multi' && q.select_count?.trim()) {
+    const sc = Number(q.select_count)
+    if (Number.isFinite(sc) && sc > 0) out.select_count = sc
+  }
+  if (NEEDS_IMAGE.has(q.type)) {
+    if (q.image?.trim()) out.image = q.image.trim()
+    const x = Number(q.x)
+    const y = Number(q.y)
+    if (q.x?.trim() && Number.isFinite(x)) out.x = x
+    if (q.y?.trim() && Number.isFinite(y)) out.y = y
+  }
+  return out
+}
+
+// Đọc options từ draft (mảng {key,text} | {key,label} | string) → QOpt[] cho form.
+function parseRawOpts(v: unknown): QOpt[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out = v
+    .map((o) => {
+      if (o && typeof o === 'object') {
+        const r = o as Record<string, unknown>
+        return { key: String(r.key ?? ''), text: String(r.text ?? r.label ?? '') }
+      }
+      return { key: '', text: String(o ?? '') }
+    })
+    .filter((o) => o.key || o.text)
+  return out.length ? out : undefined
 }
 
 const labelCls = 'block text-[12.5px] font-extrabold text-[#6A6480] mb-1.5'
@@ -82,7 +173,7 @@ export function AdminTestForm() {
     const payload: ExamPayload = {
       test: { id: '__admin_preview__', title: title || '(Chưa có tiêu đề)', skill: type, is_free: isFree },
       passages: passages.map((p) => ({ id: p.id, title: p.title, content: p.content })),
-      questions: questions.map((q) => ({ id: q.id, number: Number(q.number) || 0, type: q.type, prompt: q.prompt })),
+      questions: questions.map(emitQuestion), // rich fields (options/instruction/image/x/y) để preview đúng format thi
       audio_url: null, // audio ký URL chỉ sau access guard — preview không phát audio
     }
     setExamPreview({ payload, durationSec: Math.max(1, Number(durationMin) || 60) * 60 })
@@ -92,12 +183,20 @@ export function AdminTestForm() {
   const setQ = (i: number, patch: Partial<QField>) => setQuestions((qs) => qs.map((q, j) => (j === i ? { ...q, ...patch } : q)))
 
   function buildPayload() {
-    // ⚠️ questions KHÔNG mang đáp án; đáp án → answer_keys (tách).
-    const qOut = questions.map((q) => ({ id: q.id, number: Number(q.number) || 0, type: q.type, prompt: q.prompt }))
-    const answer_keys: Record<string, { answers: string[]; match: 'ci'; points: number }> = {}
+    // ⚠️ questions KHÔNG mang đáp án; đáp án + explanation → answer_keys (tách, server-only).
+    const qOut = questions.map(emitQuestion)
+    type KeyEntry = { answers: string[]; match: 'ci'; points: number; type?: string; explanation?: string }
+    const answer_keys: Record<string, KeyEntry> = {}
     for (const q of questions) {
       const ans = q.answers.split(',').map((s) => s.trim()).filter(Boolean)
-      if (ans.length) answer_keys[q.id] = { answers: ans, match: 'ci', points: Number(q.points) || 1 }
+      // Entry BẮT BUỘC có answers (AnswerKeyEntrySchema.min(1)); explanation chỉ đính khi đã có đáp án.
+      if (!ans.length) continue
+      const entry: KeyEntry = { answers: ans, match: 'ci', points: Number(q.points) || 1 }
+      const kt = KEY_TYPE[q.type]
+      if (kt) entry.type = kt // mcq_multi chấm theo SET; diagram/map single-value đúng nhãn
+      const exp = q.explanation?.trim()
+      if (exp) entry.explanation = exp
+      answer_keys[q.id] = entry
     }
     return {
       title,
@@ -156,7 +255,19 @@ export function AdminTestForm() {
       const points = key && key.points != null ? String(key.points) : '1'
       const numRaw = q.number
       const number = String(typeof numRaw === 'number' || typeof numRaw === 'string' ? numRaw : i + 1)
-      return { id, number, type: normType(q.type), prompt: str(q.prompt), answers, points }
+      const out: QField = { id, number, type: normType(q.type), prompt: str(q.prompt), answers, points }
+      // Giữ rich fields từ draft (trước đây bị vứt → mất gom nhóm passage/MCQ/diagram).
+      if (str(q.passage_id)) out.passage_id = str(q.passage_id)
+      if (str(q.instruction)) out.instruction = str(q.instruction)
+      if (str(q.statement)) out.statement = str(q.statement)
+      const opts = parseRawOpts(q.options)
+      if (opts) out.options = opts
+      if (q.select_count != null) out.select_count = String(q.select_count)
+      if (str(q.image)) out.image = str(q.image)
+      if (q.x != null) out.x = String(q.x)
+      if (q.y != null) out.y = String(q.y)
+      if (key && typeof key.explanation === 'string') out.explanation = key.explanation
+      return out
     })
 
     if (mappedP.length) setPassages(mappedP)
@@ -193,6 +304,8 @@ export function AdminTestForm() {
       const lbl = `Câu ${q.number || i + 1}`
       if (!q.prompt.trim()) out.push({ level: 'warn', text: `${lbl}: nội dung câu hỏi trống.` })
       if (!q.answers.trim()) out.push({ level: 'warn', text: `${lbl}: chưa có đáp án.` })
+      if (NEEDS_OPTIONS.has(q.type) && !(q.options ?? []).some((o) => o.text.trim() || o.key.trim()))
+        out.push({ level: 'warn', text: `${lbl}: loại "${q.type}" cần bank lựa chọn (options) — thí sinh sẽ thấy "thiếu lựa chọn".` })
       const n = Number(q.number)
       if (!Number.isInteger(n) || n < 1) out.push({ level: 'error', text: `${lbl}: số câu không hợp lệ.` })
       else seen.set(n, (seen.get(n) ?? 0) + 1)
@@ -444,6 +557,114 @@ export function AdminTestForm() {
                   placeholder="Nội dung câu hỏi / prompt"
                 />
 
+                {/* Gom nhóm: passage/section + instruction (câu liên tiếp cùng instruction → 1 block "Questions a–b") */}
+                <div className="mt-2.5 grid gap-2 sm:grid-cols-[minmax(0,170px)_1fr]">
+                  <select
+                    className={inputCls}
+                    value={q.passage_id ?? ''}
+                    onChange={(e) => setQ(i, { passage_id: e.target.value || undefined })}
+                    aria-label="Passage / Section của câu"
+                    title="Gán câu vào Passage/Section (để chuyển nhóm đúng như đề thật)"
+                  >
+                    <option value="">— Passage/Section: chưa gán —</option>
+                    {passages.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title || p.id}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className={inputCls}
+                    value={q.instruction ?? ''}
+                    onChange={(e) => setQ(i, { instruction: e.target.value || undefined })}
+                    placeholder="Hướng dẫn nhóm, VD: Complete the sentences. Write NO MORE THAN TWO WORDS…"
+                  />
+                </div>
+
+                {/* Bank lựa chọn cho MCQ / matching — KEY là giá trị nhập ở ô đáp án */}
+                {NEEDS_OPTIONS.has(q.type) && (
+                  <div className="mt-2.5 rounded-[10px] border border-[#F1E4C8] bg-[#FFFBF2] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#A87614]">
+                        Lựa chọn (bank) · KEY = giá trị chấm
+                      </span>
+                      {q.type === 'mcq_multi' && (
+                        <label className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#A87614]">
+                          Chọn
+                          <input
+                            className="w-12 rounded-[6px] border border-[#F1E4C8] bg-white px-1.5 py-0.5 text-center outline-none"
+                            value={q.select_count ?? ''}
+                            onChange={(e) => setQ(i, { select_count: e.target.value })}
+                            placeholder="2"
+                            aria-label="Số đáp án cần chọn"
+                          />
+                          đáp án
+                        </label>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      {(q.options ?? []).map((o, oi) => (
+                        <div key={oi} className="flex items-center gap-1.5">
+                          <input
+                            className="w-14 flex-none rounded-[7px] border border-[#F1E4C8] bg-white px-2 py-1.5 text-center text-[12.5px] font-bold text-[#8A6410] outline-none"
+                            value={o.key}
+                            onChange={(e) => {
+                              const next = [...(q.options ?? [])]
+                              next[oi] = { ...next[oi], key: e.target.value }
+                              setQ(i, { options: next })
+                            }}
+                            placeholder={String.fromCharCode(65 + oi)}
+                            aria-label="Key lựa chọn"
+                          />
+                          <input
+                            className="min-w-0 flex-1 rounded-[8px] border border-[#F1E4C8] bg-white px-3 py-1.5 text-sm text-[#2A2740] outline-none"
+                            value={o.text}
+                            onChange={(e) => {
+                              const next = [...(q.options ?? [])]
+                              next[oi] = { ...next[oi], text: e.target.value }
+                              setQ(i, { options: next })
+                            }}
+                            placeholder="Nội dung lựa chọn"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setQ(i, { options: (q.options ?? []).filter((_, j) => j !== oi) })}
+                            className="flex-none px-1 text-[13px] font-bold text-[#C8C2D2] hover:text-[#D08585]"
+                            aria-label="Xoá lựa chọn"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setQ(i, { options: [...(q.options ?? []), { key: '', text: '' }] })}
+                      className="mt-2 text-[12px] font-bold text-[#A87614]"
+                    >
+                      + Thêm lựa chọn
+                    </button>
+                  </div>
+                )}
+
+                {/* Sơ đồ cho diagram/map — có ảnh: overlay ô theo x/y%; bỏ trống ảnh: chế độ dòng chấm "N …… [ô]" */}
+                {NEEDS_IMAGE.has(q.type) && (
+                  <div className="mt-2.5 rounded-[10px] border border-[#CBE6F7] bg-[#F3FAFF] p-3">
+                    <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#1F6FB2]">Sơ đồ (diagram / map)</span>
+                    <input
+                      className={`${inputCls} mt-2`}
+                      value={q.image ?? ''}
+                      onChange={(e) => setQ(i, { image: e.target.value || undefined })}
+                      placeholder="URL ảnh sơ đồ (bỏ trống → dòng chấm 'N …… [ô nhập]')"
+                    />
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#1F6FB2]">
+                      <span>Vị trí ô nhập trên ảnh (%):</span>
+                      <input className="w-16 rounded-[7px] border border-[#CBE6F7] bg-white px-2 py-1 text-center outline-none" value={q.x ?? ''} onChange={(e) => setQ(i, { x: e.target.value })} placeholder="x" aria-label="x %" />
+                      <input className="w-16 rounded-[7px] border border-[#CBE6F7] bg-white px-2 py-1 text-center outline-none" value={q.y ?? ''} onChange={(e) => setQ(i, { y: e.target.value })} placeholder="y" aria-label="y %" />
+                    </div>
+                  </div>
+                )}
+
                 {/* Đáp án — ô server-only (tách → answer_keys) */}
                 <div className="mt-3 rounded-[10px] border border-[#D6EFE0] bg-[#F2FAF5] p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -462,6 +683,17 @@ export function AdminTestForm() {
                     onChange={(e) => setQ(i, { answers: e.target.value })}
                     placeholder="đáp án, cách nhau dấu phẩy"
                   />
+                  {/* Giải thích (P3) — chỉ hiện ở review sau nộp (owner + đã nộp); server-only cùng answer_keys */}
+                  <div className="mt-2.5">
+                    <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#157A4B]">💡 Giải thích (xem chi tiết sau nộp)</span>
+                    <textarea
+                      className="mt-1 w-full rounded-[8px] border border-[#D6EFE0] bg-white px-3 py-2 text-[12.5px] leading-[1.5] text-[#2A2740] outline-none"
+                      rows={2}
+                      value={q.explanation ?? ''}
+                      onChange={(e) => setQ(i, { explanation: e.target.value || undefined })}
+                      placeholder="Câu evidence trong passage (+ dịch) → hiện khi thí sinh xem chi tiết. Bỏ trống nếu chưa có."
+                    />
+                  </div>
                 </div>
               </div>
             )
