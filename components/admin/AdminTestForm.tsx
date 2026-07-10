@@ -35,7 +35,13 @@ type QField = {
   explanation?: string
 }
 
-const Q_TYPES = ['gap_filling', 'mcq', 'mcq_multi', 'tfng', 'ynng', 'matching', 'short_answer', 'diagram', 'map']
+const Q_TYPES = ['gap_filling', 'mcq', 'mcq_multi', 'tfng', 'ynng', 'matching', 'matching_information', 'short_answer', 'diagram', 'map']
+
+// Nhãn hiển thị gọn cho dropdown loại câu (phân biệt 2 kiểu matching). Không có → hiện raw type.
+const TYPE_LABEL: Record<string, string> = {
+  matching: 'matching (dropdown chọn)',
+  matching_information: 'matching (bảng ma trận A–H)',
+}
 
 // question.type (form) → answer_keys entry.type hợp lệ (ALLOWED_KEY_TYPES, score-reading.ts).
 //   Bắt buộc cho mcq_multi (chấm theo SET) + diagram/map (single-value đúng nhãn).
@@ -47,11 +53,12 @@ const KEY_TYPE: Record<string, string> = {
   tfng: 'tfng',
   ynng: 'ynng',
   matching: 'matching',
+  matching_information: 'matching_information',
   diagram: 'diagram_label',
   map: 'map_labelling',
 }
-// Loại câu cần bank options (hiện editor options). matching cũng dùng options làm bank ghép.
-const NEEDS_OPTIONS = new Set(['mcq', 'mcq_multi', 'matching'])
+// Loại câu cần bank options (hiện editor options). matching/matching_information dùng options làm bank ghép/cột.
+const NEEDS_OPTIONS = new Set(['mcq', 'mcq_multi', 'matching', 'matching_information'])
 const NEEDS_IMAGE = new Set(['diagram', 'map'])
 
 // Map tên loại câu OCR/IELTS chuẩn → 6 type của form (giảm gõ tay khi import). Không khớp → 'gap_filling'.
@@ -60,8 +67,10 @@ const TYPE_ALIAS: Record<string, string> = {
   mcq_multi: 'mcq_multi', multi_select: 'mcq_multi', multiple_answer: 'mcq_multi',
   true_false_notgiven: 'tfng', tf_ng: 'tfng', tfng: 'tfng',
   yes_no_notgiven: 'ynng', yn_ng: 'ynng', ynng: 'ynng',
-  matching_headings: 'matching', matching_information: 'matching', matching_features: 'matching',
-  matching_sentence_endings: 'matching', matching_paragraphs: 'matching', matching_endings: 'matching', matching: 'matching',
+  matching_headings: 'matching', matching_features: 'matching', matching_endings: 'matching',
+  matching_sentence_endings: 'matching', matching: 'matching',
+  // matching_information / matching_paragraphs → bảng ma trận (renderer gom ≥2 câu liên tiếp cùng bank)
+  matching_information: 'matching_information', matching_paragraphs: 'matching_information', matching_matrix: 'matching_information',
   summary_completion: 'gap_filling', sentence_completion: 'gap_filling', note_completion: 'gap_filling',
   table_completion: 'gap_filling', flowchart_completion: 'gap_filling', form_completion: 'gap_filling',
   gap_filling: 'gap_filling', fill_blank: 'gap_filling',
@@ -86,6 +95,7 @@ const TYPE_CHIP: Record<string, { bg: string; color: string }> = {
   mcq_multi: { bg: '#FFF3DC', color: '#A87614' },
   gap_filling: { bg: '#F0ECFF', color: '#5B43C7' },
   matching: { bg: '#F0ECFF', color: '#5B43C7' },
+  matching_information: { bg: '#F0ECFF', color: '#5B43C7' },
   short_answer: { bg: '#F0ECFF', color: '#5B43C7' },
   diagram: { bg: '#E4F3FF', color: '#1F6FB2' },
   map: { bg: '#E4F3FF', color: '#1F6FB2' },
@@ -576,7 +586,7 @@ export function AdminTestForm() {
                   >
                     {Q_TYPES.map((t) => (
                       <option key={t} value={t}>
-                        {t}
+                        {TYPE_LABEL[t] ?? t}
                       </option>
                     ))}
                   </select>
