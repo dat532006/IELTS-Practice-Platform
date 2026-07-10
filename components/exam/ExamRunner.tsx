@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import type { AttemptDTO, ExamPayload, SubmitResult } from '@/types/exam'
 import { QuestionRenderer } from '@/components/exam/questions/QuestionRenderer'
 import { MatchingMatrixQuestion } from '@/components/exam/questions/MatchingMatrixQuestion'
+import { SummaryQuestion } from '@/components/exam/questions/SummaryQuestion'
+import { MatchingBankQuestion } from '@/components/exam/questions/MatchingBankQuestion'
 import { ListeningAudioPlayer } from '@/components/exam/ListeningAudioPlayer'
 import {
   ClockIcon,
@@ -82,15 +84,51 @@ function rangeLabel(qs: ExamQuestion[]): string {
   return a === b ? `${a}` : `${a}–${b}`
 }
 
-// W9 (T3.1) — gom câu matching_information liên tiếp (cùng pool options) → 1 matrix; còn lại render đơn.
-type RenderItem = { kind: 'single'; q: ExamQuestion } | { kind: 'matrix'; qs: ExamQuestion[]; options: QOption[] }
-const isMatchingInfo = (q: ExamQuestion): boolean => (q.type ?? '').toLowerCase().trim() === 'matching_information'
+// W9 (T3.1) — gom câu cùng dạng liên tiếp thành 1 khối: matrix (matching_information), summary (đoạn nhiều ô),
+//   matchbank (matching_features: bank hiện rõ + ô điền); còn lại render đơn.
+type RenderItem =
+  | { kind: 'single'; q: ExamQuestion }
+  | { kind: 'matrix'; qs: ExamQuestion[]; options: QOption[] }
+  | { kind: 'summary'; qs: ExamQuestion[]; template: string }
+  | { kind: 'matchbank'; qs: ExamQuestion[]; options: QOption[] }
+const typeOf = (q: ExamQuestion): string => (q.type ?? '').toLowerCase().trim()
+const isMatchingInfo = (q: ExamQuestion): boolean => typeOf(q) === 'matching_information'
+const isSummary = (q: ExamQuestion): boolean => typeOf(q) === 'summary' || typeOf(q) === 'summary_completion'
+const isMatchFeatures = (q: ExamQuestion): boolean => typeOf(q) === 'matching_features'
 const optionsSig = (opts?: QOption[]): string => (Array.isArray(opts) ? opts.map((o) => o.key).join('|') : '')
+const markerCount = (s?: string): number => (s ? (s.match(/\[\d+\]/g)?.length ?? 0) : 0)
 function buildRenderItems(qs: ExamQuestion[]): RenderItem[] {
   const items: RenderItem[] = []
   let i = 0
   while (i < qs.length) {
     const q = qs[i]
+    // Summary: gom câu 'summary' liên tiếp → 1 đoạn nhiều ô. template = prompt có nhiều marker [n] nhất.
+    if (isSummary(q)) {
+      const grp = [q]
+      let j = i + 1
+      while (j < qs.length && isSummary(qs[j])) {
+        grp.push(qs[j])
+        j++
+      }
+      const template = grp.reduce((best, g) => (markerCount(g.prompt) > markerCount(best) ? (g.prompt ?? '') : best), '')
+      items.push({ kind: 'summary', qs: grp, template })
+      i = j
+      continue
+    }
+    // Matching features: bank hiện rõ + ô điền chữ (option dài). Gom ≥1 câu liên tiếp cùng bank.
+    if (isMatchFeatures(q) && Array.isArray(q.options) && q.options.length > 0) {
+      const sig = optionsSig(q.options)
+      const grp = [q]
+      let j = i + 1
+      while (j < qs.length && isMatchFeatures(qs[j]) && optionsSig(qs[j].options) === sig) {
+        grp.push(qs[j])
+        j++
+      }
+      items.push({ kind: 'matchbank', qs: grp, options: q.options })
+      i = j
+      continue
+    }
+    // Matrix: matching_information (≥2 câu liên tiếp cùng pool options).
     if (isMatchingInfo(q) && Array.isArray(q.options) && q.options.length > 0) {
       const sig = optionsSig(q.options)
       const grp = [q]
@@ -806,22 +844,44 @@ export function ExamRunner({
                     </div>
                     {block.instruction && <InstructionText text={block.instruction} className="dcx-qinstr" />}
                     <div className="dcx-qlist">
-                      {block.items.map((item, idx) =>
-                        item.kind === 'matrix' ? (
-                          <div key={`matrix-${item.qs[0].id}`}>
-                            <MatchingMatrixQuestion
-                              questions={item.qs}
-                              options={item.options}
-                              answers={answers}
-                              onAnswer={onAnswerChange}
-                              bookmarkedQs={bookmarkedQs}
-                              onToggleBookmark={toggleQuestionBookmark}
-                              activeQid={activeQid}
-                              onActivate={setActiveQid}
-                            />
-                          </div>
-                        ) : (
-                          (() => {
+                      {block.items.map((item, idx) => {
+                        if (item.kind === 'matrix')
+                          return (
+                            <div key={`matrix-${item.qs[0].id}`}>
+                              <MatchingMatrixQuestion
+                                questions={item.qs}
+                                options={item.options}
+                                answers={answers}
+                                onAnswer={onAnswerChange}
+                                bookmarkedQs={bookmarkedQs}
+                                onToggleBookmark={toggleQuestionBookmark}
+                                activeQid={activeQid}
+                                onActivate={setActiveQid}
+                              />
+                            </div>
+                          )
+                        if (item.kind === 'summary')
+                          return (
+                            <div key={`summary-${item.qs[0].id}`}>
+                              <SummaryQuestion questions={item.qs} template={item.template} answers={answers} onAnswer={onAnswerChange} />
+                            </div>
+                          )
+                        if (item.kind === 'matchbank')
+                          return (
+                            <div key={`matchbank-${item.qs[0].id}`}>
+                              <MatchingBankQuestion
+                                questions={item.qs}
+                                options={item.options}
+                                answers={answers}
+                                onAnswer={onAnswerChange}
+                                bookmarkedQs={bookmarkedQs}
+                                onToggleBookmark={toggleQuestionBookmark}
+                                activeQid={activeQid}
+                                onActivate={setActiveQid}
+                              />
+                            </div>
+                          )
+                        return (() => {
                             const kind = renderKindOf(item.q.type)
                             const noBadge = kind === 'gap' || kind === 'diagram' || kind === 'map'
                             const statement =
@@ -879,8 +939,7 @@ export function ExamRunner({
                               </div>
                             )
                           })()
-                        ),
-                      )}
+                        })}
                     </div>
                   </section>
                 ))
