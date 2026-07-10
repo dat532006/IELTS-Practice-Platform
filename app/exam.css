@@ -599,6 +599,11 @@
   flex: none;
   position: relative;
   transition: all 0.12s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  text-decoration: none;
 }
 .dc-exam .dcx-navpill:hover { border-color: #c9bdf0; }
 .dc-exam .dcx-navpill.answered { background: var(--brand-soft); border-color: #cdbdf5; color: #5a3fc0; }
