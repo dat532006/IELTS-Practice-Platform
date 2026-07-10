@@ -509,6 +509,28 @@
 .dc-exam .dcx-mtable td.cell.sel { background: #f3eeff; }
 .dc-exam .dcx-mtable .dcx-mnum { color: #5a3fc0; font-weight: 800; }
 
+/* ── Summary completion: đoạn nhiều ô liền mạch (SummaryQuestion) ── */
+.dc-exam .dcx-summary { margin-top: 2px; }
+.dc-exam .dcx-summary-title { font-weight: 800; font-size: 17px; text-align: center; margin: 4px 0 14px; }
+.dc-exam .dcx-summary-p { margin: 0 0 12px; line-height: 2.2; }
+.dc-exam .dcx-summary-p:last-child { margin-bottom: 0; }
+
+/* ── Matching "bank hiện rõ + ô điền chữ" (MatchingBankQuestion) ── */
+.dc-exam .dcx-mbank { margin-top: 6px; }
+.dc-exam .dcx-mbank-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+.dc-exam .dcx-mbank-list li {
+  display: flex; gap: 10px; align-items: baseline;
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; background: #fff; font-size: 14px;
+}
+.dc-exam .dcx-mbank-list li b { color: #5a3fc0; font-weight: 800; flex: none; }
+.dc-exam .dcx-mbank-items { display: flex; flex-direction: column; gap: 12px; }
+.dc-exam .dcx-mbank-row { display: flex; align-items: center; gap: 12px; }
+.dc-exam .dcx-mbank-text { flex: 1; min-width: 0; font-size: 15px; }
+.dc-exam .dcx-gap-input.dcx-mbank-box {
+  border: 2px dashed #c9bff0; border-radius: 8px; padding: 8px 6px;
+  width: 90px; min-width: 0; max-width: 90px; flex: none;
+}
+
 /* ── Listening form-completion table ── */
 .dc-exam .dcx-lform {
   margin-top: 20px;
@@ -1405,7 +1427,9 @@
 .dc-exam.ct-wb .themed .dcx-rich h3,
 .dc-exam.ct-wb .themed .dcx-passage-sub { color: #b9b3cc !important; }
 .dc-exam.ct-wb .themed .dcx-gap-input { background: #22202e; color: #fff; border-color: #4a4560; }
-.dc-exam.ct-wb .themed .dcx-opt { background: #201e2c; border-color: #3b3650; color: #f4f2fb; }
+.dc-exam.ct-wb .themed .dcx-opt,
+.dc-exam.ct-wb .themed .dcx-mbank-list li { background: #201e2c; border-color: #3b3650; color: #f4f2fb; }
+.dc-exam.ct-wb .themed .dcx-mbank-list li b { color: #b9a8f5; }
 .dc-exam.ct-wb .themed .dcx-opt.sel { background: #322c4a; }
 .dc-exam.ct-wb .themed .dcx-select { background: #22202e; color: #fff; border-color: #4a4560; }
 .dc-exam.ct-wb .themed .dcx-para-letter { color: #b9a8f5; }
@@ -1417,7 +1441,9 @@
 .dc-exam.ct-yb .themed .dcx-rich h3,
 .dc-exam.ct-yb .themed .dcx-passage-sub { color: #e8c33a !important; }
 .dc-exam.ct-yb .themed .dcx-gap-input { background: #161616; color: #ffd60a; border-color: #5a5220; }
-.dc-exam.ct-yb .themed .dcx-opt { background: #161616; border-color: #5a5220; color: #ffd60a; }
+.dc-exam.ct-yb .themed .dcx-opt,
+.dc-exam.ct-yb .themed .dcx-mbank-list li { background: #161616; border-color: #5a5220; color: #ffd60a; }
+.dc-exam.ct-yb .themed .dcx-mbank-list li b { color: #ffd60a; }
 .dc-exam.ct-yb .themed .dcx-opt.sel { background: #201d05; border-color: #ffd60a; }
 .dc-exam.ct-yb .themed .dcx-select { background: #161616; color: #ffd60a; border-color: #5a5220; }
 .dc-exam.ct-yb .themed .dcx-para-letter { color: #ffd60a; }
