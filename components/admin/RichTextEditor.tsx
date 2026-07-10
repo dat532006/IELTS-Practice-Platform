@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, type ClipboardEvent } from 'react'
+import { useCallback, useEffect, useRef, type ClipboardEvent, type CSSProperties } from 'react'
 
 // M11 — Trình soạn thảo passage kiểu Word (WYSIWYG). contentEditable + toolbar → xuất HTML.
 //   CHỈ dùng ở form admin (client). An toàn thực thi do SERVER sanitize allowlist (lib/sanitize/passage-html)
@@ -46,20 +46,21 @@ export function looksRich(v: string): boolean {
   return /<(\/?)(p|br|strong|b|em|i|u|s|h2|h3|ul|ol|li|span|div)(\s|>|\/)/i.test(v)
 }
 
-type BtnDef = { cmd: string; arg?: string; label: string; title: string; bold?: boolean }
+type BtnDef = { cmd: string; arg?: string; label: string; title: string; css?: CSSProperties }
+// Nhãn tiếng Việt rõ nghĩa (Owner báo ký hiệu ¶/◀/≡ khó hiểu). B/I/U hiện đúng kiểu để nhìn là biết.
 const BTNS: BtnDef[] = [
-  { cmd: 'bold', label: 'B', title: 'Đậm (Ctrl+B)', bold: true },
-  { cmd: 'italic', label: 'I', title: 'Nghiêng (Ctrl+I)' },
-  { cmd: 'underline', label: 'U', title: 'Gạch chân (Ctrl+U)' },
+  { cmd: 'bold', label: 'B', title: 'In đậm (Ctrl+B)', css: { fontWeight: 800 } },
+  { cmd: 'italic', label: 'I', title: 'In nghiêng (Ctrl+I)', css: { fontStyle: 'italic', fontWeight: 700 } },
+  { cmd: 'underline', label: 'U', title: 'Gạch chân (Ctrl+U)', css: { textDecoration: 'underline', fontWeight: 700 } },
   { cmd: 'formatBlock', arg: 'h2', label: 'Tiêu đề', title: 'Tiêu đề bài đọc — căn giữa, in đậm' },
   { cmd: 'formatBlock', arg: 'h3', label: 'Phụ đề', title: 'Phụ đề — căn giữa, chữ thường' },
-  { cmd: 'formatBlock', arg: 'p', label: '¶', title: 'Đoạn văn thường' },
-  { cmd: 'justifyLeft', label: '⯇', title: 'Căn trái' },
-  { cmd: 'justifyCenter', label: '≡', title: 'Căn giữa' },
-  { cmd: 'justifyFull', label: '☰', title: 'Căn đều 2 bên' },
-  { cmd: 'insertUnorderedList', label: '• —', title: 'Danh sách chấm' },
-  { cmd: 'insertOrderedList', label: '1.', title: 'Danh sách số' },
-  { cmd: 'removeFormat', label: 'Xoá ĐD', title: 'Xoá định dạng vùng chọn' },
+  { cmd: 'formatBlock', arg: 'p', label: 'Đoạn', title: 'Đoạn văn thường' },
+  { cmd: 'justifyLeft', label: 'Căn trái', title: 'Căn lề trái' },
+  { cmd: 'justifyCenter', label: 'Căn giữa', title: 'Căn giữa' },
+  { cmd: 'justifyFull', label: 'Căn đều', title: 'Căn đều 2 bên' },
+  { cmd: 'insertUnorderedList', label: '• Danh sách', title: 'Danh sách gạch đầu dòng' },
+  { cmd: 'insertOrderedList', label: '1. Đánh số', title: 'Danh sách đánh số' },
+  { cmd: 'removeFormat', label: 'Xoá định dạng', title: 'Xoá định dạng vùng chọn' },
 ]
 
 export function RichTextEditor({
@@ -129,7 +130,7 @@ export function RichTextEditor({
             onMouseDown={(e) => e.preventDefault()} // giữ vùng chọn trong editor khi bấm nút
             onClick={() => run(b)}
             className="admin-rte-btn"
-            style={b.bold ? { fontWeight: 800 } : undefined}
+            style={b.css}
           >
             {b.label}
           </button>
