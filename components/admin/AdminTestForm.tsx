@@ -64,6 +64,8 @@ const KEY_TYPE: Record<string, string> = {
 // Loại câu cần bank options (hiện editor options). matching* dùng options làm bank ghép/cột.
 const NEEDS_OPTIONS = new Set(['mcq', 'mcq_multi', 'matching', 'matching_information', 'matching_features'])
 const NEEDS_IMAGE = new Set(['diagram', 'map'])
+// Loại "gộp hàng" (statement + bank dùng chung) → cho công cụ tạo nhanh nhiều hàng 1 lần (khỏi spam thủ công).
+const BULK_TYPES = new Set(['matching', 'matching_information', 'matching_features'])
 
 // Map tên loại câu OCR/IELTS chuẩn → 6 type của form (giảm gõ tay khi import). Không khớp → 'gap_filling'.
 const TYPE_ALIAS: Record<string, string> = {
@@ -203,6 +205,7 @@ export function AdminTestForm() {
   const [questions, setQuestions] = useState<QField[]>([
     { id: 'q1', number: '1', type: 'gap_filling', prompt: '', answers: '', points: '1' },
   ])
+  const [bulkText, setBulkText] = useState<Record<string, string>>({}) // ô "tạo nhanh nhiều hàng" theo qid
 
   const [phase, setPhase] = useState<'idle' | 'submitting'>('idle')
   const [error, setError] = useState('')
@@ -230,6 +233,36 @@ export function AdminTestForm() {
 
   const setP = (i: number, patch: Partial<Passage>) => setPassages((ps) => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)))
   const setQ = (i: number, patch: Partial<QField>) => setQuestions((qs) => qs.map((q, j) => (j === i ? { ...q, ...patch } : q)))
+
+  // Tạo nhanh nhiều hàng cùng bank + hướng dẫn: câu hiện tại thành hàng 1, mỗi dòng còn lại thêm 1 hàng dưới.
+  //   Dòng "statement | đáp án" gán luôn đáp án. Số câu tự tăng từ số của câu hiện tại. Options CLONE riêng mỗi hàng.
+  function bulkRows(i: number, qid: string, text: string) {
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+    if (!lines.length) return
+    setQuestions((qs) => {
+      const base = qs[i]
+      if (!base) return qs
+      const start = Number(base.number) || i + 1
+      const rows: QField[] = lines.map((line, k) => {
+        const cut = line.lastIndexOf('|')
+        const prompt = cut >= 0 ? line.slice(0, cut).trim() : line
+        const answers = cut >= 0 ? line.slice(cut + 1).trim() : ''
+        return {
+          ...base,
+          id: k === 0 ? base.id : uid('q'),
+          number: String(start + k),
+          prompt,
+          answers,
+          options: (base.options ?? []).map((o) => ({ ...o })),
+          explanation: k === 0 ? base.explanation : undefined,
+        }
+      })
+      const next = [...qs]
+      next.splice(i, 1, ...rows)
+      return next
+    })
+    setBulkText((m) => ({ ...m, [qid]: '' }))
+  }
 
   function buildPayload() {
     // ⚠️ questions KHÔNG mang đáp án; đáp án + explanation → answer_keys (tách, server-only).
@@ -700,6 +733,34 @@ export function AdminTestForm() {
                     >
                       + Thêm lựa chọn
                     </button>
+
+                    {/* Tạo nhanh nhiều hàng (matching): nhập bank + hướng dẫn 1 lần rồi dán danh sách statement → 1 click ra hết hàng */}
+                    {BULK_TYPES.has(q.type) && (
+                      <div className="mt-3 border-t border-[#F1E4C8] pt-2.5">
+                        <div className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#A87614]">
+                          ⚡ Tạo nhanh nhiều hàng — dùng chung bank + hướng dẫn của câu này
+                        </div>
+                        <textarea
+                          value={bulkText[q.id] ?? ''}
+                          onChange={(e) => setBulkText((m) => ({ ...m, [q.id]: e.target.value }))}
+                          rows={4}
+                          placeholder={'Mỗi dòng = 1 hàng (statement). Thêm " | đáp án" để gán luôn đáp án.\nsupport for an earlier finding… | B\ncriticism of the way… | D'}
+                          className="mt-1.5 w-full rounded-[8px] border border-[#F1E4C8] bg-white px-3 py-2 text-[13px] leading-[1.5] text-[#2A2740] outline-none"
+                        />
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => bulkRows(i, q.id, bulkText[q.id] ?? '')}
+                            className="rounded-[8px] bg-[#A87614] px-3 py-1.5 text-[12px] font-bold text-white transition hover:bg-[#8A6410]"
+                          >
+                            Tạo hàng từ danh sách →
+                          </button>
+                          <span className="text-[11px] font-semibold text-[#9C8A5E]">
+                            Câu này thành hàng 1; đặt “Số câu” = số bắt đầu (VD 14) trước khi bấm — các hàng tự đánh số tiếp.
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
