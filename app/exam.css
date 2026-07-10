@@ -82,6 +82,13 @@
     overflow: visible;
   }
 }
+/* Admin "Xem giao diện thi" (overlay): khóa exam vào ĐÚNG chiều cao THẬT của overlay (fill 100%),
+   thay 100vh — 100vh trong webview/overlay hay lớn hơn vùng nhìn → dư khoảng trống cuộn được ở dưới.
+   Chỉ áp desktop (2 cột, cuộn trong cột); mobile giữ nguyên scroll trang. */
+@media (min-width: 1024px) {
+  .dcx-exam-preview .dc-exam { min-height: 0; height: 100%; }
+  .dcx-exam-preview .dc-exam .dcx-shell { height: 100%; }
+}
 
 /* ─────────────────────────── Header ─────────────────────────── */
 .dc-exam .dcx-header {

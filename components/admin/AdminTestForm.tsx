@@ -982,7 +982,7 @@ export function AdminTestForm() {
 
       {/* Preview giao diện thi thật (fullscreen overlay) — ExamRunner preview mode, KHÔNG API/attempt */}
       {examPreview && (
-        <div className="fixed inset-0 z-[100] overflow-auto bg-[#F4F1F8]">
+        <div className="dcx-exam-preview fixed inset-0 z-[100] overflow-auto bg-[#F4F1F8]">
           <button
             type="button"
             onClick={() => setExamPreview(null)}
@@ -990,7 +990,7 @@ export function AdminTestForm() {
           >
             ✕ Đóng preview
           </button>
-          <div className={examFontVars}>
+          <div className={`${examFontVars} h-full`}>
             <ExamRunner testId="__admin_preview__" preview={examPreview} />
           </div>
         </div>
