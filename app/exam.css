@@ -82,12 +82,18 @@
     overflow: visible;
   }
 }
-/* Admin "Xem giao diện thi" (overlay): khóa exam vào ĐÚNG chiều cao THẬT của overlay (fill 100%),
-   thay 100vh — 100vh trong webview/overlay hay lớn hơn vùng nhìn → dư khoảng trống cuộn được ở dưới.
-   Chỉ áp desktop (2 cột, cuộn trong cột); mobile giữ nguyên scroll trang. */
-@media (min-width: 1024px) {
-  .dcx-exam-preview .dc-exam { min-height: 0; height: 100%; }
-  .dcx-exam-preview .dc-exam .dcx-shell { height: 100%; }
+/* Admin "Xem giao diện thi" (overlay): khóa exam thành app khung CỐ ĐỊNH = đúng chiều cao overlay
+   ở MỌI bề rộng (không chỉ desktop). Vì nội dung == viewport nên overlay KHÔNG có gì để cuộn →
+   khi input/radio (sr-only) nhận focus, trình duyệt không thể kéo cả overlay xuống vùng trống
+   (bug "chọn đáp án là văng xuống"). QUAN TRỌNG: dùng overflow:CLIP (không phải hidden) — hidden vẫn
+   cho trình duyệt cuộn container bằng scroll-into-view, còn clip tạo container KHÔNG cuộn được. Cột
+   trái/phải vẫn overflow-y:auto tự cuộn nội bộ (kể cả khi <1024 stack dọc). */
+.dcx-exam-preview { overflow: clip; }
+.dcx-exam-preview .dc-exam { min-height: 0 !important; height: 100%; overflow: clip; }
+.dcx-exam-preview .dc-exam .dcx-shell { height: 100% !important; min-height: 0 !important; overflow: clip !important; }
+@media (max-width: 1023px) {
+  .dcx-exam-preview .dc-exam .dcx-left,
+  .dcx-exam-preview .dc-exam .dcx-right { overflow-y: auto !important; }
 }
 
 /* ─────────────────────────── Header ─────────────────────────── */
@@ -537,6 +543,22 @@
   border: 2px dashed #c9bff0; border-radius: 8px; padding: 8px 6px;
   width: 90px; min-width: 0; max-width: 90px; flex: none;
 }
+
+/* ── Kéo-thả (drag-drop) cho matching bank + summary word-list ── */
+.dc-exam .dcx-chip { cursor: grab; user-select: none; transition: border-color .12s, box-shadow .12s, background .12s; }
+.dc-exam .dcx-chip:hover { border-color: #a690f0; }
+.dc-exam .dcx-chip:active { cursor: grabbing; }
+.dc-exam .dcx-chip.picked { border-color: #7c5ce6; background: #f2eeff; box-shadow: 0 0 0 2px rgba(124, 92, 230, 0.28); }
+.dc-exam .dcx-gap-input.dcx-mbank-box.droppable { border-color: #a690f0; background: #faf8ff; }
+.dc-exam .dcx-gap-input.dcx-mbank-box.drop-over { border-style: solid; border-color: #7c5ce6; background: #efe9ff; box-shadow: 0 0 0 2px rgba(124, 92, 230, 0.28); }
+.dc-exam .dcx-drag-hint { font-size: 13px; color: #6a48d6; margin: 0 0 10px; font-weight: 600; }
+.dc-exam .dcx-summary-bank { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 16px; }
+.dc-exam .dcx-summary-bank li { padding: 8px 12px; font-size: 13.5px; }
+/* dark contrast (word-black / yellow-black) */
+.dc-exam.ct-wb .themed .dcx-chip.picked,
+.dc-exam.ct-yb .themed .dcx-chip.picked { background: #2c2740; box-shadow: 0 0 0 2px rgba(185, 168, 245, 0.5); }
+.dc-exam.ct-wb .themed .dcx-mbank-box.drop-over,
+.dc-exam.ct-yb .themed .dcx-mbank-box.drop-over { background: #2c2740; }
 
 /* ── Listening form-completion table ── */
 .dc-exam .dcx-lform {
