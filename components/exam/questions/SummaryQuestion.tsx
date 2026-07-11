@@ -29,11 +29,20 @@ export function SummaryQuestion({
   const [picked, setPicked] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
 
+  const allowReuse = /more than once/i.test(questions[0]?.instruction ?? '')
+  const used = new Set(questions.map((q) => answers[q.id]).filter((v): v is string => typeof v === 'string' && v !== ''))
+
   const paras = (template || '').split(/\n{2,}/).map((s) => s.trim()).filter(Boolean)
   const hasMarker = (s: string) => /\[\d+\]/.test(s)
 
-  const place = (qid: string, key: string) => {
-    onAnswer(qid, hasBank ? key.toUpperCase().slice(0, 2) : key)
+  // Bank mode: chuẩn hoá chữ + (nếu không cho lặp) TỰ CHUYỂN khỏi ô khác. Không bank: điền tự do.
+  const place = (qid: string, raw: string) => {
+    if (!hasBank) { onAnswer(qid, raw); setPicked(null); return }
+    const key = raw.toUpperCase().slice(0, 2)
+    if (key && !allowReuse) {
+      for (const other of questions) if (other.id !== qid && answers[other.id] === key) onAnswer(other.id, '')
+    }
+    onAnswer(qid, key)
     setPicked(null)
   }
 
@@ -52,7 +61,7 @@ export function SummaryQuestion({
               type="text"
               autoComplete="off"
               value={v}
-              onChange={(e) => onAnswer(q.id, hasBank ? e.target.value.toUpperCase().slice(0, 2) : e.target.value)}
+              onChange={(e) => place(q.id, e.target.value)}
               onClick={() => { if (picked) place(q.id, picked) }}
               onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setOverId(q.id) }}
               onDragLeave={() => setOverId((o) => (o === q.id ? null : o))}
@@ -79,30 +88,36 @@ export function SummaryQuestion({
         <>
           {picked && <p className="dcx-drag-hint">Đang chọn <b>{picked}</b> — bấm vào ô trống để đặt (hoặc bấm lại thẻ để bỏ).</p>}
           <ul className="dcx-mbank-list dcx-summary-bank">
-            {options!.map((o) => (
-              <li
-                key={o.key}
-                className={`dcx-chip${picked === o.key ? ' picked' : ''}`}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('text/plain', o.key)
-                  e.dataTransfer.effectAllowed = 'copy'
-                }}
-                role="button"
-                tabIndex={0}
-                aria-pressed={picked === o.key}
-                onClick={() => setPicked((p) => (p === o.key ? null : o.key))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setPicked((p) => (p === o.key ? null : o.key))
-                  }
-                }}
-              >
-                <b>{o.key}</b>
-                <span>{o.text || o.key}</span>
-              </li>
-            ))}
+            {options!.map((o) => {
+              const isUsed = !allowReuse && used.has(o.key)
+              return (
+                <li
+                  key={o.key}
+                  className={`dcx-chip${picked === o.key ? ' picked' : ''}${isUsed ? ' used' : ''}`}
+                  draggable={!isUsed}
+                  onDragStart={(e) => {
+                    if (isUsed) { e.preventDefault(); return }
+                    e.dataTransfer.setData('text/plain', o.key)
+                    e.dataTransfer.effectAllowed = 'copy'
+                  }}
+                  role="button"
+                  tabIndex={isUsed ? -1 : 0}
+                  aria-pressed={picked === o.key}
+                  aria-disabled={isUsed}
+                  onClick={() => { if (!isUsed) setPicked((p) => (p === o.key ? null : o.key)) }}
+                  onKeyDown={(e) => {
+                    if (isUsed) return
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setPicked((p) => (p === o.key ? null : o.key))
+                    }
+                  }}
+                >
+                  <b>{o.key}</b>
+                  <span>{o.text || o.key}</span>
+                </li>
+              )
+            })}
           </ul>
         </>
       )}
