@@ -89,7 +89,7 @@ function rangeLabel(qs: ExamQuestion[]): string {
 type RenderItem =
   | { kind: 'single'; q: ExamQuestion }
   | { kind: 'matrix'; qs: ExamQuestion[]; options: QOption[] }
-  | { kind: 'summary'; qs: ExamQuestion[]; template: string }
+  | { kind: 'summary'; qs: ExamQuestion[]; template: string; options?: QOption[] }
   | { kind: 'matchbank'; qs: ExamQuestion[]; options: QOption[] }
 const typeOf = (q: ExamQuestion): string => (q.type ?? '').toLowerCase().trim()
 const isMatchingInfo = (q: ExamQuestion): boolean => typeOf(q) === 'matching_information'
@@ -111,7 +111,9 @@ function buildRenderItems(qs: ExamQuestion[]): RenderItem[] {
         j++
       }
       const template = grp.reduce((best, g) => (markerCount(g.prompt) > markerCount(best) ? (g.prompt ?? '') : best), '')
-      items.push({ kind: 'summary', qs: grp, template })
+      // Word-bank (A–G) nếu có → SummaryQuestion render bank kéo-thả; không có → ô gõ chữ thường.
+      const options = grp.find((g) => Array.isArray(g.options) && g.options.length > 0)?.options
+      items.push({ kind: 'summary', qs: grp, template, options })
       i = j
       continue
     }
@@ -863,7 +865,7 @@ export function ExamRunner({
                         if (item.kind === 'summary')
                           return (
                             <div key={`summary-${item.qs[0].id}`}>
-                              <SummaryQuestion questions={item.qs} template={item.template} answers={answers} onAnswer={onAnswerChange} />
+                              <SummaryQuestion questions={item.qs} template={item.template} options={item.options} answers={answers} onAnswer={onAnswerChange} />
                             </div>
                           )
                         if (item.kind === 'matchbank')

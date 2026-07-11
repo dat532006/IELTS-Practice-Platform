@@ -62,7 +62,8 @@ const KEY_TYPE: Record<string, string> = {
   map: 'map_labelling',
 }
 // Loại câu cần bank options (hiện editor options). matching* dùng options làm bank ghép/cột.
-const NEEDS_OPTIONS = new Set(['mcq', 'mcq_multi', 'matching', 'matching_information', 'matching_features'])
+// summary: options = word-bank A–G (nếu có) → exam render bank kéo-thả; để trống = ô gõ chữ thường.
+const NEEDS_OPTIONS = new Set(['mcq', 'mcq_multi', 'matching', 'matching_information', 'matching_features', 'summary'])
 const NEEDS_IMAGE = new Set(['diagram', 'map'])
 // Loại "gộp hàng" (statement + bank dùng chung) → cho công cụ tạo nhanh nhiều hàng 1 lần (khỏi spam thủ công).
 const BULK_TYPES = new Set(['matching', 'matching_information', 'matching_features'])
@@ -982,7 +983,7 @@ export function AdminTestForm() {
 
       {/* Preview giao diện thi thật (fullscreen overlay) — ExamRunner preview mode, KHÔNG API/attempt */}
       {examPreview && (
-        <div className="dcx-exam-preview fixed inset-0 z-[100] overflow-auto bg-[#F4F1F8]">
+        <div className="dcx-exam-preview fixed inset-0 z-[100] bg-[#F4F1F8]">
           <button
             type="button"
             onClick={() => setExamPreview(null)}
