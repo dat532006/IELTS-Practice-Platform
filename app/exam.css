@@ -69,11 +69,13 @@
 }
 
 /* ─────────────────────────── App shell ─────────────────────────── */
+/* overflow:CLIP (không phải hidden): hidden vẫn cho trình duyệt cuộn shell bằng scroll-into-view
+   khi input sr-only nhận focus (cùng bài học với overlay preview bên dưới) — clip thì không. */
 .dc-exam .dcx-shell {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  overflow: hidden;
+  overflow: clip;
 }
 @media (max-width: 1023px) {
   .dc-exam .dcx-shell {
@@ -250,10 +252,15 @@
   flex: 1;
   min-height: 0;
 }
+/* position:relative BẮT BUỘC: radio/checkbox sr-only (position:absolute) phải neo containing block
+   vào CỘT cuộn. Không có nó, offsetParent = body → input vô hình nằm ở tọa độ TRANG (dưới fold)
+   → kéo dài document.scrollHeight (vùng trắng cuộn được dưới footer) và khi click label, focus
+   scroll-into-view kéo cả TRANG xuống vùng trắng đó (bug "chọn đáp án là văng xuống"). */
 .dc-exam .dcx-left,
 .dc-exam .dcx-right {
   overflow-y: auto;
   min-width: 0;
+  position: relative;
 }
 .dc-exam .dcx-left { flex: 1 1 50%; }
 .dc-exam .dcx-right {

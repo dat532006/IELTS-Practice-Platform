@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { AttemptDTO, ExamPayload, SubmitResult } from '@/types/exam'
@@ -150,6 +150,44 @@ function buildRenderItems(qs: ExamQuestion[]): RenderItem[] {
   }
   return items
 }
+
+// Passage render TÁCH RIÊNG + memo: React 19 set lại innerHTML của dangerouslySetInnerHTML mỗi khi
+//   object {__html} đổi identity (commitUpdate không so sánh chuỗi __html) — mà timer tick re-render
+//   mỗi giây ⇒ children passage bị thay mới liên tục ⇒ mọi Range của CSS Highlight API collapse
+//   ⇒ highlight vẽ xong biến mất ngay (bug "Highlight không hoạt động" trên passage rich HTML).
+//   memo + prop `passage` ổn định (từ payload) ⇒ subtree bail-out, DOM passage BẤT BIẾN giữa các
+//   render — điều kiện sống của anchor node-path (W8/W9) và của chính CSS Highlight ranges.
+const PassageArticle = memo(function PassageArticle({ passage }: { passage: Passage }) {
+  const raw = passage.content ?? ''
+  // Rich: HTML admin soạn WYSIWYG (đã sanitize server, cả lúc lưu lẫn lúc trả) → render trực tiếp,
+  //   giữ heading/căn lề/danh sách admin đặt. Highlight neo node-path+quote vẫn chạy trên text node.
+  if (RICH_RE.test(raw)) {
+    return (
+      <article style={{ marginBottom: 20 }}>
+        <div className="dcx-rich rtext" dangerouslySetInnerHTML={{ __html: raw }} />
+      </article>
+    )
+  }
+  // Legacy plain text: tiêu đề/phụ đề căn giữa + tách đoạn thụt đầu dòng như bản in (.dcx-para).
+  const paras = raw.split(/\n{2,}|\n/).map((s) => s.trim()).filter(Boolean)
+  return (
+    <article style={{ marginBottom: 20 }}>
+      {passage.title && <div className="dcx-passage-title">{passage.title}</div>}
+      {passage.subtitle && <div className="dcx-passage-sub">{passage.subtitle}</div>}
+      {paras.length > 0 ? (
+        paras.map((para, k) => (
+          <p key={k} className="rtext dcx-para" style={{ textAlign: 'justify' }}>
+            {para}
+          </p>
+        ))
+      ) : (
+        <p className="rtext" style={{ whiteSpace: 'pre-line', textAlign: 'justify' }}>
+          {raw}
+        </p>
+      )}
+    </article>
+  )
+})
 
 // Capture parity: instruction tự BOLD các cụm IN HOA (vd "ONE WORD ONLY", "NO MORE THAN TWO WORDS").
 function InstructionText({ text, className }: { text: string; className?: string }) {
@@ -763,37 +801,7 @@ export function ExamRunner({
                 {!active || active.passages.length === 0 ? (
                   <p className="rmuted">{sectionLabel} này không có đoạn văn.</p>
                 ) : (
-                  active.passages.map((p) => {
-                    const raw = p.content ?? ''
-                    // Rich: HTML admin soạn WYSIWYG (đã sanitize server, cả lúc lưu lẫn lúc trả) → render trực tiếp,
-                    //   giữ heading/căn lề/danh sách admin đặt. Highlight neo node-path+quote vẫn chạy trên text node.
-                    if (RICH_RE.test(raw)) {
-                      return (
-                        <article key={p.id} style={{ marginBottom: 20 }}>
-                          <div className="dcx-rich rtext" dangerouslySetInnerHTML={{ __html: raw }} />
-                        </article>
-                      )
-                    }
-                    // Legacy plain text: tiêu đề/phụ đề căn giữa + tách đoạn thụt đầu dòng như bản in (.dcx-para).
-                    const paras = raw.split(/\n{2,}|\n/).map((s) => s.trim()).filter(Boolean)
-                    return (
-                      <article key={p.id} style={{ marginBottom: 20 }}>
-                        {p.title && <div className="dcx-passage-title">{p.title}</div>}
-                        {p.subtitle && <div className="dcx-passage-sub">{p.subtitle}</div>}
-                        {paras.length > 0 ? (
-                          paras.map((para, k) => (
-                            <p key={k} className="rtext dcx-para" style={{ textAlign: 'justify' }}>
-                              {para}
-                            </p>
-                          ))
-                        ) : (
-                          <p className="rtext" style={{ whiteSpace: 'pre-line', textAlign: 'justify' }}>
-                            {raw}
-                          </p>
-                        )}
-                      </article>
-                    )
-                  })
+                  active.passages.map((p) => <PassageArticle key={p.id} passage={p} />)
                 )}
                 {noteMarkers.map((m) => (
                   <button
