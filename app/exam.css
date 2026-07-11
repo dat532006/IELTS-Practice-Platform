@@ -549,6 +549,9 @@
 .dc-exam .dcx-chip:hover { border-color: #a690f0; }
 .dc-exam .dcx-chip:active { cursor: grabbing; }
 .dc-exam .dcx-chip.picked { border-color: #7c5ce6; background: #f2eeff; box-shadow: 0 0 0 2px rgba(124, 92, 230, 0.28); }
+.dc-exam .dcx-chip.used { opacity: .4; cursor: default; background: #f4f2f8; }
+.dc-exam .dcx-chip.used b, .dc-exam .dcx-chip.used span { text-decoration: line-through; }
+.dc-exam .dcx-chip.used:hover { border-color: var(--border); }
 .dc-exam .dcx-gap-input.dcx-mbank-box.droppable { border-color: #a690f0; background: #faf8ff; }
 .dc-exam .dcx-gap-input.dcx-mbank-box.drop-over { border-style: solid; border-color: #7c5ce6; background: #efe9ff; box-shadow: 0 0 0 2px rgba(124, 92, 230, 0.28); }
 .dc-exam .dcx-drag-hint { font-size: 13px; color: #6a48d6; margin: 0 0 10px; font-weight: 600; }
