@@ -196,7 +196,9 @@ function AutoGrowTextarea(props: {
   )
 }
 
-export function AdminTestForm() {
+// `testId` (2026-07-12): edit mode — tự fetch /api/admin/tests/[id]/preview (kênh admin riêng, có
+//   answer_keys) → đổ vào form qua applyDraft (cùng mapping với import JSON); Lưu = PATCH theo id.
+export function AdminTestForm({ testId }: { testId?: string } = {}) {
   const [title, setTitle] = useState('')
   const [type, setType] = useState<TestType>('reading')
   const [slug, setSlug] = useState('')
@@ -221,6 +223,37 @@ export function AdminTestForm() {
   // Preview GIAO DIỆN THI thật (2026-07-08): dựng ExamPayload local từ state → ExamRunner preview mode.
   //   KHÔNG gửi answer_keys vào payload (đúng luật thép #2 — payload thi không bao giờ mang đáp án).
   const [examPreview, setExamPreview] = useState<{ payload: ExamPayload; durationSec: number } | null>(null)
+  // Edit mode (2026-07-12): trạng thái nạp đề cũ vào form.
+  const [editLoading, setEditLoading] = useState(Boolean(testId))
+  const [editLoadErr, setEditLoadErr] = useState('')
+
+  // Edit boot: nạp đề cũ từ admin preview (kênh riêng có answer_keys) → applyDraft; set `created`
+  //   để panel Publish/Preview/Media dùng được ngay (đề đã tồn tại, status thật từ server).
+  useEffect(() => {
+    if (!testId) return
+    let alive = true
+    ;(async () => {
+      try {
+        const r = await fetch(`/api/admin/tests/${testId}/preview`)
+        const j = await r.json().catch(() => null)
+        if (!alive) return
+        if (r.ok && j?.data?.test) {
+          const t = j.data.test as Record<string, unknown>
+          applyDraft({ ...t, answer_keys: j.data.answer_keys ?? undefined })
+          setCreated({ test_id: testId, status: String(t.status ?? 'draft') })
+        } else if (r.status === 403) setEditLoadErr('Bạn không có quyền admin.')
+        else if (r.status === 404) setEditLoadErr('Không tìm thấy đề.')
+        else setEditLoadErr('Không tải được đề.')
+      } catch {
+        if (alive) setEditLoadErr('Lỗi kết nối.')
+      } finally {
+        if (alive) setEditLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [testId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function openExamPreview() {
     const payload: ExamPayload = {
@@ -307,7 +340,17 @@ export function AdminTestForm() {
       setImportMsg({ tone: 'err', text: 'File phải là một object đề (test.draft.json).' })
       return
     }
-    const data = parsed as Record<string, unknown>
+    const res = applyDraft(parsed as Record<string, unknown>)
+    const bits = [`nạp ${res.passages} passage · ${res.questions} câu`]
+    if (res.noAnswers) bits.push(`${res.noAnswers} câu CHƯA có đáp án (gõ tay ở ô 🔒)`)
+    setImportMsg({ tone: 'ok', text: `✓ Đã ${bits.join(' · ')}. Rà lại type + đáp án rồi Lưu.` })
+    setShowImport(false)
+    setShowPreview(true)
+  }
+
+  // Mapping chung cho import JSON + edit mode (2026-07-12): đổ object đề (kèm answer_keys nếu có)
+  //   vào state form. Reverse answer_keys → ô đáp án/điểm/giải thích từng câu; chuẩn hoá type.
+  function applyDraft(data: Record<string, unknown>): { passages: number; questions: number; noAnswers: number } {
     const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
     if (str(data.title)) setTitle(str(data.title))
@@ -362,11 +405,7 @@ export function AdminTestForm() {
     if (mappedQ.length) setQuestions(mappedQ)
 
     const noAns = mappedQ.filter((q) => !q.answers.trim()).length
-    const bits = [`nạp ${mappedP.length} passage · ${mappedQ.length} câu`]
-    if (noAns) bits.push(`${noAns} câu CHƯA có đáp án (gõ tay ở ô 🔒)`)
-    setImportMsg({ tone: 'ok', text: `✓ Đã ${bits.join(' · ')}. Rà lại type + đáp án rồi Lưu.` })
-    setShowImport(false)
-    setShowPreview(true)
+    return { passages: mappedP.length, questions: mappedQ.length, noAnswers: noAns }
   }
 
   function onImportFile(e: ChangeEvent<HTMLInputElement>) {
@@ -406,15 +445,16 @@ export function AdminTestForm() {
     setPhase('submitting')
     setError('')
     try {
+      // Edit mode: PATCH theo id (upsert nội dung + answer_keys); tạo mới: POST như cũ.
       const r = await fetch('/api/admin/tests', {
-        method: 'POST',
+        method: testId ? 'PATCH' : 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(buildPayload()),
+        body: JSON.stringify(testId ? { ...buildPayload(), id: testId } : buildPayload()),
       })
       const j = await r.json().catch(() => null)
-      if (r.status === 201 && j?.data?.test_id) setCreated({ test_id: j.data.test_id, status: j.data.status })
+      if ((testId ? r.ok : r.status === 201) && j?.data?.test_id) setCreated({ test_id: j.data.test_id, status: j.data.status })
       else if (r.status === 403) setError('Bạn không có quyền admin.')
-      else setError((j?.message as string) || 'Không tạo được đề. Kiểm tra dữ liệu.')
+      else setError((j?.message as string) || 'Không lưu được đề. Kiểm tra dữ liệu.')
     } catch {
       setError('Lỗi kết nối.')
     } finally {
@@ -467,15 +507,31 @@ export function AdminTestForm() {
     }
   }
 
+  // Edit mode: chờ nạp xong đề cũ (tránh flash form trống); lỗi nạp → báo + đường về danh sách.
+  if (editLoading || editLoadErr) {
+    return (
+      <div className="rounded-[20px] border border-[#E7E4EE] bg-white p-8 text-[#2A2740] shadow-[0_30px_60px_-38px_rgba(60,40,90,0.4)]">
+        <Link href="/admin/tests" className="text-sm font-semibold text-[#6A48D6] underline">
+          ← Danh sách đề
+        </Link>
+        {editLoadErr ? (
+          <p className="mt-5 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{editLoadErr}</p>
+        ) : (
+          <p className="mt-5 text-center text-sm text-[#A8A2BA]">Đang tải đề…</p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-[20px] border border-[#E7E4EE] bg-white p-6 text-[#2A2740] shadow-[0_30px_60px_-38px_rgba(60,40,90,0.4)] sm:p-8">
       <div className="flex flex-wrap items-end justify-between gap-3.5">
         <div>
           <div className="flex items-center gap-3">
-            <Link href="/admin" className="text-sm font-semibold text-[#6A48D6] underline">
-              ← Dashboard
+            <Link href={testId ? '/admin/tests' : '/admin'} className="text-sm font-semibold text-[#6A48D6] underline">
+              {testId ? '← Danh sách đề' : '← Dashboard'}
             </Link>
-            <h1 className="text-[21px] font-extrabold tracking-[-0.02em]">Tạo đề mới</h1>
+            <h1 className="text-[21px] font-extrabold tracking-[-0.02em]">{testId ? 'Sửa đề' : 'Tạo đề mới'}</h1>
           </div>
           <p className="mt-1 text-[13.5px] font-semibold text-[#857F96]">Đáp án tách sang answer_keys — không bao giờ gửi về client.</p>
         </div>
@@ -938,8 +994,8 @@ export function AdminTestForm() {
 
       {error && <p aria-live="assertive" className="mt-4 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
 
-      {/* footer actions */}
-      {!created ? (
+      {/* footer actions — edit mode giữ nút Lưu (PATCH) song song panel publish/media */}
+      {(!created || testId) && (
         <div className="mt-5 flex flex-wrap items-center gap-2.5">
           <button
             type="button"
@@ -947,10 +1003,11 @@ export function AdminTestForm() {
             disabled={phase === 'submitting' || !title}
             className="ml-auto rounded-[11px] bg-[#7C5CE6] px-6 py-3 text-[14.5px] font-bold text-white shadow-[0_12px_24px_-10px_rgba(124,92,230,0.45)] transition hover:bg-[#6A48D6] disabled:cursor-not-allowed disabled:bg-[#D8D2E4]"
           >
-            {phase === 'submitting' ? 'Đang lưu…' : 'Lưu đề (draft) →'}
+            {phase === 'submitting' ? 'Đang lưu…' : testId ? 'Lưu thay đổi →' : 'Lưu đề (draft) →'}
           </button>
         </div>
-      ) : (
+      )}
+      {created && (
         <div className="mt-5 rounded-[13px] border border-[#D9CFFF] bg-[#FBFAFF] p-4">
           <p className="text-sm font-semibold text-[#5B43C7]">
             ✓ Đã lưu đề <code className="font-mono">{created.test_id.slice(0, 8)}…</code> — trạng thái: <b>{created.status}</b>

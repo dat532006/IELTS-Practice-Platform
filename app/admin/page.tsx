@@ -1,29 +1,51 @@
 import Link from 'next/link'
+import { requireAdmin } from '@/lib/auth/guards'
+import { createAdminClient } from '@/lib/supabase/admin'
 
-// W12 — Admin dashboard (M11). Layout đã server-gate requireAdmin. Static (markup-only) theo design frame 3.
-// Số liệu thống kê chưa có endpoint riêng → để placeholder "—" (không bịa số, không thêm data flow).
-const stats = [
-  { label: 'Đề đã publish' },
-  { label: 'Đề nháp' },
-  { label: 'Sản phẩm' },
-]
+// W12 — Admin dashboard (M11). Layout đã server-gate requireAdmin; page tự guard lại (defense-in-depth)
+// TRƯỚC khi gọi RPC service_role. Stats thật từ admin_dashboard_stats (2026-07-12) — lỗi → hiện "—",
+// KHÔNG bịa số.
+type Stats = {
+  tests_published?: number
+  tests_draft?: number
+  products_published?: number
+  users?: number
+  attempts_submitted?: number
+  topup_coins_success?: number
+}
+
+async function loadStats(): Promise<Stats | null> {
+  const g = await requireAdmin()
+  if (!g.ok) return null
+  const { data, error } = await createAdminClient().rpc('admin_dashboard_stats')
+  if (error || !data) return null
+  return data as Stats
+}
 
 const actions = [
   {
-    href: '/admin/tests/new',
-    title: 'Tạo đề mới',
-    desc: 'Passage + câu hỏi + đáp án (tách) → lưu draft → preview → publish.',
-    cta: 'Bắt đầu →',
+    href: '/admin/tests',
+    title: 'Đề thi',
+    desc: 'Danh sách đề: sửa nội dung, đổi miễn phí/tính phí, publish, ẩn/xóa.',
+    cta: 'Quản lý →',
     iconBg: '#F0ECFF',
     iconDot: '#7C5CE6',
   },
   {
     href: '/admin/products',
     title: 'Sản phẩm / Bundle',
-    desc: 'Tạo product/bundle → gắn đề + đặt giá → publish ra catalog.',
+    desc: 'Tạo product/bundle → gắn/gỡ đề + đặt giá → publish ra catalog.',
     cta: 'Quản lý →',
     iconBg: '#FFEDE6',
     iconDot: '#F2724E',
+  },
+  {
+    href: '/admin/users',
+    title: 'Người dùng',
+    desc: 'Tài khoản đã đăng ký: gói sở hữu, giao dịch, lịch sử làm bài, ví, khóa.',
+    cta: 'Xem →',
+    iconBg: '#E4F3FF',
+    iconDot: '#1F6FB2',
   },
   {
     href: '/admin/activation-codes',
@@ -41,9 +63,28 @@ const actions = [
     iconBg: '#E7F7EE',
     iconDot: '#1E9E63',
   },
+  {
+    href: '/admin/tests/new',
+    title: 'Tạo đề mới',
+    desc: 'Passage + câu hỏi + đáp án (tách) → lưu draft → preview → publish.',
+    cta: 'Bắt đầu →',
+    iconBg: '#F0ECFF',
+    iconDot: '#7C5CE6',
+  },
 ]
 
-export default function AdminDashboard() {
+export default async function AdminDashboard() {
+  const s = await loadStats()
+  const n = (v: number | undefined) => (typeof v === 'number' ? v.toLocaleString('vi-VN') : '—')
+  const stats = [
+    { label: 'Đề đã publish', value: n(s?.tests_published) },
+    { label: 'Đề nháp', value: n(s?.tests_draft) },
+    { label: 'Sản phẩm', value: n(s?.products_published) },
+    { label: 'Người dùng', value: n(s?.users) },
+    { label: 'Lượt nộp bài', value: n(s?.attempts_submitted) },
+    { label: 'Xương cá đã nạp', value: n(s?.topup_coins_success) },
+  ]
+
   return (
     <div className="text-[#2A2740]">
       <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Bảng điều khiển</h1>
@@ -52,11 +93,11 @@ export default function AdminDashboard() {
       </p>
 
       {/* Stats */}
-      <div className="mt-5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-        {stats.map((s) => (
-          <div key={s.label} className="rounded-[15px] border border-[#EBE8F1] bg-white px-5 py-[18px]">
-            <div className="text-[12px] font-bold uppercase tracking-[0.04em] text-[#9088A2]">{s.label}</div>
-            <div className="mt-2 text-[30px] font-extrabold tracking-[-0.02em] text-[#2A2740]">—</div>
+      <div className="mt-5 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
+        {stats.map((st) => (
+          <div key={st.label} className="rounded-[15px] border border-[#EBE8F1] bg-white px-5 py-[18px]">
+            <div className="text-[12px] font-bold uppercase tracking-[0.04em] text-[#9088A2]">{st.label}</div>
+            <div className="mt-2 text-[26px] font-extrabold tracking-[-0.02em] text-[#2A2740]">{st.value}</div>
           </div>
         ))}
       </div>

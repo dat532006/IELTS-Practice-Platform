@@ -54,6 +54,10 @@ export function AdminProductDetail({ productId }: { productId: string }) {
   const [bindTestId, setBindTestId] = useState('')
   const [bindPos, setBindPos] = useState('0')
   const [bindErr, setBindErr] = useState('')
+  const [bindMsg, setBindMsg] = useState('')
+  // Picker: danh sách đề (metadata) để chọn thay vì dán UUID tay (2026-07-12).
+  const [pickList, setPickList] = useState<{ id: string; title: string | null; slug: string | null; type: string | null; status: string }[]>([])
+  const [confirmUnbind, setConfirmUnbind] = useState<string | null>(null)
 
   function hydrate(p: ProductMeta) {
     setTitle(p.title ?? '')
@@ -87,6 +91,16 @@ export function AdminProductDetail({ productId }: { productId: string }) {
   }
   useEffect(() => {
     load()
+    // Nạp danh sách đề cho picker (metadata-only, tối đa 200 — đủ cho catalog hiện tại).
+    ;(async () => {
+      try {
+        const r = await fetch('/api/admin/tests?per_page=200')
+        const j = await r.json().catch(() => null)
+        if (r.ok && Array.isArray(j?.data?.items)) setPickList(j.data.items)
+      } catch {
+        /* picker lỗi → vẫn còn ô dán UUID */
+      }
+    })()
   }, [productId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveMeta() {
@@ -139,6 +153,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
   async function addTest() {
     setBusy('bind')
     setBindErr('')
+    setBindMsg('')
     const pos = Number(bindPos) || 0
     try {
       const res = await bindTest(bindTestId.trim(), pos)
@@ -148,6 +163,31 @@ export function AdminProductDetail({ productId }: { productId: string }) {
         await load()
       } else if (res.status === 403) setBindErr('Bạn không có quyền admin.')
       else setBindErr(res.message || 'Không gắn được đề (kiểm tra test_id).')
+    } catch {
+      setBindErr('Lỗi kết nối.')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  // Gỡ đề khỏi mục lục VOL. Owner quyết 2026-07-12: KHÔNG thu hồi quyền người đã mua trước đó.
+  async function removeTest(testId: string) {
+    setBusy('unbind')
+    setBindErr('')
+    setBindMsg('')
+    setConfirmUnbind(null)
+    try {
+      const r = await fetch(`/api/admin/products/${productId}/tests`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ test_id: testId }),
+      })
+      const j = await r.json().catch(() => null)
+      if (r.ok) {
+        setBindMsg('✓ Đã gỡ đề khỏi mục lục. Người đã mua VOL trước đó vẫn giữ quyền làm đề này.')
+        await load()
+      } else if (r.status === 403) setBindErr('Bạn không có quyền admin.')
+      else setBindErr((j?.message as string) || 'Không gỡ được đề.')
     } catch {
       setBindErr('Lỗi kết nối.')
     } finally {
@@ -267,10 +307,25 @@ export function AdminProductDetail({ productId }: { productId: string }) {
               </div>
             </div>
 
-            {/* bind form */}
+            {/* bind form — picker chọn đề (2026-07-12) + fallback dán UUID */}
             <div className="rounded-[11px] border border-[#ECE9F2] bg-[#FBFAFE] p-3">
-              <label className={labelCls}>
-                Gắn đề (test_id)
+              {pickList.length > 0 && (
+                <label className={labelCls}>
+                  Chọn đề để gắn
+                  <select className={inputCls} value={bindTestId} onChange={(e) => setBindTestId(e.target.value)}>
+                    <option value="">— Chọn đề —</option>
+                    {pickList
+                      .filter((t) => !tests.some((b) => b.test_id === t.id))
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {(t.title || t.slug || t.id.slice(0, 8)) + ` · ${t.type ?? '—'} · ${t.status}`}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
+              <label className={`${labelCls} mt-2 block`}>
+                {pickList.length > 0 ? 'Hoặc dán test_id (UUID)' : 'Gắn đề (test_id)'}
                 <input className={`${inputCls} font-mono`} value={bindTestId} onChange={(e) => setBindTestId(e.target.value)} placeholder="UUID của đề" />
               </label>
               <div className="mt-2 flex items-end gap-2">
@@ -291,6 +346,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
             </div>
 
             {bindErr && <p aria-live="assertive" className="mt-3 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{bindErr}</p>}
+            {bindMsg && <p aria-live="polite" className="mt-3 rounded-[10px] border border-[#D9CFFF] bg-[#FBFAFF] px-3 py-2 text-[13px] font-semibold text-[#5B43C7]">{bindMsg}</p>}
 
             {sorted.length === 0 ? (
               <p className="mt-3 py-4 text-center text-sm text-[#A8A2BA]">Chưa có đề nào trong bundle.</p>
@@ -310,7 +366,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
                         {t.type ?? '—'} · <span className="font-mono">{t.test_id.slice(0, 8)}…</span>
                       </div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => move(i, -1)}
@@ -329,6 +385,27 @@ export function AdminProductDetail({ productId }: { productId: string }) {
                       >
                         ↓
                       </button>
+                      {confirmUnbind === t.test_id ? (
+                        <span className="ml-1 flex items-center gap-1 text-[11.5px] font-bold">
+                          Gỡ?
+                          <button type="button" onClick={() => removeTest(t.test_id)} disabled={busy === 'unbind'} className="text-[#C0392B] underline">
+                            Có
+                          </button>
+                          <button type="button" onClick={() => setConfirmUnbind(null)} className="underline">
+                            Không
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmUnbind(t.test_id)}
+                          disabled={busy === 'unbind'}
+                          title="Gỡ đề khỏi mục lục VOL — người đã mua trước đó vẫn giữ quyền"
+                          className="ml-1 rounded-[8px] border border-[#F3D2D2] bg-[#FDF6F6] px-2 py-1 text-xs font-bold text-[#C0392B] hover:bg-[#FBECEC] disabled:opacity-40"
+                        >
+                          Gỡ
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
