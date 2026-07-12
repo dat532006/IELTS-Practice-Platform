@@ -1,7 +1,7 @@
 import type { SkillKey } from '@/components/brand/skill'
 
 // Contract dữ liệu trang Tài khoản (server → client). Chỉ metadata own-only (RLS lọc phía server).
-export type TxnType = 'topup' | 'spend' | 'refund' | 'bonus'
+export type TxnType = 'topup' | 'spend' | 'refund' | 'bonus' | 'adjust'
 export type TxnStatus = 'pending' | 'success' | 'failed' | 'expired'
 
 export type AccountProfile = {

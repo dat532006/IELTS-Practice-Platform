@@ -23,6 +23,7 @@ const TYPE_LABEL: Record<TxnType, string> = {
   spend: 'Mở khóa gói đề',
   refund: 'Hoàn xương cá',
   bonus: 'Thưởng xương cá',
+  adjust: 'Điều chỉnh (trừ)', // admin trừ thủ công — amount dương, chiều trừ (khớp RPC admin_adjust_coins)
 }
 const STATUS_NOTE: Record<string, string> = { pending: 'đang xử lý', failed: 'thất bại', expired: 'hết hạn' }
 
@@ -109,7 +110,7 @@ export function WalletPanel({ coins, transactions }: { coins: number; transactio
       ) : (
         <div className="mt-3 overflow-hidden rounded-[14px] border border-[#F1EDF7]">
           {transactions.map((t, i) => {
-            const credit = t.type !== 'spend'
+            const credit = t.type !== 'spend' && t.type !== 'adjust' // adjust = admin trừ → chiều âm
             const dim = t.status !== 'success'
             const note = STATUS_NOTE[t.status]
             const sub = [t.type === 'topup' && t.provider ? PROVIDER_LABEL[t.provider] ?? t.provider : null, fmtDate(t.createdAt)]

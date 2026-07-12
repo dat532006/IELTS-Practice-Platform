@@ -7,7 +7,8 @@ import { requireAdmin } from '@/lib/auth/guards'
 const navItems = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/products', label: 'Sản phẩm' },
-  { href: '/admin/tests/new', label: 'Đề thi' },
+  { href: '/admin/tests', label: 'Đề thi' },
+  { href: '/admin/users', label: 'Người dùng' },
   { href: '/admin/activation-codes', label: 'Mã kích hoạt' },
   { href: '/admin/grants', label: 'Cấp quyền' },
 ]

@@ -1,14 +1,33 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminApi } from '@/lib/admin/guard'
-import { createTest, updateTest, type AdminTestOutcome } from '@/lib/admin/tests'
+import { createTest, updateTest, listTests, type AdminTestOutcome } from '@/lib/admin/tests'
 import { ok, fail } from '@/lib/api/response'
 
-// POST/PATCH /api/admin/tests — Admin test CRUD + answer-key split (M11, W12).
+// GET/POST/PATCH /api/admin/tests — Admin test CRUD + answer-key split (M11, W12; GET list 2026-07-12).
 // LUẬT THÉP: requireAdmin server-side TRƯỚC mọi mutation; đáp án → answer_keys (KHÔNG vào tests.questions/response).
 function mapFail(res: Extract<AdminTestOutcome, { ok: false }>) {
   if (res.code === 'VALIDATION_ERROR') return fail('VALIDATION_ERROR', res.detail ?? 'Dữ liệu đề không hợp lệ', { status: 400 })
   if (res.code === 'NOT_FOUND') return fail('NOT_FOUND', 'Không tìm thấy đề', { status: 404 })
   return fail('INTERNAL', 'Không lưu được đề', { status: 500 })
+}
+
+// GET — danh sách đề cho admin: metadata-only (KHÔNG passages/questions/answer_keys) + VOL chứa đề.
+export async function GET(request: Request) {
+  const g = await requireAdminApi()
+  if (!g.ok) return g.res
+  const sp = new URL(request.url).searchParams
+  try {
+    const res = await listTests(createAdminClient(), {
+      q: sp.get('q') ?? undefined,
+      status: sp.get('status') ?? undefined,
+      type: sp.get('type') ?? undefined,
+      page: Number(sp.get('page')) || undefined,
+      perPage: Number(sp.get('per_page')) || undefined,
+    })
+    return ok(res)
+  } catch {
+    return fail('INTERNAL', 'Không tải được danh sách đề', { status: 500 })
+  }
 }
 
 export async function POST(request: Request) {

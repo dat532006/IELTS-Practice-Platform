@@ -107,6 +107,115 @@ export async function updateTest(admin: SupabaseClient, raw: unknown): Promise<A
   return { ok: true, test_id: data.id as string, status: data.status as string }
 }
 
+// Danh sách đề cho admin (metadata-only — KHÔNG passages/questions/answer_keys) + VOL chứa đề.
+//   Filter: q (ilike title/slug), status, type; phân trang. Chỉ gọi sau requireAdmin.
+export type AdminTestListItem = {
+  id: string
+  slug: string | null
+  title: string | null
+  type: string | null
+  is_free: boolean
+  status: string
+  duration_sec: number | null
+  created_at: string
+  products: { id: string; title: string | null; slug: string | null }[]
+}
+export async function listTests(
+  admin: SupabaseClient,
+  opts: { q?: string; status?: string; type?: string; page?: number; perPage?: number },
+): Promise<{ items: AdminTestListItem[]; total: number; page: number; per_page: number }> {
+  const page = Math.max(1, opts.page ?? 1)
+  const perPage = Math.min(200, Math.max(1, opts.perPage ?? 50))
+  let query = admin
+    .from('tests')
+    .select('id, slug, title, type, is_free, status, duration_sec, created_at', { count: 'exact' })
+  if (opts.status) query = query.eq('status', opts.status)
+  if (opts.type) query = query.eq('type', opts.type)
+  if (opts.q) {
+    const safe = opts.q.replace(/[%_,()]/g, ' ').trim()
+    if (safe) query = query.or(`title.ilike.%${safe}%,slug.ilike.%${safe}%`)
+  }
+  const { data, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range((page - 1) * perPage, page * perPage - 1)
+  if (error) throw new Error(error.message)
+
+  const rows = (data ?? []) as Omit<AdminTestListItem, 'products'>[]
+  const ids = rows.map((r) => r.id)
+  const byTest = new Map<string, AdminTestListItem['products']>()
+  if (ids.length > 0) {
+    const { data: ct } = await admin
+      .from('collection_tests')
+      .select('test_id, products(id, title, slug)')
+      .in('test_id', ids)
+    for (const row of (ct ?? []) as unknown as { test_id: string; products: { id: string; title: string | null; slug: string | null } | null }[]) {
+      if (!row.products) continue
+      const list = byTest.get(row.test_id) ?? []
+      list.push(row.products)
+      byTest.set(row.test_id, list)
+    }
+  }
+  return {
+    items: rows.map((r) => ({ ...r, products: byTest.get(r.id) ?? [] })),
+    total: count ?? rows.length,
+    page,
+    per_page: perPage,
+  }
+}
+
+// Meta-only update (toggle nhanh từ danh sách) — KHÔNG đụng passages/questions/answer_keys.
+export async function setTestMeta(
+  admin: SupabaseClient,
+  testId: string,
+  patch: { is_free?: boolean },
+): Promise<AdminTestOutcome> {
+  if (patch.is_free === undefined) return { ok: false, code: 'VALIDATION_ERROR', detail: 'Không có field nào để cập nhật' }
+  const { data, error } = await admin
+    .from('tests')
+    .update({ is_free: patch.is_free })
+    .eq('id', testId)
+    .select('id, status')
+    .maybeSingle()
+  if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
+  if (!data) return { ok: false, code: 'NOT_FOUND' }
+  return { ok: true, test_id: data.id as string, status: data.status as string }
+}
+
+// Xóa đề 2 TẦNG (Owner quyết 2026-07-12):
+//   - draft + CHƯA có attempt nào → hard delete (dọn dependents: answer_keys/collection_tests/
+//     test_unlocks/bookmarks — attempts chắc chắn 0 do điều kiện tầng).
+//   - còn lại (published/hidden hoặc đã có người làm) → status='hidden' (soft-hide): biến mất khỏi
+//     catalog nhưng attempt/result của học viên cũ GIỮ NGUYÊN. Khôi phục = publish lại.
+export type DeleteTestOutcome =
+  | { ok: true; action: 'deleted' | 'hidden' }
+  | { ok: false; code: 'NOT_FOUND' | 'INTERNAL'; detail?: string }
+export async function deleteTestTwoTier(admin: SupabaseClient, testId: string): Promise<DeleteTestOutcome> {
+  const { data: t, error: tErr } = await admin.from('tests').select('id, status').eq('id', testId).maybeSingle()
+  if (tErr) return { ok: false, code: 'INTERNAL', detail: tErr.message }
+  if (!t) return { ok: false, code: 'NOT_FOUND' }
+
+  const { count, error: cErr } = await admin
+    .from('attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('test_id', testId)
+  if (cErr) return { ok: false, code: 'INTERNAL', detail: cErr.message }
+
+  const attempts = count ?? 0
+  if ((t as { status: string }).status === 'draft' && attempts === 0) {
+    for (const table of ['answer_keys', 'collection_tests', 'test_unlocks', 'bookmarks'] as const) {
+      const { error } = await admin.from(table).delete().eq('test_id', testId)
+      if (error) return { ok: false, code: 'INTERNAL', detail: `${table}: ${error.message}` }
+    }
+    const { error } = await admin.from('tests').delete().eq('id', testId)
+    if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
+    return { ok: true, action: 'deleted' }
+  }
+
+  const { error } = await admin.from('tests').update({ status: 'hidden' }).eq('id', testId)
+  if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
+  return { ok: true, action: 'hidden' }
+}
+
 // Preview admin-only: full test + answer_keys (kênh riêng, KHÔNG phải /api/exam). Chỉ gọi sau requireAdmin.
 export async function getTestPreview(admin: SupabaseClient, testId: string) {
   const { data: test } = await admin
