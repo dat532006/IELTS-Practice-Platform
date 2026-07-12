@@ -92,19 +92,33 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
         className="relative mt-4 overflow-hidden rounded-[24px] border border-[#EEEAF3] shadow-[0_30px_60px_-38px_rgba(60,40,90,0.42)]"
         style={{ background: 'radial-gradient(120% 70% at 96% -8%, #FBE6DC 0%, rgba(251,230,220,0) 46%), #FFFFFF' }}
       >
-        {/* Cover band theo kỹ năng (không có ảnh riêng của đề → fallback trang trí + watermark) */}
+        {/* Cover band theo kỹ năng: ảnh minh họa riêng của đề nếu có, else fallback trang trí + watermark */}
         <div className="relative h-[174px] overflow-hidden" style={{ background: soft }}>
-          <span className="pointer-events-none absolute -right-6 -top-10 h-[150px] w-[150px] rounded-full bg-white/25" />
-          <span
-            className="pointer-events-none absolute -bottom-3 right-6 select-none text-[104px] font-extrabold leading-none"
-            style={{ color: accent, opacity: 0.16 }}
-          >
-            {coverMono(meta.title)}
-          </span>
-          <span
-            className="pointer-events-none absolute inset-0"
-            style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 44%)' }}
-          />
+          {meta.cover_image ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={meta.cover_image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              {/* Phủ nhẹ đỉnh để chip/pill nổi rõ trên mọi ảnh */}
+              <span
+                className="pointer-events-none absolute inset-0"
+                style={{ background: 'linear-gradient(180deg, rgba(20,12,35,0.30) 0%, rgba(20,12,35,0) 46%)' }}
+              />
+            </>
+          ) : (
+            <>
+              <span className="pointer-events-none absolute -right-6 -top-10 h-[150px] w-[150px] rounded-full bg-white/25" />
+              <span
+                className="pointer-events-none absolute -bottom-3 right-6 select-none text-[104px] font-extrabold leading-none"
+                style={{ color: accent, opacity: 0.16 }}
+              >
+                {coverMono(meta.title)}
+              </span>
+              <span
+                className="pointer-events-none absolute inset-0"
+                style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 44%)' }}
+              />
+            </>
+          )}
           <div className="absolute left-[18px] top-4 flex items-center gap-[11px]">
             <span
               className="flex h-11 w-11 flex-none items-center justify-center rounded-[13px] text-white"

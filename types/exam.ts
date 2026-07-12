@@ -22,6 +22,7 @@ export type TestMeta = {
   difficulty: number | null
   source: string | null
   question_types: string[]
+  cover_image: string | null // URL ảnh minh họa (PUBLIC metadata); null → cover fallback trang trí
   locked: boolean
   // FE-F01: product published chứa test (mục lục RLS published-only) — CTA mua ở pre-exam khi locked.
   //   null khi test chưa thuộc bundle nào (CTA fallback /products). Vẫn chỉ metadata public.

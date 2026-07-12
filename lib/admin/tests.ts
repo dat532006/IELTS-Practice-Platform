@@ -163,16 +163,20 @@ export async function listTests(
   }
 }
 
-// Meta-only update (toggle nhanh từ danh sách) — KHÔNG đụng passages/questions/answer_keys.
+// Meta-only update (toggle nhanh từ danh sách + ảnh minh họa) — KHÔNG đụng passages/questions/answer_keys.
+//   cover_image: string = set URL ảnh; null = gỡ ảnh; undefined = không đụng.
 export async function setTestMeta(
   admin: SupabaseClient,
   testId: string,
-  patch: { is_free?: boolean },
+  patch: { is_free?: boolean; cover_image?: string | null },
 ): Promise<AdminTestOutcome> {
-  if (patch.is_free === undefined) return { ok: false, code: 'VALIDATION_ERROR', detail: 'Không có field nào để cập nhật' }
+  const update: { is_free?: boolean; cover_image?: string | null } = {}
+  if (patch.is_free !== undefined) update.is_free = patch.is_free
+  if (patch.cover_image !== undefined) update.cover_image = patch.cover_image
+  if (Object.keys(update).length === 0) return { ok: false, code: 'VALIDATION_ERROR', detail: 'Không có field nào để cập nhật' }
   const { data, error } = await admin
     .from('tests')
-    .update({ is_free: patch.is_free })
+    .update(update)
     .eq('id', testId)
     .select('id, status')
     .maybeSingle()
@@ -220,7 +224,7 @@ export async function deleteTestTwoTier(admin: SupabaseClient, testId: string): 
 export async function getTestPreview(admin: SupabaseClient, testId: string) {
   const { data: test } = await admin
     .from('tests')
-    .select('id, slug, title, type, source, is_free, difficulty, duration_sec, question_types, passages, questions, status, audio_key, created_at')
+    .select('id, slug, title, type, source, is_free, difficulty, duration_sec, question_types, passages, questions, status, audio_key, cover_image, created_at')
     .eq('id', testId)
     .maybeSingle()
   if (!test) return { ok: false as const, code: 'NOT_FOUND' as const }

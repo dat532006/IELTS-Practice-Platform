@@ -19,6 +19,7 @@ type TestMetaRow = {
   difficulty: number | null
   source: string | null
   question_types: string[] | null
+  cover_image: string | null
 }
 
 export async function getTestMeta(
@@ -29,7 +30,7 @@ export async function getTestMeta(
   if (!isUuid(id)) return null // id sai định dạng → "không tìm thấy" (tránh Postgres 22P02 → 500)
   const { data, error } = await supabase
     .from('tests')
-    .select('id, title, type, is_free, duration_sec, difficulty, source, question_types')
+    .select('id, title, type, is_free, duration_sec, difficulty, source, question_types, cover_image')
     .eq('id', id)
     .maybeSingle()
   if (error) throw new Error(error.message)
@@ -59,6 +60,7 @@ export async function getTestMeta(
     difficulty: t.difficulty,
     source: t.source,
     question_types: t.question_types ?? [],
+    cover_image: t.cover_image,
     locked: !unlocked,
     product,
   }
