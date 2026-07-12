@@ -9,14 +9,16 @@ import { safeNextPath } from '@/lib/utils'
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string | string[] }>
+  searchParams: Promise<{ next?: string | string[]; reason?: string | string[] }>
 }) {
   const sp = await searchParams
   const raw = Array.isArray(sp.next) ? sp.next[0] : sp.next
+  const reason = Array.isArray(sp.reason) ? sp.reason[0] : sp.reason
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (user) redirect(safeNextPath(raw, '/dashboard'))
-  return <LoginForm next={safeNextPath(raw)} />
+  // reason: chỉ nhận giá trị đã biết (idle = passive logout) — không echo chuỗi tự do vào UI.
+  return <LoginForm next={safeNextPath(raw)} reason={reason === 'idle' ? 'idle' : undefined} />
 }

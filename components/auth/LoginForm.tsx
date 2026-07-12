@@ -9,7 +9,8 @@ import { AuthCard, AuthField, FieldLabel, PasswordField, PrimaryButton } from '@
 import { MailIcon, LockIcon } from '@/components/brand/icons'
 
 // `next` đã được sanitize ở server (login page) — path nội bộ an toàn, mặc định '/'.
-export function LoginForm({ next = '/' }: { next?: string }) {
+// `reason` server đã lọc whitelist ('idle' = bị đăng xuất do treo máy quá lâu — IdleLogout 2026-07-13).
+export function LoginForm({ next = '/', reason }: { next?: string; reason?: 'idle' }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -38,6 +39,12 @@ export function LoginForm({ next = '/' }: { next?: string }) {
         <p className="mt-1.5 text-[14px] font-semibold text-[#857F96]">
           Đăng nhập để tiếp tục hành trình luyện band.
         </p>
+
+        {reason === 'idle' && (
+          <p className="mt-3 rounded-[10px] border border-[#F1E4C8] bg-[#FFFBF2] px-3 py-2.5 text-[13px] font-semibold leading-[1.5] text-[#8A6A1F]">
+            Bạn đã được đăng xuất do không hoạt động trong thời gian dài. Đăng nhập lại để tiếp tục.
+          </p>
+        )}
 
         <div className="mt-[22px]">
           <GoogleAuthButton next={next} />
