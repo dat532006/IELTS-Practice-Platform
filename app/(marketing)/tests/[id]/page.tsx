@@ -2,16 +2,51 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getTestMeta } from '@/lib/exam/meta'
-import {
-  SKILL_LABEL,
-  canEnterExam,
-  deriveTestUiState,
-  formatDurationMin,
-} from '@/lib/products/access-state'
+import { canEnterExam, deriveTestUiState, formatDurationMin } from '@/lib/products/access-state'
+import { skillMeta, SkillGlyph } from '@/components/brand/skill'
+import { FishBone } from '@/components/brand/FishBone'
 import { isUuid } from '@/lib/utils'
+import type { ExamSkill } from '@/types/exam'
 
 // W4 — Pre-exam page (M05). Server component đọc getTestMeta (SAFE metadata, KHÔNG payload).
-// CTA theo access-state: free/unlocked → vào /exam/[id]; locked → login (guest) / mua (auth).
+//   CTA theo access-state: free/unlocked → /exam/[id]; locked → login (guest) / mua bundle (auth).
+// 2026-07 redesign: đưa body về ngôn ngữ thương hiệu (tím/san hô) như homepage & product detail.
+//   Header/Footer giữ nguyên. KHÔNG đổi data-fetch/access-logic — chỉ trình bày.
+
+// Nền pastel header thẻ theo kỹ năng (token README §2; accent + glyph lấy từ hệ skill dùng chung).
+const SKILL_SOFT: Record<ExamSkill, string> = {
+  reading: '#FFEDE6',
+  listening: '#FFF3DC',
+  writing: '#F0ECFF',
+}
+
+// Ký tự "watermark" trên cover: số đuôi tiêu đề ("… TEST 01" → "01"), fallback chữ cái đầu.
+function coverMono(title: string): string {
+  const num = title.match(/(\d{1,3})\s*$/)
+  if (num) return num[1].padStart(2, '0')
+  const ch = title.match(/[a-z0-9]/i)
+  return (ch?.[0] ?? '?').toUpperCase()
+}
+
+function ClockIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7C5CE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </svg>
+  )
+}
+
+function BarsIcon() {
+  return (
+    <svg width="17" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="4" y="13" width="3.4" height="6" rx="1.7" fill="#ECA22B" />
+      <rect x="10.3" y="9" width="3.4" height="10" rx="1.7" fill="#ECA22B" />
+      <rect x="16.6" y="5" width="3.4" height="14" rx="1.7" fill="#ECA22B" />
+    </svg>
+  )
+}
+
 export default async function PreExamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   if (!isUuid(id)) notFound() // id sai định dạng → 404 (tránh lỗi DB)
@@ -26,103 +61,180 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
   const state = deriveTestUiState(meta, !!user)
   const canEnter = canEnterExam(meta)
 
+  // Trình bày (KHÔNG phải access-logic): accent/label/glyph theo kỹ năng + badge/CTA theo state.
+  const sk = skillMeta(meta.skill)
+  const accent = sk.color
+  const soft = SKILL_SOFT[meta.skill]
+  const locked = state === 'locked_guest' || state === 'locked_auth'
+  const badge = locked
+    ? { text: '🔒 Khóa', cls: 'bg-[#FFF1DC] text-[#C98A1A]' }
+    : state === 'unlocked'
+      ? { text: '✓ Đã mở khóa', cls: 'bg-[#E7F7EE] text-[#1E9E63]' }
+      : { text: 'Miễn phí', cls: 'bg-[#E7F7EE] text-[#1E9E63]' }
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <nav className="text-xs text-slate-400">
-        <Link href="/" className="hover:text-teal-700">
+    <div className="mx-auto max-w-2xl px-4 py-10 text-[#2A2740]">
+      {/* Breadcrumb (brand) */}
+      <nav className="text-[12.5px] font-semibold text-[#A8A2BA]">
+        <Link href="/" className="hover:text-[#7C5CE6]">
           Trang chủ
-        </Link>{' '}
-        /{' '}
-        <Link href="/products" className="hover:text-teal-700">
+        </Link>
+        <span className="mx-1.5 text-[#D2CCDD]">/</span>
+        <Link href="/products" className="hover:text-[#7C5CE6]">
           Bộ đề
-        </Link>{' '}
-        / <span className="text-slate-600">{meta.title}</span>
+        </Link>
+        <span className="mx-1.5 text-[#D2CCDD]">/</span>
+        <span className="text-[#564F6B]">{meta.title}</span>
       </nav>
 
-      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-6">
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-2xl font-bold text-slate-900">{meta.title}</h1>
-          {meta.is_free ? (
-            <span className="shrink-0 rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-              Miễn phí
+      {/* Hero card */}
+      <div
+        className="relative mt-4 overflow-hidden rounded-[24px] border border-[#EEEAF3] shadow-[0_30px_60px_-38px_rgba(60,40,90,0.42)]"
+        style={{ background: 'radial-gradient(120% 70% at 96% -8%, #FBE6DC 0%, rgba(251,230,220,0) 46%), #FFFFFF' }}
+      >
+        {/* Cover band theo kỹ năng (không có ảnh riêng của đề → fallback trang trí + watermark) */}
+        <div className="relative h-[174px] overflow-hidden" style={{ background: soft }}>
+          <span className="pointer-events-none absolute -right-6 -top-10 h-[150px] w-[150px] rounded-full bg-white/25" />
+          <span
+            className="pointer-events-none absolute -bottom-3 right-6 select-none text-[104px] font-extrabold leading-none"
+            style={{ color: accent, opacity: 0.16 }}
+          >
+            {coverMono(meta.title)}
+          </span>
+          <span
+            className="pointer-events-none absolute inset-0"
+            style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 44%)' }}
+          />
+          <div className="absolute left-[18px] top-4 flex items-center gap-[11px]">
+            <span
+              className="flex h-11 w-11 flex-none items-center justify-center rounded-[13px] text-white"
+              style={{ background: accent, boxShadow: `0 8px 18px -6px ${accent}` }}
+            >
+              <SkillGlyph skill={meta.skill} size={23} strokeWidth={1.9} />
             </span>
-          ) : meta.locked ? (
-            <span className="shrink-0 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-              🔒 Khóa
+            <span
+              className="inline-flex items-center rounded-full bg-white px-[13px] py-[6px] text-[12px] font-extrabold uppercase tracking-[0.05em] shadow-[0_4px_12px_-6px_rgba(60,40,90,0.28)]"
+              style={{ color: accent }}
+            >
+              Bộ đề · {sk.coverLabel}
             </span>
-          ) : (
-            <span className="shrink-0 rounded bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-700">
-              Đã mở
-            </span>
-          )}
+          </div>
         </div>
 
-        {/* Metadata an toàn (không có nội dung đề) */}
-        <dl className="mt-4 grid grid-cols-2 gap-y-3 text-sm sm:grid-cols-3">
-          <div>
-            <dt className="text-slate-400">Kỹ năng</dt>
-            <dd className="font-medium text-slate-800">{SKILL_LABEL[meta.skill]}</dd>
+        {/* Body */}
+        <div className="px-6 pb-7 pt-6 sm:px-[30px] sm:pb-[30px]">
+          <div className="flex items-start justify-between gap-3.5">
+            <h1 className="min-w-0 flex-1 text-[25px] font-extrabold leading-[1.15] tracking-[-0.02em]">
+              {meta.title}
+            </h1>
+            <span
+              className={`flex-none whitespace-nowrap rounded-full px-3 py-[6px] text-[12.5px] font-extrabold ${badge.cls}`}
+            >
+              {badge.text}
+            </span>
           </div>
-          <div>
-            <dt className="text-slate-400">Thời lượng</dt>
-            <dd className="font-medium text-slate-800">{formatDurationMin(meta.duration_sec)}</dd>
+
+          {/* Meta chips (an toàn — không có nội dung đề) */}
+          <div className="mt-5 flex flex-wrap gap-3">
+            <div className="flex items-center gap-[11px] rounded-[15px] border border-[#EFEAF6] bg-[#FAF8FF] px-[15px] py-[11px]">
+              <span
+                className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[10px]"
+                style={{ background: soft, color: accent }}
+              >
+                <SkillGlyph skill={meta.skill} size={17} strokeWidth={2.2} />
+              </span>
+              <span className="whitespace-nowrap">
+                <span className="block text-[11.5px] font-bold text-[#9D96AE]">Kỹ năng</span>
+                <span className="block text-[15px] font-extrabold text-[#2A2740]">{sk.label}</span>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-[11px] rounded-[15px] border border-[#EFEAF6] bg-[#FAF8FF] px-[15px] py-[11px]">
+              <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[10px] bg-[#F0ECFF]">
+                <ClockIcon />
+              </span>
+              <span className="whitespace-nowrap">
+                <span className="block text-[11.5px] font-bold text-[#9D96AE]">Thời lượng</span>
+                <span className="block text-[15px] font-extrabold text-[#2A2740]">
+                  {formatDurationMin(meta.duration_sec)}
+                </span>
+              </span>
+            </div>
+
+            {meta.difficulty != null && (
+              <div className="flex items-center gap-[11px] rounded-[15px] border border-[#EFEAF6] bg-[#FAF8FF] px-[15px] py-[11px]">
+                <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[10px] bg-[#FFF3DC]">
+                  <BarsIcon />
+                </span>
+                <span className="whitespace-nowrap">
+                  <span className="block text-[11.5px] font-bold text-[#9D96AE]">Độ khó</span>
+                  <span className="block text-[15px] font-extrabold text-[#2A2740]">{meta.difficulty}/5</span>
+                </span>
+              </div>
+            )}
           </div>
-          {meta.difficulty != null && (
-            <div>
-              <dt className="text-slate-400">Độ khó</dt>
-              <dd className="font-medium text-slate-800">{meta.difficulty}/5</dd>
+
+          {meta.question_types.length > 0 && (
+            <div className="mt-[18px]">
+              <div className="text-[11.5px] font-bold text-[#9D96AE]">Dạng câu hỏi</div>
+              <div className="mt-[9px] flex flex-wrap gap-[7px]">
+                {meta.question_types.map((qt) => (
+                  <span
+                    key={qt}
+                    className="rounded-[8px] bg-[#F0ECFF] px-[11px] py-[5px] text-[12px] font-bold text-[#6A4BD0]"
+                  >
+                    {qt}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
-        </dl>
 
-        {meta.question_types.length > 0 && (
-          <div className="mt-4 text-sm">
-            <p className="text-slate-400">Dạng câu hỏi</p>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {meta.question_types.map((qt) => (
-                <span key={qt} className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
-                  {qt}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+          <div className="my-6 h-px bg-[#EFEAF6]" />
 
-        {/* CTA theo access-state */}
-        <div className="mt-6 border-t border-slate-100 pt-5">
+          {/* CTA theo access-state — href/logic GIỮ NGUYÊN như bản cũ, chỉ đổi style */}
           {canEnter ? (
-            <Link
-              href={`/exam/${meta.id}`}
-              className="inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-800 sm:w-auto"
-            >
-              {meta.is_free ? 'Bắt đầu làm bài →' : 'Vào làm bài →'}
-            </Link>
+            <>
+              <Link
+                href={`/exam/${meta.id}`}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#7C5CE6] px-[26px] py-[15px] text-[15.5px] font-bold text-white shadow-[0_12px_28px_rgba(124,92,230,0.3)] transition hover:bg-[#6A48D6] sm:w-auto"
+              >
+                {meta.is_free ? 'Bắt đầu làm bài →' : 'Vào làm bài →'}
+              </Link>
+              <p className="mt-3.5 max-w-[34em] text-[13px] font-semibold leading-[1.55] text-[#857F96]">
+                {meta.is_free
+                  ? 'Miễn phí · không cần xương cá · kết quả chấm tự động ngay khi nộp bài.'
+                  : 'Bạn đã mở khóa đề này — vào làm bài bất cứ lúc nào, kết quả chấm ngay khi nộp bài.'}
+              </p>
+            </>
           ) : state === 'locked_guest' ? (
             <>
               <Link
                 href="/login"
-                className="inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-800 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#7C5CE6] px-[26px] py-[15px] text-[15.5px] font-bold text-white shadow-[0_12px_28px_rgba(124,92,230,0.3)] transition hover:bg-[#6A48D6] sm:w-auto"
               >
                 Đăng nhập để mở khóa
               </Link>
-              <p className="mt-2 text-xs text-slate-400">
-                Đây là đề trả phí — đăng nhập rồi mua bộ đề bằng xương cá để mở khóa.
+              <p className="mt-3.5 inline-flex max-w-[34em] flex-wrap items-center gap-x-1 text-[13px] font-semibold leading-[1.55] text-[#857F96]">
+                Đây là đề trả phí — đăng nhập rồi mua bộ đề bằng <FishBone /> xương cá để mở khóa.
               </p>
             </>
           ) : (
-            /* locked_auth — đã đăng nhập nhưng chưa mở khóa: CTA mua bundle chứa đề (checkout coin W16 đã live).
-               FE-F01: hết nút disabled/copy "mở ở W15–16"; redeem KHÔNG thuộc luồng mua thường (Owner W16). */
+            /* locked_auth — đã đăng nhập, chưa mở khóa: CTA mua bundle chứa đề (checkout coin W16 live).
+               product null → fallback /products. Logic FE-F01 giữ nguyên. */
             <>
               <Link
                 href={meta.product ? `/products/${meta.product.slug}` : '/products'}
-                className="inline-flex w-full items-center justify-center rounded-md bg-teal-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-800 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#7C5CE6] px-[26px] py-[15px] text-[15.5px] font-bold text-white shadow-[0_12px_28px_rgba(124,92,230,0.3)] transition hover:bg-[#6A48D6] sm:w-auto"
               >
                 {meta.product ? `Mua bộ đề "${meta.product.title}" →` : 'Xem bộ đề chứa đề này →'}
               </Link>
-              <p className="mt-2 text-xs text-slate-400">
-                Đề trả phí — mua bộ đề bằng xương cá, mở khóa ngay sau khi thanh toán.{' '}
-                <Link href="/products" className="text-teal-700 hover:underline">
-                  Xem tất cả bộ đề
+              <p className="mt-3.5 max-w-[34em] text-[13px] font-semibold leading-[1.55] text-[#857F96]">
+                <span className="inline-flex flex-wrap items-center gap-x-1">
+                  Đề trả phí — mua bộ đề bằng <FishBone /> xương cá, mở khóa ngay sau khi thanh toán.
+                </span>{' '}
+                <Link href="/products" className="font-bold text-[#6A48D6] hover:underline">
+                  Xem tất cả bộ đề →
                 </Link>
               </p>
             </>
