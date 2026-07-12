@@ -86,6 +86,12 @@ async function getLandingData(): Promise<{ hot: LandingProduct[]; free: LandingP
 }
 
 export default async function LandingPage() {
+  // Bug 2026-07-13: user ĐÃ đăng nhập bấm "Start free" vẫn bị đưa về /register.
+  //   CTA theo auth: đã đăng nhập → /free (vào làm đề miễn phí ngay); guest → /register như cũ.
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   const { hot, free } = await getLandingData()
   return (
     <div className={`dc-home ${jakarta.variable} ${newsreader.variable}`}>
@@ -118,8 +124,8 @@ export default async function LandingPage() {
             the official band descriptors — all in a calm, friendly space that keeps you motivated.
           </p>
           <div className="hero-ctas">
-            <Link href="/register" className="btn-primary">
-              Start free
+            <Link href={user ? '/free' : '/register'} className="btn-primary">
+              {user ? 'Practice free tests' : 'Start free'}
             </Link>
             <Link href="/products" className="btn-outline">
               Browse test packs
