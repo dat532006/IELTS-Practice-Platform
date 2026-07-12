@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { requireAdmin } from '@/lib/auth/guards'
+import { AdminAccountBar } from '@/components/admin/AdminAccountBar'
 
 // W12 — Admin layout (M11). SERVER gate: requireAdmin() là guard THẬT (UI chỉ tiện ích).
 //   UNAUTHORIZED → /login; FORBIDDEN → 403 UI (không render children). Chrome admin riêng (design frame 3).
@@ -50,7 +51,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               </Link>
             ))}
           </nav>
-          <span className="ml-auto text-[12.5px] font-semibold text-[#A8A2BA]">Admin · IELTS Platform</span>
+          {/* Email admin đang đăng nhập (link hồ sơ chi tiết) + Đăng xuất (2026-07-12) */}
+          <AdminAccountBar email={g.user.email ?? null} userId={g.user.id} />
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
