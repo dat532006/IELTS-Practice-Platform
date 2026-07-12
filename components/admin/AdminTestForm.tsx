@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { RichTextEditor, plainToHtml, looksRich } from './RichTextEditor'
 import { ExamRunner } from '@/components/exam/ExamRunner'
 import { examFontVars } from '@/app/exam-fonts'
@@ -216,6 +217,8 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
   const [preview, setPreview] = useState<{ test: unknown; answer_keys: unknown } | null>(null)
   const [busy, setBusy] = useState('')
   const [mediaMsg, setMediaMsg] = useState('')
+  const [coverUrl, setCoverUrl] = useState<string | null>(null) // ảnh minh họa đề (tests.cover_image)
+  const coverInputRef = useRef<HTMLInputElement>(null)
   const [showImport, setShowImport] = useState(false)
   const [importText, setImportText] = useState('')
   const [importMsg, setImportMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null)
@@ -241,6 +244,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           const t = j.data.test as Record<string, unknown>
           applyDraft({ ...t, answer_keys: j.data.answer_keys ?? undefined })
           setCreated({ test_id: testId, status: String(t.status ?? 'draft') })
+          setCoverUrl((t.cover_image as string | null) ?? null)
         } else if (r.status === 403) setEditLoadErr('Bạn không có quyền admin.')
         else if (r.status === 404) setEditLoadErr('Không tìm thấy đề.')
         else setEditLoadErr('Không tải được đề.')
@@ -502,6 +506,74 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       if (r.ok && j?.data?.upload_url) setMediaMsg(`✓ Đã tạo upload URL (${kind}). FE PUT file lên URL này.`)
       else if (j?.meta?.error_code === 'STORAGE_NOT_CONFIGURED') setMediaMsg(`⚠️ Storage chưa cấu hình (${kind}) — cần creds R2/bucket (Owner/DevOps).`)
       else setMediaMsg('Không tạo được upload URL.')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  // Upload ảnh minh họa đề (cover): presign → PUT file lên Supabase Storage → lưu cover_image (PATCH).
+  async function uploadCover(file: File) {
+    if (!created) return
+    setBusy('cover')
+    setMediaMsg('')
+    try {
+      const r = await fetch('/api/admin/media', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'image', filename: file.name, content_type: file.type, test_id: created.test_id }),
+      })
+      const j = await r.json().catch(() => null)
+      if (!r.ok || !j?.data?.upload_url) {
+        setMediaMsg(
+          j?.meta?.error_code === 'STORAGE_NOT_CONFIGURED'
+            ? '⚠️ Supabase Storage chưa cấu hình (bucket media) — chạy migration/khởi động storage.'
+            : 'Không tạo được upload URL cho ảnh.',
+        )
+        return
+      }
+      const { path, token, bucket, public_url } = j.data as { path: string; token: string; bucket: string; public_url: string }
+      // PUT file thật lên signed upload URL (Supabase Storage client).
+      const { error: upErr } = await createClient().storage.from(bucket).uploadToSignedUrl(path, token, file)
+      if (upErr) {
+        setMediaMsg(`Upload ảnh thất bại: ${upErr.message}`)
+        return
+      }
+      // Lưu URL công khai vào tests.cover_image (meta-only PATCH).
+      const pr = await fetch(`/api/admin/tests/${created.test_id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cover_image: public_url }),
+      })
+      if (!pr.ok) {
+        setMediaMsg('Đã upload nhưng không lưu được cover_image.')
+        return
+      }
+      setCoverUrl(public_url)
+      setMediaMsg('✓ Đã cập nhật ảnh minh họa đề.')
+    } catch {
+      setMediaMsg('Lỗi khi upload ảnh.')
+    } finally {
+      setBusy('')
+      if (coverInputRef.current) coverInputRef.current.value = '' // cho phép chọn lại cùng file
+    }
+  }
+
+  async function removeCover() {
+    if (!created) return
+    setBusy('cover')
+    setMediaMsg('')
+    try {
+      const pr = await fetch(`/api/admin/tests/${created.test_id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cover_image: null }),
+      })
+      if (!pr.ok) {
+        setMediaMsg('Không gỡ được ảnh.')
+        return
+      }
+      setCoverUrl(null)
+      setMediaMsg('✓ Đã gỡ ảnh minh họa.')
     } finally {
       setBusy('')
     }
@@ -1024,13 +1096,55 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
             >
               {created.status === 'published' ? 'Đã publish' : 'Publish đề →'}
             </button>
-            <button type="button" onClick={() => doMedia('image')} disabled={busy === 'media'} className="rounded-[11px] bg-[#F4F1FB] px-4 py-2.5 text-sm font-bold text-[#2A2740] hover:bg-[#EAE4F6]">
-              Upload ảnh
-            </button>
             <button type="button" onClick={() => doMedia('audio')} disabled={busy === 'media'} className="rounded-[11px] bg-[#F4F1FB] px-4 py-2.5 text-sm font-bold text-[#2A2740] hover:bg-[#EAE4F6]">
               Upload audio
             </button>
           </div>
+
+          {/* Ảnh minh họa đề (cover) — hiện ở trang pre-exam /tests/[id] */}
+          <div className="mt-4 rounded-[12px] border border-[#E8E2F2] bg-white p-3.5">
+            <p className="text-[13px] font-bold text-[#2A2740]">Ảnh minh họa đề (cover)</p>
+            <p className="mt-0.5 text-[12px] font-medium text-[#857F96]">Hiện trên đầu trang vào đề. PNG/JPG/WebP, ≤ 5MB. Không có ảnh → dùng nền trang trí theo kỹ năng.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3.5">
+              <div className="flex h-[68px] w-[120px] flex-none items-center justify-center overflow-hidden rounded-[10px] border border-[#EEEAF3] bg-[#FAF8FF]">
+                {coverUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={coverUrl} alt="cover" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-[11px] font-semibold text-[#B4ADC4]">Chưa có ảnh</span>
+                )}
+              </div>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) void uploadCover(f)
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={busy === 'cover'}
+                className="rounded-[11px] bg-[#7C5CE6] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A48D6] disabled:bg-[#D8D2E4]"
+              >
+                {busy === 'cover' ? 'Đang tải…' : coverUrl ? 'Đổi ảnh…' : 'Chọn ảnh…'}
+              </button>
+              {coverUrl && (
+                <button
+                  type="button"
+                  onClick={removeCover}
+                  disabled={busy === 'cover'}
+                  className="rounded-[11px] border border-[#E4DEEE] bg-white px-4 py-2.5 text-sm font-bold text-[#564F6B] transition hover:border-[#CCC3DC] disabled:opacity-50"
+                >
+                  Gỡ ảnh
+                </button>
+              )}
+            </div>
+          </div>
+
           {mediaMsg && <p className="mt-2 text-xs text-[#6A6480]">{mediaMsg}</p>}
           {preview && (
             <pre className="mt-3 max-h-72 overflow-auto rounded-[10px] bg-[#2A2740] p-3 text-xs text-slate-100">{JSON.stringify(preview, null, 2)}</pre>

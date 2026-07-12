@@ -10,7 +10,16 @@ import { isUuid } from '@/lib/utils'
 //   đề vẫn đi PATCH /api/admin/tests (full body, answer-key split). DELETE: draft chưa ai làm →
 //   xóa cứng; còn lại → status='hidden' (học viên cũ giữ nguyên kết quả — Owner quyết 2026-07-12).
 
-const MetaBody = z.object({ is_free: z.boolean() }).strict()
+// Meta-only: is_free (toggle) và/hoặc cover_image (URL ảnh minh họa; null = gỡ ảnh). Cần ≥1 field.
+const MetaBody = z
+  .object({
+    is_free: z.boolean().optional(),
+    cover_image: z.string().trim().max(1000).url().nullable().optional(),
+  })
+  .strict()
+  .refine((b) => b.is_free !== undefined || b.cover_image !== undefined, {
+    message: 'Cần ít nhất một field: is_free hoặc cover_image',
+  })
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const g = await requireAdminApi()
@@ -21,7 +30,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   let raw: unknown
   try { raw = await request.json() } catch { return fail('VALIDATION_ERROR', 'Body JSON không hợp lệ', { status: 400 }) }
   const parsed = MetaBody.safeParse(raw)
-  if (!parsed.success) return fail('VALIDATION_ERROR', 'Chỉ hỗ trợ field is_free (boolean)', { status: 400 })
+  if (!parsed.success) return fail('VALIDATION_ERROR', 'Chỉ hỗ trợ is_free (boolean) và cover_image (URL|null)', { status: 400 })
 
   const res = await setTestMeta(createAdminClient(), id, parsed.data)
   if (!res.ok) {

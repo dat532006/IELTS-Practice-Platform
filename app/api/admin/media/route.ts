@@ -45,8 +45,10 @@ export async function POST(request: Request) {
   }
 
   // image → Supabase Storage signed upload URL. Thiếu bucket → STORAGE_NOT_CONFIGURED.
+  //   Trả thêm bucket + public_url (bucket public) để client upload rồi lưu cover_image qua PATCH đề.
   const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'media'
   const { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(objectKey)
   if (error || !data) return fail('STORAGE_NOT_CONFIGURED', 'Supabase Storage bucket chưa cấu hình (image upload)', { status: 503 })
-  return ok({ method: 'PUT', upload_url: data.signedUrl, path: data.path, token: data.token })
+  const publicUrl = admin.storage.from(bucket).getPublicUrl(data.path).data.publicUrl
+  return ok({ method: 'PUT', upload_url: data.signedUrl, path: data.path, token: data.token, bucket, public_url: publicUrl })
 }
