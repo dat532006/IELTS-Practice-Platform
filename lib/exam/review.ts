@@ -48,6 +48,7 @@ export function buildReviewItems(
       is_correct: isAnswerCorrect(ans[qid], entry),
       // P3: giải thích chỉ đính khi có (đã qua owner+terminal guard ở getResult, giống correct_answers).
       ...(entry.explanation ? { explanation: entry.explanation } : {}),
+      ...(entry.evidence ? { evidence: entry.evidence } : {}),
     })
   }
   // sắp theo number nếu có (ổn định cho UI), giữ nguyên thứ tự key khi thiếu number.

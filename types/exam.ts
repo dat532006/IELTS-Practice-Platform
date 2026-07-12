@@ -55,6 +55,7 @@ export type ReviewItem = {
   correct_answers: string[] // đáp án chấp nhận (hiển thị); chỉ owner + terminal mới nhận
   is_correct: boolean
   explanation?: string // P3: giải thích/evidence — admin author ở answer_keys; chỉ owner + terminal (cùng đường correct_answers)
+  evidence?: string // trích nguyên văn từ passage — review-in-exam highlight + đánh số [n]; cùng guard explanation
 }
 
 export type ResultDTO = {

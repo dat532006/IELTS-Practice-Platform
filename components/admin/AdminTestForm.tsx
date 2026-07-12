@@ -34,6 +34,7 @@ type QField = {
   y?: string
   // review evidence (P3) — vào answer_keys entry, KHÔNG vào questions
   explanation?: string
+  evidence?: string // trích nguyên văn từ passage → review-in-exam highlight + đánh số [n]
 }
 
 const Q_TYPES = ['gap_filling', 'summary', 'mcq', 'mcq_multi', 'tfng', 'ynng', 'matching', 'matching_information', 'matching_features', 'short_answer', 'diagram', 'map']
@@ -321,6 +322,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           answers,
           options: (base.options ?? []).map((o) => ({ ...o })),
           explanation: k === 0 ? base.explanation : undefined,
+          evidence: k === 0 ? base.evidence : undefined,
         }
       })
       const next = [...qs]
@@ -333,17 +335,19 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
   function buildPayload() {
     // ⚠️ questions KHÔNG mang đáp án; đáp án + explanation → answer_keys (tách, server-only).
     const qOut = questions.map(emitQuestion)
-    type KeyEntry = { answers: string[]; match: 'ci'; points: number; type?: string; explanation?: string }
+    type KeyEntry = { answers: string[]; match: 'ci'; points: number; type?: string; explanation?: string; evidence?: string }
     const answer_keys: Record<string, KeyEntry> = {}
     for (const q of questions) {
       const ans = q.answers.split(',').map((s) => s.trim()).filter(Boolean)
-      // Entry BẮT BUỘC có answers (AnswerKeyEntrySchema.min(1)); explanation chỉ đính khi đã có đáp án.
+      // Entry BẮT BUỘC có answers (AnswerKeyEntrySchema.min(1)); explanation/evidence chỉ đính khi đã có đáp án.
       if (!ans.length) continue
       const entry: KeyEntry = { answers: ans, match: 'ci', points: Number(q.points) || 1 }
       const kt = KEY_TYPE[q.type]
       if (kt) entry.type = kt // mcq_multi chấm theo SET; diagram/map single-value đúng nhãn
       const exp = q.explanation?.trim()
       if (exp) entry.explanation = exp
+      const ev = q.evidence?.trim()
+      if (ev) entry.evidence = ev.slice(0, 2000)
       answer_keys[q.id] = entry
     }
     return {
@@ -430,6 +434,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       if (q.x != null) out.x = String(q.x)
       if (q.y != null) out.y = String(q.y)
       if (key && typeof key.explanation === 'string') out.explanation = key.explanation
+      if (key && typeof key.evidence === 'string') out.evidence = key.evidence
       return out
     })
 
@@ -999,7 +1004,19 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                       minHeight={64}
                       value={q.explanation ?? ''}
                       onChange={(e) => setQ(i, { explanation: e.target.value || undefined })}
-                      placeholder="Câu evidence trong passage (+ dịch) → hiện khi thí sinh xem chi tiết. Bỏ trống nếu chưa có."
+                      placeholder="Giải thích/dịch nghĩa → hiện ở khối 'Giải thích chi tiết' trang kết quả. Bỏ trống nếu chưa có."
+                    />
+                  </div>
+                  {/* Evidence (2026-07-12) — trích NGUYÊN VĂN từ passage → chế độ 'Xem lại trong bài'
+                      tự tìm text-match để highlight xanh + gắn số câu [n] trong bài đọc. */}
+                  <div className="mt-2.5">
+                    <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#157A4B]">📍 Evidence (trích nguyên văn từ passage)</span>
+                    <AutoGrowTextarea
+                      className="mt-1 w-full rounded-[8px] border border-[#D6EFE0] bg-white px-3 py-2 text-[12.5px] leading-[1.5] text-[#2A2740] outline-none"
+                      minHeight={48}
+                      value={q.evidence ?? ''}
+                      onChange={(e) => setQ(i, { evidence: e.target.value || undefined })}
+                      placeholder="Copy đúng câu trong passage chứa đáp án — sẽ được highlight + đánh số khi thí sinh 'Xem lại trong bài'. Sai 1 chữ = không tìm thấy (không highlight)."
                     />
                   </div>
                 </div>
