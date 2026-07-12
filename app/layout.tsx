@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans, Newsreader } from 'next/font/google'
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from '@/lib/site'
+import { IdleLogout } from '@/components/auth/IdleLogout'
 import './globals.css'
 
 // Design system (handoff): Plus Jakarta Sans cho toàn bộ, Newsreader italic cho accent word.
@@ -45,7 +46,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi" className={`${jakarta.variable} ${newsreader.variable}`}>
-      <body className="min-h-screen bg-white font-sans text-slate-900 antialiased">{children}</body>
+      <body className="min-h-screen bg-white font-sans text-slate-900 antialiased">
+        {/* Passive logout toàn site (30p; /admin 15p; trừ trang thi) — chỉ tác động khi có session */}
+        <IdleLogout />
+        {children}
+      </body>
     </html>
   )
 }
