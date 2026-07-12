@@ -347,6 +347,21 @@
   transform: translateY(-2px);
   color: #fff;
 }
+/* Review mode (2026-07-12): badge số câu [n] neo đầu câu evidence trong passage */
+.dc-exam .dcx-evnum {
+  position: absolute;
+  transform: translate(-2px, -14px);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  color: #0e7a43;
+  background: #e7f7ee;
+  border: 1px solid #9fd8ba;
+  border-radius: 6px;
+  padding: 2px 4px;
+  pointer-events: none;
+  z-index: 2;
+}
 
 /* ─────────────────────────── Question blocks ─────────────────────────── */
 .dc-exam .dcx-qblock + .dcx-qblock { margin-top: 30px; }
@@ -639,6 +654,9 @@
 }
 .dc-exam .dcx-navpill:hover { border-color: #c9bdf0; }
 .dc-exam .dcx-navpill.answered { background: var(--brand-soft); border-color: #cdbdf5; color: #5a3fc0; }
+/* Review mode (2026-07-12): pill tô ĐÚNG/SAI theo is_correct bài đã nộp */
+.dc-exam .dcx-navpill.rv-ok { background: #e7f7ee; border-color: #9fd8ba; color: #0e7a43; }
+.dc-exam .dcx-navpill.rv-bad { background: #fdeaea; border-color: #eeb1b1; color: #c22f2f; }
 .dc-exam .dcx-navpill.current {
   box-shadow: 0 0 0 2px var(--coral);
   border-color: var(--coral);

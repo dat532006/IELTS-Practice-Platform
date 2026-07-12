@@ -182,3 +182,113 @@ export function noteMarkerPositions(root: HTMLElement, anchors: HighlightAnchor[
   }
   return out
 }
+
+// ============================================================
+// 2026-07-12 — Evidence highlight (review-in-exam). Admin chỉ lưu QUOTE (trích nguyên văn),
+//   KHÔNG có node-path → tìm text-match trong text node stream của passage → dựng Range.
+//   Whitespace-flexible (mọi run khoảng trắng coi như nhau); không thấy → null (skip êm).
+// ============================================================
+
+type TextIndex = { text: string; map: { node: Text; start: number }[] }
+
+// Ghép toàn bộ text node dưới root thành 1 chuỗi + bảng map vị trí → (node, offset).
+function buildTextIndex(root: Node): TextIndex {
+  const doc = root.ownerDocument ?? (typeof document !== 'undefined' ? document : null)
+  const map: { node: Text; start: number }[] = []
+  let text = ''
+  if (!doc) return { text, map }
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let n: Node | null
+  while ((n = walker.nextNode())) {
+    const t = n as Text
+    map.push({ node: t, start: text.length })
+    text += t.data
+  }
+  return { text, map }
+}
+
+function posToNodeOffset(idx: TextIndex, pos: number): { node: Text; offset: number } | null {
+  for (let i = idx.map.length - 1; i >= 0; i--) {
+    const m = idx.map[i]
+    if (pos >= m.start) {
+      const offset = Math.min(pos - m.start, m.node.data.length)
+      return { node: m.node, offset }
+    }
+  }
+  return null
+}
+
+// Tìm quote trong root (case-sensitive, khoảng trắng linh hoạt) → Range. Không thấy/lỗi → null.
+export function rangeFromQuote(root: Node, quote: string): Range | null {
+  const q = quote.trim().replace(/\s+/g, ' ')
+  if (q.length < 3) return null
+  try {
+    const idx = buildTextIndex(root)
+    if (!idx.text) return null
+    // Regex từ quote đã escape, mỗi khoảng trắng → \s+ (khớp xuống dòng/nbsp trong DOM).
+    const pattern = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '[\\s\\u00a0]+')
+    const m = new RegExp(pattern).exec(idx.text)
+    if (!m) return null
+    const start = posToNodeOffset(idx, m.index)
+    const end = posToNodeOffset(idx, m.index + m[0].length)
+    if (!start || !end) return null
+    const range = (root.ownerDocument ?? document).createRange()
+    range.setStart(start.node, start.offset)
+    range.setEnd(end.node, end.offset)
+    return range
+  } catch {
+    return null
+  }
+}
+
+const EV_NAME = 'exam-evidence'
+
+function ensureEvidenceStyle(): void {
+  if (typeof document === 'undefined' || document.getElementById('exam-ev-style')) return
+  const style = document.createElement('style')
+  style.id = 'exam-ev-style'
+  // Xanh lá đậm + chữ trắng — phân biệt highlight maroon của thí sinh; contrast ≥7:1 cả 3 theme.
+  style.textContent = '::highlight(exam-evidence){background-color:#0E7A43;color:#ffffff;}'
+  document.head.appendChild(style)
+}
+
+export type EvidenceItem = { number?: number; quote: string }
+
+// Tô mọi evidence tìm thấy trong root (registry riêng 'exam-evidence' — không đụng highlight thí sinh).
+export function applyEvidenceHighlights(root: Node, items: EvidenceItem[]): void {
+  const hl = getHighlightApi()
+  if (!hl) return
+  ensureEvidenceStyle()
+  const ranges: Range[] = []
+  for (const it of items) {
+    const r = rangeFromQuote(root, it.quote)
+    if (r) ranges.push(r)
+  }
+  if (ranges.length === 0) {
+    hl.reg.delete(EV_NAME)
+    return
+  }
+  hl.reg.set(EV_NAME, new hl.Ctor(...ranges))
+}
+
+export function clearEvidenceHighlights(): void {
+  getHighlightApi()?.reg.delete(EV_NAME)
+}
+
+// Vị trí badge số câu [n] — đặt ĐẦU range (góc trên-trái), tọa độ tương đối root như noteMarkerPositions.
+export function evidenceMarkerPositions(
+  root: HTMLElement,
+  items: EvidenceItem[],
+): { number: number; left: number; top: number }[] {
+  const rootRect = root.getBoundingClientRect()
+  const out: { number: number; left: number; top: number }[] = []
+  for (const it of items) {
+    if (typeof it.number !== 'number') continue
+    const r = rangeFromQuote(root, it.quote)
+    if (!r) continue
+    const first = r.getClientRects()[0]
+    if (!first) continue
+    out.push({ number: it.number, left: first.left - rootRect.left, top: first.top - rootRect.top })
+  }
+  return out
+}

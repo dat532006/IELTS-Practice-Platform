@@ -55,6 +55,9 @@ export const AnswerKeyEntrySchema = z.object({
   // P3 (review evidence): giải thích/đáp án chi tiết. SERVER-ONLY — chỉ rời server qua review DTO
   //   (owner + attempt submitted|expired), giống correct_answers. KHÔNG ảnh hưởng scoring.
   explanation: z.string().max(4000).optional(),
+  // 2026-07-12 (review-in-exam): câu evidence TRÍCH NGUYÊN VĂN từ passage — client tìm text-match
+  //   để highlight + đánh số trong bài đọc khi xem lại. Cùng guard owner+terminal như explanation.
+  evidence: z.string().max(2000).optional(),
 })
 
 export type AnswerKeyEntry = z.infer<typeof AnswerKeyEntrySchema>

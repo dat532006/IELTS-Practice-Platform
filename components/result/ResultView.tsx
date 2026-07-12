@@ -247,12 +247,21 @@ export function ResultView({ attemptId }: { attemptId: string }) {
           </div>
           <BandDonut band={data.band} />
         </div>
-        <Link
-          href={`/exam/${data.test.id}`}
-          className="mt-2 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
-        >
-          Thử lại bài kiểm tra <span aria-hidden>→</span>
-        </Link>
+        <div className="mt-2 flex flex-wrap gap-2.5">
+          {/* Review-in-exam (2026-07-12): mở lại giao diện thi — đáp án đúng điền sẵn + evidence highlight */}
+          <Link
+            href={`/result/${attemptId}/review`}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#0E7A43] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b6437]"
+          >
+            Xem lại trong bài (đáp án + evidence) <span aria-hidden>→</span>
+          </Link>
+          <Link
+            href={`/exam/${data.test.id}`}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+          >
+            Thử lại bài kiểm tra <span aria-hidden>→</span>
+          </Link>
+        </div>
       </section>
 
       {/* Chi tiết bài thi (capture: 3 vòng tròn + 4 chỉ số) */}

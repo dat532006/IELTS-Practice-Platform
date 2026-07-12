@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type { AttemptDTO, ExamPayload, SubmitResult } from '@/types/exam'
+import type { AttemptDTO, ExamPayload, ReviewItem, SubmitResult } from '@/types/exam'
 import { QuestionRenderer } from '@/components/exam/questions/QuestionRenderer'
 import { MatchingMatrixQuestion } from '@/components/exam/questions/MatchingMatrixQuestion'
 import { SummaryQuestion } from '@/components/exam/questions/SummaryQuestion'
@@ -26,8 +26,11 @@ import {
 import { isAnswered, renderKindOf, type AnswerValue, type ExamQuestion, type QOption } from '@/components/exam/questions/types'
 import {
   anchorFromRange,
+  applyEvidenceHighlights,
   applyHighlights,
+  clearEvidenceHighlights,
   clearHighlights,
+  evidenceMarkerPositions,
   highlightAtPoint,
   newAnchorId,
   noteMarkerPositions,
@@ -215,12 +218,17 @@ function buildBlocks(qs: ExamQuestion[]): QBlock[] {
 // `preview` (admin authoring, 2026-07-08): render payload LOCAL trong giao diện thi thật để soát định
 //   dạng đề — KHÔNG start attempt, KHÔNG fetch payload, KHÔNG API nào được gọi (submit/autosave/
 //   annotation đều guard `!attempt`, attempt luôn null ở preview). Timer hiển thị tĩnh, không đếm.
+// `review` (2026-07-12): xem lại bài ĐÃ NỘP trong giao diện thi thật — đáp án ĐÚNG điền sẵn (read-only),
+//   evidence highlight xanh + badge số câu trong passage, nav pill tô đúng/sai theo is_correct.
+//   Không attempt/timer/submit; highlight thí sinh (nếu trang truyền) chỉ hiển thị, không sửa được.
 export function ExamRunner({
   testId,
   preview,
+  review,
 }: {
   testId: string
   preview?: { payload: ExamPayload; durationSec: number }
+  review?: { payload: ExamPayload; items: ReviewItem[]; attemptId: string; highlights?: HighlightAnchor[] }
 }) {
   const router = useRouter()
   const [phase, setPhase] = useState<Phase>('loading')
@@ -241,6 +249,7 @@ export function ExamRunner({
   const [hlPopup, setHlPopup] = useState<{ x: number; y: number; anchor: HighlightAnchor } | null>(null)
   const [editPopup, setEditPopup] = useState<{ x: number; y: number; anchor: HighlightAnchor } | null>(null)
   const [noteMarkers, setNoteMarkers] = useState<{ id: string; left: number; top: number }[]>([])
+  const [evMarkers, setEvMarkers] = useState<{ number: number; left: number; top: number }[]>([]) // review: badge [n] evidence
   // Tier0: tỉ lệ chia 2 cột (divider kéo) + cờ desktop (chỉ kéo trên lg).
   const [splitPct, setSplitPct] = useState(50)
   const [isLg, setIsLg] = useState(false)
@@ -260,6 +269,13 @@ export function ExamRunner({
   const passages = (Array.isArray(payload?.passages) ? payload?.passages : []) as Passage[]
   const questions = (Array.isArray(payload?.questions) ? payload?.questions : []) as ExamQuestion[]
   const answeredCount = questions.filter((q) => isAnswered(answers[q.id])).length
+
+  // Review: tra cứu is_correct/evidence theo qid (đáp án đúng đã điền vào `answers` lúc boot).
+  const reviewByQid = useMemo(() => {
+    const m = new Map<string, ReviewItem>()
+    for (const it of review?.items ?? []) m.set(it.question_id, it)
+    return m
+  }, [review])
 
   const groups = useMemo(() => buildGroups(passages, questions), [payload]) // eslint-disable-line react-hooks/exhaustive-deps
   const active = groups[activeGroup] ?? groups[0]
@@ -365,6 +381,23 @@ export function ExamRunner({
   // --- Boot ---
   useEffect(() => {
     let alive = true
+    // Review: payload + review items từ trang kết quả — điền ĐÁP ÁN ĐÚNG (read-only), không timer,
+    //   vào thẳng màn active (không màn hướng dẫn). Highlight thí sinh (nếu có) chỉ để xem.
+    if (review) {
+      setPayload(review.payload)
+      const filled: Record<string, AnswerValue> = {}
+      for (const it of review.items) {
+        filled[it.question_id] = it.type === 'mcq_multi' ? it.correct_answers : (it.correct_answers[0] ?? '')
+      }
+      setAnswers(filled)
+      setHighlights(Array.isArray(review.highlights) ? review.highlights : [])
+      baseRemainingRef.current = -1
+      setRemaining(null)
+      setPhase('active')
+      return () => {
+        alive = false
+      }
+    }
     // Preview (admin): payload local, KHÔNG attempt/API — vào màn hướng dẫn như thi thật, timer tĩnh.
     if (preview) {
       setPayload(preview.payload)
@@ -417,7 +450,7 @@ export function ExamRunner({
     return () => {
       alive = false
     }
-  }, [testId, router, preview])
+  }, [testId, router, preview, review])
 
   // --- Timer ---
   useEffect(() => {
@@ -435,9 +468,9 @@ export function ExamRunner({
     return () => clearInterval(t)
   }, [phase, doSubmit])
 
-  // --- W9: warn khi rời trang lúc đang làm + có đáp án chưa nộp ---
+  // --- W9: warn khi rời trang lúc đang làm + có đáp án chưa nộp (review: read-only → không warn) ---
   useEffect(() => {
-    if (phase !== 'active') return
+    if (phase !== 'active' || review) return
     const handler = (e: BeforeUnloadEvent) => {
       if (answeredCount > 0) {
         e.preventDefault()
@@ -446,7 +479,7 @@ export function ExamRunner({
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [phase, answeredCount])
+  }, [phase, answeredCount, review])
 
   // --- W9: khóa scroll nền khi mở modal/options ---
   useEffect(() => {
@@ -495,13 +528,14 @@ export function ExamRunner({
 
   const onAnswerChange = useCallback(
     (qid: string, v: AnswerValue) => {
+      if (review) return // read-only: đáp án đúng đã điền, không cho đổi
       setAnswers((a) => {
         const next = { ...a, [qid]: v }
         scheduleAnswerSave(next)
         return next
       })
     },
-    [scheduleAnswerSave],
+    [scheduleAnswerSave, review],
   )
 
   // --- Selection trong passage → tạo highlight; click thường → sửa/xóa highlight (F-c) ---
@@ -610,6 +644,28 @@ export function ExamRunner({
       clearHighlights()
     }
   }, [visibleHighlights, showPassage, textSize, contrast, phase, payload, activeGroup, splitPct])
+
+  // Review: evidence highlight xanh + badge [n] — CHỈ câu thuộc group đang xem, tìm quote text-match.
+  useEffect(() => {
+    if (!review || phase !== 'active') return
+    const root = passageRootRef.current
+    if (!root) return
+    const activeQids = new Set((active?.questions ?? []).map((q) => q.id))
+    const evs = review.items
+      .filter((it) => it.evidence && activeQids.has(it.question_id))
+      .map((it) => ({ number: it.number, quote: it.evidence as string }))
+    const sync = () => {
+      applyEvidenceHighlights(root, evs)
+      setEvMarkers(evidenceMarkerPositions(root, evs))
+    }
+    sync()
+    window.addEventListener('resize', sync)
+    return () => {
+      window.removeEventListener('resize', sync)
+      clearEvidenceHighlights()
+      setEvMarkers([])
+    }
+  }, [review, phase, payload, activeGroup, showPassage, textSize, contrast, splitPct, active])
 
   // Tier0: sau khi ◀▶ đổi group/câu → cuộn tới câu (chỉ khi pending, không cuộn lúc focus thường).
   useEffect(() => {
@@ -748,6 +804,11 @@ export function ExamRunner({
               </div>
             </div>
             <div className="dcx-header-spacer" />
+            {review && (
+              <span className="dcx-timer" title="Chế độ xem lại — đáp án đúng đã điền sẵn, evidence tô xanh trong bài đọc">
+                <span className="dcx-timer-val" style={{ color: '#0E7A43' }}>✓ Xem lại bài làm</span>
+              </span>
+            )}
             {limited && (
               <div className={`dcx-timer${lowTime ? ' low' : ''}`}>
                 <span style={{ color: 'var(--brand)', display: 'flex' }}>
@@ -794,8 +855,8 @@ export function ExamRunner({
             >
               <div
                 ref={passageRootRef}
-                onMouseUp={onPassageMouseUp}
-                onTouchEnd={onPassageMouseUp}
+                onMouseUp={review ? undefined : onPassageMouseUp}
+                onTouchEnd={review ? undefined : onPassageMouseUp}
                 className="dcx-passage themed"
               >
                 {!active || active.passages.length === 0 ? (
@@ -803,6 +864,12 @@ export function ExamRunner({
                 ) : (
                   active.passages.map((p) => <PassageArticle key={p.id} passage={p} />)
                 )}
+                {/* Review: badge số câu [n] neo đầu câu evidence (không tương tác) */}
+                {evMarkers.map((m, k) => (
+                  <span key={`ev-${m.number}-${k}`} className="dcx-evnum" style={{ left: m.left, top: m.top }} aria-hidden>
+                    [{m.number}]
+                  </span>
+                ))}
                 {noteMarkers.map((m) => (
                   <button
                     key={m.id}
@@ -926,6 +993,7 @@ export function ExamRunner({
                                       question={item.q}
                                       value={answers[item.q.id]}
                                       onChange={(v) => onAnswerChange(item.q.id, v)}
+                                      disabled={!!review}
                                     />
                                   </div>
                                 </div>
@@ -944,6 +1012,7 @@ export function ExamRunner({
                                     value={answers[item.q.id]}
                                     onChange={(v) => onAnswerChange(item.q.id, v)}
                                     hideStatement={statement != null}
+                                    disabled={!!review}
                                   />
                                 </div>
                               </div>
@@ -976,14 +1045,17 @@ export function ExamRunner({
                       const done = isAnswered(answers[q.id])
                       const flagged = bookmarkedQs.includes(q.id)
                       const isActive = activeQid === q.id
+                      // Review: pill tô theo ĐÚNG/SAI của bài đã nộp (thay trạng thái đã trả lời).
+                      const rv = review ? reviewByQid.get(q.id) : undefined
+                      const stateCls = rv ? (rv.is_correct ? ' rv-ok' : ' rv-bad') : done && !review ? ' answered' : ''
                       return (
                         <a
                           key={q.id}
                           href={`#q-${q.id}`}
                           onClick={() => setActiveQid(q.id)}
                           aria-current={isActive ? 'true' : undefined}
-                          aria-label={`Câu ${q.number ?? i + 1}${done ? ', đã trả lời' : ''}${flagged ? ', đã đánh dấu' : ''}`}
-                          className={`dcx-navpill${done ? ' answered' : ''}${isActive ? ' current' : ''}${flagged ? ' flagged' : ''}`}
+                          aria-label={`Câu ${q.number ?? i + 1}${rv ? (rv.is_correct ? ', bạn làm đúng' : ', bạn làm sai') : done ? ', đã trả lời' : ''}${flagged ? ', đã đánh dấu' : ''}`}
+                          className={`dcx-navpill${stateCls}${isActive ? ' current' : ''}${flagged ? ' flagged' : ''}`}
                         >
                           {q.number ?? i + 1}
                         </a>
@@ -1020,7 +1092,11 @@ export function ExamRunner({
             >
               <ArrowRight className="h-5 w-5" />
             </button>
-            {preview ? (
+            {review ? (
+              <Link href={`/result/${review.attemptId}`} className="dcx-submit" title="Về trang kết quả">
+                ← Về kết quả
+              </Link>
+            ) : preview ? (
               <span
                 className="dcx-submit"
                 aria-disabled="true"
