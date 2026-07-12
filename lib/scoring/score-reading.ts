@@ -13,7 +13,7 @@
 // ============================================================
 
 import { z } from 'zod'
-import { normalizeAnswer, type MatchMode } from './normalize'
+import { normalizeAnswer, canonicalizeNumberWords, type MatchMode } from './normalize'
 
 // Các dạng được scoring hỗ trợ (single-value, trừ mcq_multi = set). Type lạ → key invalid (không single-hóa âm thầm).
 export const ALLOWED_KEY_TYPES = [
@@ -106,7 +106,14 @@ export function isAnswerCorrect(userAnswer: unknown, key: AnswerKeyEntry): boole
   const got = normalizeAnswer(toScalar(userAnswer), match)
   if (got === '') return false // empty answer → sai (tính rõ ràng)
   const acc = accepted.map((a) => normalizeAnswer(a, match))
-  return acc.includes(got)
+  if (acc.includes(got)) return true
+  // Fallback tương đương số chữ ↔ số ('seven' == '7'), CHỈ mode ci (exact = admin muốn khớp tuyệt đối).
+  //   2 vế cùng qua 1 transform thuần → deterministic; đáp án không chứa từ-số giữ nguyên (đã trượt ở trên).
+  if (match === 'ci') {
+    const gotNum = canonicalizeNumberWords(got)
+    return acc.some((a) => canonicalizeNumberWords(a) === gotNum)
+  }
+  return false
 }
 
 export function scoreReading(answers: Record<string, unknown> | null | undefined, keys: AnswerKeys): ReadingScore {
