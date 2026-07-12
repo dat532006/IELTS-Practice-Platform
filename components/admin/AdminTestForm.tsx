@@ -219,6 +219,9 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
   const [mediaMsg, setMediaMsg] = useState('')
   const [coverUrl, setCoverUrl] = useState<string | null>(null) // ảnh minh họa đề (tests.cover_image)
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const [showBulkAns, setShowBulkAns] = useState(false) // ô nhập đáp án hàng loạt (1 dòng = 1 câu)
+  const [bulkAnsText, setBulkAnsText] = useState('')
+  const [bulkAnsMsg, setBulkAnsMsg] = useState('')
   const [showImport, setShowImport] = useState(false)
   const [importText, setImportText] = useState('')
   const [importMsg, setImportMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null)
@@ -271,6 +274,31 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
 
   const setP = (i: number, patch: Partial<Passage>) => setPassages((ps) => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)))
   const setQ = (i: number, patch: Partial<QField>) => setQuestions((qs) => qs.map((q, j) => (j === i ? { ...q, ...patch } : q)))
+
+  // Nhập đáp án hàng loạt: 1 dòng = đáp án cho 1 câu THEO THỨ TỰ trên form (dòng 1 → câu đầu).
+  //   Trong 1 dòng vẫn dùng dấu phẩy cho nhiều đáp án chấp nhận (giữ convention ô đáp án lẻ).
+  //   Dòng trống = giữ nguyên đáp án hiện có của câu đó (không xoá nhầm).
+  function openBulkAnswers() {
+    setBulkAnsText(questions.map((q) => q.answers).join('\n')) // prefill đáp án hiện có để rà/sửa
+    setBulkAnsMsg('')
+    setShowBulkAns(true)
+  }
+  function applyBulkAnswers() {
+    const lines = bulkAnsText.replace(/\r/g, '').split('\n')
+    const n = questions.length
+    const applied = lines.slice(0, n).filter((l) => l.trim() !== '').length
+    const extra = lines.slice(n).filter((l) => l.trim() !== '').length
+    setQuestions((qs) =>
+      qs.map((q, i) => {
+        const line = (lines[i] ?? '').trim()
+        return line === '' ? q : { ...q, answers: line }
+      }),
+    )
+    setBulkAnsMsg(
+      `✓ Đã điền ${applied}/${n} câu.` +
+        (extra > 0 ? ` ⚠️ Thừa ${extra} dòng cuối (form chỉ có ${n} câu) — bấm "+ Thêm câu hỏi" rồi áp dụng lại.` : ''),
+    )
+  }
 
   // Tạo nhanh nhiều hàng cùng bank + hướng dẫn: câu hiện tại thành hàng 1, mỗi dòng còn lại thêm 1 hàng dưới.
   //   Dòng "statement | đáp án" gán luôn đáp án. Số câu tự tăng từ số của câu hiện tại. Options CLONE riêng mỗi hàng.
@@ -727,16 +755,50 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
 
       {/* questions builder */}
       <div className="mt-5">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-[14px] font-extrabold text-[#2A2740]">Câu hỏi &amp; đáp án</div>
-          <button
-            type="button"
-            onClick={() => setQuestions((qs) => [...qs, { id: uid('q'), number: String(qs.length + 1), type: 'gap_filling', prompt: '', answers: '', points: '1' }])}
-            className="text-[12.5px] font-bold text-[#6A48D6]"
-          >
-            + Thêm câu hỏi
-          </button>
+          <div className="flex items-center gap-3.5">
+            <button type="button" onClick={showBulkAns ? () => setShowBulkAns(false) : openBulkAnswers} className="text-[12.5px] font-bold text-[#6A48D6]">
+              {showBulkAns ? '× Đóng nhập nhanh' : '⚡ Nhập đáp án hàng loạt'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuestions((qs) => [...qs, { id: uid('q'), number: String(qs.length + 1), type: 'gap_filling', prompt: '', answers: '', points: '1' }])}
+              className="text-[12.5px] font-bold text-[#6A48D6]"
+            >
+              + Thêm câu hỏi
+            </button>
+          </div>
         </div>
+
+        {/* Nhập đáp án hàng loạt: 1 dòng = 1 câu theo thứ tự form. Ô này cũng server-only như ô đáp án lẻ. */}
+        {showBulkAns && (
+          <div className="mb-3 rounded-[13px] border border-[#CDE8D9] bg-[#F4FBF7] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#1E9E63]">🔒 Đáp án hàng loạt (server)</span>
+              <span className="text-[11.5px] font-semibold text-[#857F96]">{questions.length} câu trên form</span>
+            </div>
+            <p className="mt-1.5 text-[12.5px] font-medium leading-[1.5] text-[#6A6480]">
+              Mỗi dòng là đáp án cho 1 câu <b>theo thứ tự trên form</b> (dòng 1 → câu 1). Nhiều đáp án chấp nhận
+              trong cùng câu: cách nhau dấu phẩy (VD: <code className="rounded bg-white px-1 font-mono">seven, 7</code>).
+              Dòng trống = giữ nguyên đáp án hiện có.
+            </p>
+            <textarea
+              className="mt-2.5 w-full rounded-[10px] border border-[#D6EDE0] bg-white px-3 py-2.5 font-mono text-[13px] leading-[1.7] text-[#157A4B] outline-none focus:border-[#1E9E63]"
+              rows={Math.min(Math.max(questions.length + 1, 6), 16)}
+              value={bulkAnsText}
+              onChange={(e) => setBulkAnsText(e.target.value)}
+              placeholder={'A\nB\nseven, 7\nTRUE\n…'}
+              spellCheck={false}
+            />
+            <div className="mt-2.5 flex flex-wrap items-center gap-3">
+              <button type="button" onClick={applyBulkAnswers} className="rounded-[10px] bg-[#1E9E63] px-4 py-2 text-[13px] font-bold text-white transition hover:bg-[#17824F]">
+                Áp dụng vào các câu ↓
+              </button>
+              {bulkAnsMsg && <span className="text-[12.5px] font-semibold text-[#3B7A5C]">{bulkAnsMsg}</span>}
+            </div>
+          </div>
+        )}
         <div className="flex flex-col gap-[11px]">
           {questions.map((q, i) => {
             const chip = TYPE_CHIP[q.type] ?? { bg: '#F0ECFF', color: '#5B43C7' }
