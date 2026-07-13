@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminApi } from '@/lib/admin/guard'
 import { addTestToProduct } from '@/lib/admin/products'
+import { refreshProductSearch } from '@/lib/admin/product-search'
 import { ok, fail } from '@/lib/api/response'
 import { isUuid } from '@/lib/utils'
 
@@ -46,5 +47,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     .eq('test_id', parsed.data.test_id)
     .select('test_id')
   if (error) return fail('INTERNAL', 'Không gỡ được đề khỏi product', { status: 500 })
-  return ok({ product_id: id, test_id: parsed.data.test_id, removed: (data?.length ?? 0) > 0 })
+  const removed = (data?.length ?? 0) > 0
+  // Luôn refresh cả khi removed=false: retry sẽ tự chữa lần DELETE trước đã gỡ link
+  // nhưng refresh thất bại.
+  const refreshed = await refreshProductSearch(admin)
+  if (!refreshed.ok) return fail('INTERNAL', 'Đã gỡ đề nhưng chưa cập nhật được catalog', { status: 500 })
+  return ok({ product_id: id, test_id: parsed.data.test_id, removed })
 }

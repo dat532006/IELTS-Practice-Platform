@@ -1,6 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { refreshProductSearch } from '@/lib/admin/product-search'
 
 // ============================================================
 // W13 — Admin Product / Bundle Manager & Pricing (M11/M04). SERVER-ONLY.
@@ -83,6 +84,11 @@ export async function updateProduct(admin: SupabaseClient, raw: unknown): Promis
     return { ok: false, code: 'INTERNAL', detail: error.message }
   }
   if (!data) return { ok: false, code: 'NOT_FOUND' }
+  // Draft/hidden không nằm trong matview; product published phải refresh để catalog thấy ngay.
+  if ((data.status as string) === 'published') {
+    const refreshed = await refreshProductSearch(admin)
+    if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã cập nhật product nhưng refresh catalog lỗi: ${refreshed.detail}` }
+  }
   return { ok: true, product_id: data.id as string, status: data.status as string }
 }
 
@@ -166,9 +172,9 @@ export async function addTestToProduct(
   const parsed = BindTestSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, code: 'VALIDATION_ERROR', detail: parsed.error.issues[0]?.message }
 
-  const { data: product } = await admin.from('products').select('id').eq('id', productId).maybeSingle()
+  const { data: product } = await admin.from('products').select('id, status').eq('id', productId).maybeSingle()
   if (!product) return { ok: false, code: 'NOT_FOUND', detail: 'product không tồn tại' }
-  const { data: test } = await admin.from('tests').select('id').eq('id', parsed.data.test_id).maybeSingle()
+  const { data: test } = await admin.from('tests').select('id, status').eq('id', parsed.data.test_id).maybeSingle()
   if (!test) return { ok: false, code: 'VALIDATION_ERROR', detail: 'test_id không tồn tại' }
 
   const { error } = await admin
@@ -178,6 +184,12 @@ export async function addTestToProduct(
       { onConflict: 'product_id,test_id' },
     )
   if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
+  // Chỉ cặp published/published có mặt trong matview. Upsert vẫn refresh khi retry để
+  // tự chữa trường hợp lần trước ghi link thành công nhưng refresh thất bại.
+  if ((product.status as string) === 'published' && (test.status as string) === 'published') {
+    const refreshed = await refreshProductSearch(admin)
+    if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã gắn đề nhưng refresh catalog lỗi: ${refreshed.detail}` }
+  }
   return { ok: true, product_id: productId, test_id: parsed.data.test_id, position: parsed.data.position }
 }
 
@@ -193,8 +205,8 @@ export async function publishProduct(admin: SupabaseClient, productId: string): 
   if (!data) return { ok: false, code: 'NOT_FOUND' }
 
   // Matview product_search BỎ QUA RLS → refresh chỉ qua RPC service_role (đã grant execute service_role).
-  const { error: rErr } = await admin.rpc('refresh_product_search')
-  if (rErr) return { ok: false, code: 'INTERNAL', detail: `published nhưng refresh product_search lỗi: ${rErr.message}` }
+  const refreshed = await refreshProductSearch(admin)
+  if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `published nhưng refresh product_search lỗi: ${refreshed.detail}` }
 
   return { ok: true, product_id: data.id as string, status: data.status as string }
 }

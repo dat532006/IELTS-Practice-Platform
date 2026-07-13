@@ -51,6 +51,12 @@ async function api(method, path, cookie, payload) {
   return { status: r.status, body }
 }
 
+async function catalogItem(productId, extra = '') {
+  const suffix = extra ? `&${extra}` : ''
+  const cat = await api('GET', `/api/products?q=${TOKEN}&page_size=48${suffix}`, null)
+  return (cat.body?.data?.items ?? []).find((item) => item.id === productId) ?? null
+}
+
 function testBody(slug, title) {
   return {
     slug, title, type: 'reading', is_free: true, difficulty: 5, duration_sec: 3600, question_types: ['gap_filling'],
@@ -156,6 +162,63 @@ const run = async () => {
   check('admin detail → 200 + bound tests', adDet.status === 200 && (adDet.body?.data?.tests?.length ?? 0) === 2, `got ${adDet.status} tests=${adDet.body?.data?.tests?.length}`)
   for (const s of ['passages', 'questions', 'answer_keys', ANSWER_SECRET]) check(`admin detail KHÔNG lộ "${s}"`, !jsonHas(adDet.body, s))
   check('non-admin admin-detail → 403', (await api('GET', `/api/admin/products/${productId}`, USER.cookie)).status === 403)
+
+  // 11) Regression VOL 09: product đã published rồi mới đổi mục lục/lifecycle test.
+  // Đây là thứ tự từng làm product hiện ở All nhưng mất khỏi filter Reading vì matview stale.
+  const publishedPatch = await api('PATCH', '/api/admin/products', ADMIN.cookie, {
+    ...PRODUCT_BODY, id: productId, price_coins: 210,
+  })
+  check('PATCH product published → 200 + refresh', publishedPatch.status === 200, `got ${publishedPatch.status}`)
+  check('catalog thấy price mới ngay', (await catalogItem(productId))?.price_coins === 210)
+
+  const unbindPub = await api('DELETE', `/api/admin/products/${productId}/tests`, ADMIN.cookie, { test_id: pubTestId })
+  check('unbind Reading khỏi product published → removed=true', unbindPub.status === 200 && unbindPub.body?.data?.removed === true)
+  check('All vẫn có product khi chỉ còn draft test', !!(await catalogItem(productId)))
+  check('Reading không có product khi skills=[]', !(await catalogItem(productId, 'skill=reading')))
+
+  const publishBoundDraft = await api('POST', `/api/admin/tests/${draftTestId}/publish`, ADMIN.cookie)
+  check('publish bound draft Reading → 200', publishBoundDraft.status === 200, `got ${publishBoundDraft.status}`)
+  check('Reading xuất hiện ngay sau publish test', !!(await catalogItem(productId, 'skill=reading')))
+
+  const updateBody = (type) => ({
+    ...testBody('w13-smoke-draft-test', '[W13] Draft Test'),
+    id: draftTestId,
+    type,
+    question_types: type === 'writing' ? ['essay'] : ['gap_filling'],
+  })
+  const toListening = await api('PATCH', '/api/admin/tests', ADMIN.cookie, updateBody('listening'))
+  check('đổi published test Reading→Listening → 200', toListening.status === 200, `got ${toListening.status}`)
+  check('Reading biến mất sau đổi type', !(await catalogItem(productId, 'skill=reading')))
+  check('Listening xuất hiện sau đổi type', !!(await catalogItem(productId, 'skill=listening')))
+
+  const toWriting = await api('PATCH', '/api/admin/tests', ADMIN.cookie, updateBody('writing'))
+  check('đổi Listening→Writing → 200', toWriting.status === 200, `got ${toWriting.status}`)
+  check('Listening biến mất sau đổi type', !(await catalogItem(productId, 'skill=listening')))
+  check('Writing xuất hiện sau đổi type', !!(await catalogItem(productId, 'skill=writing')))
+
+  const noFree = await api('PATCH', `/api/admin/tests/${draftTestId}`, ADMIN.cookie, { is_free: false })
+  check('toggle is_free published test → 200', noFree.status === 200, `got ${noFree.status}`)
+  check('free filter cập nhật ngay', !(await catalogItem(productId, 'free=1')))
+
+  const hideWriting = await api('DELETE', `/api/admin/tests/${draftTestId}`, ADMIN.cookie)
+  check('hide published Writing test → hidden', hideWriting.status === 200 && hideWriting.body?.data?.action === 'hidden')
+  check('Writing biến mất sau hide', !(await catalogItem(productId, 'skill=writing')))
+  check('All vẫn có published product sau hide', !!(await catalogItem(productId)))
+
+  const bindPublishedReading = await api('POST', `/api/admin/products/${productId}/tests`, ADMIN.cookie, { test_id: pubTestId, position: 1 })
+  check('bind Reading vào product đã published → 201', bindPublishedReading.status === 201, `got ${bindPublishedReading.status}`)
+  check('VOL xuất hiện ngay dưới Reading sau bind', !!(await catalogItem(productId, 'skill=reading')))
+  check('VOL không lọt Listening/Writing', !(await catalogItem(productId, 'skill=listening')) && !(await catalogItem(productId, 'skill=writing')))
+
+  const unbindAgain = await api('DELETE', `/api/admin/products/${productId}/tests`, ADMIN.cookie, { test_id: pubTestId })
+  check('unbind Reading lần nữa → removed=true', unbindAgain.status === 200 && unbindAgain.body?.data?.removed === true)
+  check('Reading biến mất ngay sau unbind', !(await catalogItem(productId, 'skill=reading')))
+  const unbindRetry = await api('DELETE', `/api/admin/products/${productId}/tests`, ADMIN.cookie, { test_id: pubTestId })
+  check('retry unbind idempotent → removed=false + vẫn refresh', unbindRetry.status === 200 && unbindRetry.body?.data?.removed === false)
+
+  const restoreReading = await api('POST', `/api/admin/products/${productId}/tests`, ADMIN.cookie, { test_id: pubTestId, position: 1 })
+  check('restore Reading fixture → 201', restoreReading.status === 201, `got ${restoreReading.status}`)
+  check('Reading xuất hiện lại sau restore', !!(await catalogItem(productId, 'skill=reading')))
 
   finish()
 }
