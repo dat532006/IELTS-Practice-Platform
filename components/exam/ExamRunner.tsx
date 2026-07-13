@@ -79,11 +79,19 @@ function buildGroups(passages: Passage[], questions: ExamQuestion[]): ExamGroup[
   })
 }
 
+// Choose TWO/THREE (mcq_multi) is ONE item that stands for a range of numbers → e.g. "24–26".
+const isRangeQ = (q: ExamQuestion): boolean =>
+  (q.type ?? '').toLowerCase() === 'mcq_multi' && typeof q.select_count === 'number' && q.select_count > 1
+const qEnd = (q: ExamQuestion): number => (typeof q.number === 'number' ? q.number + (isRangeQ(q) ? (q.select_count as number) - 1 : 0) : NaN)
+function qNumberLabel(q: ExamQuestion, fallback: number): string {
+  const n = typeof q.number === 'number' ? q.number : fallback
+  return isRangeQ(q) ? `${n}–${n + (q.select_count as number) - 1}` : `${n}`
+}
 function rangeLabel(qs: ExamQuestion[]): string {
   const nums = qs.map((q) => q.number).filter((n): n is number => typeof n === 'number')
   if (nums.length === 0) return ''
   const a = Math.min(...nums)
-  const b = Math.max(...nums)
+  const b = Math.max(...qs.map(qEnd).filter((n) => !Number.isNaN(n))) // extend for Choose TWO/THREE ranges
   return a === b ? `${a}` : `${a}–${b}`
 }
 
@@ -917,7 +925,7 @@ export function ExamRunner({
                 blocks.map((block, bi) => (
                   <section key={bi} className="dcx-qblock">
                     <div className="dcx-qhead">
-                      {block.qs.length > 1 ? 'Questions' : 'Question'} {rangeLabel(block.qs)}
+                      {block.qs.length > 1 || rangeLabel(block.qs).includes('–') ? 'Questions' : 'Question'} {rangeLabel(block.qs)}
                     </div>
                     {block.instruction && <InstructionText text={block.instruction} className="dcx-qinstr" />}
                     <div className="dcx-qlist">
@@ -1002,7 +1010,7 @@ export function ExamRunner({
                             return (
                               <div key={item.q.id} id={`q-${item.q.id}`} style={{ scrollMarginTop: 96 }} onFocus={() => setActiveQid(item.q.id)}>
                                 <div className="dcx-qrow">
-                                  <span className={`dcx-qnum${isActive ? ' active' : ''}`}>{item.q.number ?? idx + 1}</span>
+                                  <span className={`dcx-qnum${isActive ? ' active' : ''}${isRangeQ(item.q) ? ' range' : ''}`}>{qNumberLabel(item.q, idx + 1)}</span>
                                   {statement && <p className="dcx-qstatement">{statement}</p>}
                                   <span style={statement ? undefined : { marginLeft: 'auto' }}>{flagBtn}</span>
                                 </div>
@@ -1054,10 +1062,10 @@ export function ExamRunner({
                           href={`#q-${q.id}`}
                           onClick={() => setActiveQid(q.id)}
                           aria-current={isActive ? 'true' : undefined}
-                          aria-label={`Câu ${q.number ?? i + 1}${rv ? (rv.is_correct ? ', bạn làm đúng' : ', bạn làm sai') : done ? ', đã trả lời' : ''}${flagged ? ', đã đánh dấu' : ''}`}
-                          className={`dcx-navpill${stateCls}${isActive ? ' current' : ''}${flagged ? ' flagged' : ''}`}
+                          aria-label={`Câu ${qNumberLabel(q, i + 1)}${rv ? (rv.is_correct ? ', bạn làm đúng' : ', bạn làm sai') : done ? ', đã trả lời' : ''}${flagged ? ', đã đánh dấu' : ''}`}
+                          className={`dcx-navpill${stateCls}${isActive ? ' current' : ''}${flagged ? ' flagged' : ''}${isRangeQ(q) ? ' range' : ''}`}
                         >
-                          {q.number ?? i + 1}
+                          {qNumberLabel(q, i + 1)}
                         </a>
                       )
                     })}

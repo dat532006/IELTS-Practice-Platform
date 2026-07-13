@@ -401,6 +401,8 @@
   background: #fff;
   color: var(--coral-deep);
 }
+/* Choose TWO/THREE badge shows a range ("24–26") → let it grow past the 26px square */
+.dc-exam .dcx-qnum.range { width: auto; min-width: 26px; padding: 0 7px; }
 .dc-exam .dcx-qrow {
   display: flex;
   align-items: flex-start;
@@ -542,6 +544,9 @@
 .dc-exam .dcx-mtable td.lead { text-align: left; padding-left: 14px; }
 .dc-exam .dcx-mtable td.cell { text-align: center; border-left: 1px solid #f0ecf6; cursor: pointer; }
 .dc-exam .dcx-mtable td.cell.sel { background: #f3eeff; }
+/* matrix uses td.cell.sel (not .dcx-opt.sel) → fill the radio dot on select, like MCQ/TFNG */
+.dc-exam .dcx-mtable td.cell.sel .dcx-opt-dot { border-color: var(--brand); }
+.dc-exam .dcx-mtable td.cell.sel .dcx-opt-dot::after { opacity: 1; }
 .dc-exam .dcx-mtable .dcx-mnum { color: #5a3fc0; font-weight: 800; }
 
 /* ── Summary completion: đoạn nhiều ô liền mạch (SummaryQuestion) ── */
@@ -652,6 +657,7 @@
   line-height: 1;
   text-decoration: none;
 }
+.dc-exam .dcx-navpill.range { width: auto; min-width: 30px; padding: 0 7px; }
 .dc-exam .dcx-navpill:hover { border-color: #c9bdf0; }
 .dc-exam .dcx-navpill.answered { background: var(--brand-soft); border-color: #cdbdf5; color: #5a3fc0; }
 /* Review mode (2026-07-12): pill tô ĐÚNG/SAI theo is_correct bài đã nộp */
