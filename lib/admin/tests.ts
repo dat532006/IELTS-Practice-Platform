@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { AnswerKeyEntrySchema } from '@/lib/scoring/score-reading'
 import { sanitizePassages } from '@/lib/sanitize/passage-html'
+import { refreshProductSearch } from '@/lib/admin/product-search'
 
 // ============================================================
 // W12 — Admin test content orchestration (M11/M05). SERVER-ONLY.
@@ -104,6 +105,11 @@ export async function updateTest(admin: SupabaseClient, raw: unknown): Promise<A
       .upsert({ test_id: parsed.data.id, keys: parsed.data.answer_keys })
     if (kErr) return { ok: false, code: 'INTERNAL', detail: kErr.message }
   }
+  // Đề published sửa type/difficulty/question_types/is_free → cột matview đổi theo.
+  if ((data.status as string) === 'published') {
+    const refreshed = await refreshProductSearch(admin)
+    if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã cập nhật đề nhưng refresh catalog lỗi: ${refreshed.detail}` }
+  }
   return { ok: true, test_id: data.id as string, status: data.status as string }
 }
 
@@ -182,6 +188,11 @@ export async function setTestMeta(
     .maybeSingle()
   if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
   if (!data) return { ok: false, code: 'NOT_FOUND' }
+  // is_free của đề published nuôi has_free_test của matview (cover_image thì không).
+  if (patch.is_free !== undefined && (data.status as string) === 'published') {
+    const refreshed = await refreshProductSearch(admin)
+    if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã cập nhật đề nhưng refresh catalog lỗi: ${refreshed.detail}` }
+  }
   return { ok: true, test_id: data.id as string, status: data.status as string }
 }
 
@@ -217,6 +228,10 @@ export async function deleteTestTwoTier(admin: SupabaseClient, testId: string): 
 
   const { error } = await admin.from('tests').update({ status: 'hidden' }).eq('id', testId)
   if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
+  // Luôn refresh cả khi test đã hidden: retry sẽ tự chữa lần hide trước ghi thành công
+  // nhưng refresh thất bại.
+  const refreshed = await refreshProductSearch(admin)
+  if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã ẩn đề nhưng refresh catalog lỗi: ${refreshed.detail}` }
   return { ok: true, action: 'hidden' }
 }
 
@@ -260,5 +275,8 @@ export async function publishTest(admin: SupabaseClient, testId: string): Promis
     .single()
   if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
   if (!data) return { ok: false, code: 'NOT_FOUND' }
+  // Đề vừa published bắt đầu được matview đếm (skills/test_count của VOL chứa nó).
+  const refreshed = await refreshProductSearch(admin)
+  if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã publish đề nhưng refresh catalog lỗi: ${refreshed.detail}` }
   return { ok: true, test_id: data.id as string, status: data.status as string }
 }
