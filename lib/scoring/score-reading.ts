@@ -13,7 +13,7 @@
 // ============================================================
 
 import { z } from 'zod'
-import { normalizeAnswer, canonicalizeNumberWords, type MatchMode } from './normalize'
+import { normalizeAnswer, cardinalValue, type MatchMode } from './normalize'
 
 // Các dạng được scoring hỗ trợ (single-value, trừ mcq_multi = set). Type lạ → key invalid (không single-hóa âm thầm).
 export const ALLOWED_KEY_TYPES = [
@@ -110,11 +110,12 @@ export function isAnswerCorrect(userAnswer: unknown, key: AnswerKeyEntry): boole
   if (got === '') return false // empty answer → sai (tính rõ ràng)
   const acc = accepted.map((a) => normalizeAnswer(a, match))
   if (acc.includes(got)) return true
-  // Fallback tương đương số chữ ↔ số ('seven' == '7'), CHỈ mode ci (exact = admin muốn khớp tuyệt đối).
-  //   2 vế cùng qua 1 transform thuần → deterministic; đáp án không chứa từ-số giữ nguyên (đã trượt ở trên).
+  // EXAM-005 — Fallback tương đương số chữ ↔ chữ-số CHỈ khi CẢ HAI vế là cardinal THUẦN ('seven' == '7',
+  //   'twenty-one' == '21'), CHỈ mode ci. Cụm có token phi-số ('One Direction' → null) KHÔNG canon →
+  //   không false positive ngữ nghĩa. exact = khớp tuyệt đối, không canon.
   if (match === 'ci') {
-    const gotNum = canonicalizeNumberWords(got)
-    return acc.some((a) => canonicalizeNumberWords(a) === gotNum)
+    const g = cardinalValue(got)
+    if (g != null) return acc.some((a) => cardinalValue(a) === g)
   }
   return false
 }
