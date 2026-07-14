@@ -395,23 +395,28 @@ begin
   end;
 end $$;
 
--- ---------- Check 21: listening score_bands = IELTS Academic (boundary phân biệt bảng đúng/sai) ----------
+-- ---------- Check 21 (EXAM-001/TEST-001): listening score_bands = IELTS Academic — FULL 3..40 ----------
+-- Fail-closed toàn bảng: mọi raw 3..40 phải map ĐÚNG bằng Reading Academic (bảng chuẩn); raw<3 unmapped.
+-- Trước đây chỉ spot-check và MÃ HOÁ giá trị SAI (18→5.5) → false-green. Giờ so từng raw với reading.
 do $$
-declare cnt int; b numeric;
+declare cnt int; r int; bl numeric; br numeric;
 begin
   select count(*) into cnt from public.score_bands where test_type = 'listening';
   if cnt <> 14 then raise exception 'FAIL check21: listening bands có % dòng (kỳ vọng 14 Academic)', cnt; end if;
-  select band into b from public.score_bands where test_type='listening' and 10 between raw_min and raw_max;
-  if b is distinct from 4.0 then raise exception 'FAIL check21: raw 10 → % (kỳ vọng 4.0)', b; end if;
-  select band into b from public.score_bands where test_type='listening' and 40 between raw_min and raw_max;
-  if b is distinct from 9.0 then raise exception 'FAIL check21: raw 40 → % (kỳ vọng 9.0)', b; end if;
-  select band into b from public.score_bands where test_type='listening' and 18 between raw_min and raw_max;
-  if b is distinct from 5.5 then raise exception 'FAIL check21: raw 18 → % (kỳ vọng 5.5)', b; end if;
-  select band into b from public.score_bands where test_type='listening' and 23 between raw_min and raw_max;
-  if b is distinct from 6.0 then raise exception 'FAIL check21: raw 23 → % (kỳ vọng 6.0)', b; end if;
+  for r in 3..40 loop
+    select band into bl from public.score_bands where test_type='listening' and r between raw_min and raw_max;
+    select band into br from public.score_bands where test_type='reading'   and r between raw_min and raw_max;
+    if bl is null then raise exception 'FAIL check21: listening raw % không map', r; end if;
+    if bl is distinct from br then raise exception 'FAIL check21: listening raw % = % nhưng reading = %', r, bl, br; end if;
+  end loop;
+  -- 4 điểm từng lệch (guard hồi quy tường minh): 18/19→5.0, 26→6.0, 32→7.0.
+  if (select band from public.score_bands where test_type='listening' and 18 between raw_min and raw_max) <> 5.0 then raise exception 'FAIL check21: raw 18 != 5.0'; end if;
+  if (select band from public.score_bands where test_type='listening' and 19 between raw_min and raw_max) <> 5.0 then raise exception 'FAIL check21: raw 19 != 5.0'; end if;
+  if (select band from public.score_bands where test_type='listening' and 26 between raw_min and raw_max) <> 6.0 then raise exception 'FAIL check21: raw 26 != 6.0'; end if;
+  if (select band from public.score_bands where test_type='listening' and 32 between raw_min and raw_max) <> 7.0 then raise exception 'FAIL check21: raw 32 != 7.0'; end if;
   perform 1 from public.score_bands where test_type='listening' and 2 between raw_min and raw_max;
   if found then raise exception 'FAIL check21: raw 2 không nên map (kỳ vọng unmapped, raw<3)'; end if;
-  raise notice 'PASS check21: listening bands = IELTS Academic (raw 10→4.0, 18→5.5, 23→6.0, 40→9.0, raw<3 unmapped)';
+  raise notice 'PASS check21: listening = Reading Academic toàn bộ raw 3..40 (18/19→5.0, 26→6.0, 32→7.0); raw<3 unmapped';
 end $$;
 
 -- ---------- Check 22: client KHÔNG đọc/gọi AI IP rate-limit internals ----------
