@@ -19,7 +19,7 @@ export const countWords = (s: string): number => (s.trim().match(/\S+/g) ?? []).
 
 export type WritingOutcome =
   | { ok: true; result: WritingGradeResult; warnings: string[] }
-  | { ok: false; code: 'NOT_FOUND' | 'ATTEMPT_TERMINAL' | 'WORD_COUNT_TOO_LOW' | 'RATE_LIMITED' | 'AI_UNAVAILABLE' }
+  | { ok: false; code: 'NOT_FOUND' | 'ATTEMPT_TERMINAL' | 'WORD_COUNT_TOO_LOW' | 'RATE_LIMITED' | 'AI_UNAVAILABLE' | 'GRADING_CONFLICT' }
 
 type AttemptRow = { id: string; user_id: string; test_id: string; status: string }
 type Passage = { id?: string; number?: number; title?: string; content?: string }
@@ -82,6 +82,22 @@ export async function submitWritingGrade(
   if ((testRow.type ?? '') !== 'writing') return { ok: false, code: 'NOT_FOUND' }
   const prompts = extractPrompts(testRow.passages)
 
+  // 3b) EXAM-002 — ATOMIC IDEMPOTENCY CLAIM trước khi reserve/gọi provider. Insert placeholder row
+  //   (ai_score=null) vào writing_submissions; unique(attempt_id) đảm bảo CHỈ 1 request thắng claim.
+  //   Request thua (unique_violation 23505) → KHÔNG reserve quota, KHÔNG gọi provider → GRADING_CONFLICT.
+  //   → dưới concurrency: đúng 1 provider call, 1 quota, 1 row, 1 winner finalize.
+  const { error: claimErr } = await admin
+    .from('writing_submissions')
+    .insert({ attempt_id: attempt.id, user_id: userId, ai_score: null })
+  if (claimErr) {
+    if ((claimErr as { code?: string }).code === '23505') return { ok: false, code: 'GRADING_CONFLICT' }
+    throw new Error(claimErr.message)
+  }
+  // Từ đây winner SỞ HỮU claim row; mọi return sớm PHẢI release (xoá placeholder) để cho phép retry.
+  const releaseClaim = async () => {
+    await admin.from('writing_submissions').delete().eq('attempt_id', attempt.id).eq('user_id', userId).is('ai_score', null)
+  }
+
   // 4) Rate limit — IP/day atomic first, then per-user free quota. Pro bypasses per-user, not IP anti-abuse.
   let ipReserved = false
   let userReserved = false
@@ -89,28 +105,29 @@ export async function submitWritingGrade(
     p_ip_hash: body.ip_hash,
     p_limit: body.ip_daily_limit,
   })
-  if (ipErr) throw new Error(ipErr.message)
+  if (ipErr) { await releaseClaim(); throw new Error(ipErr.message) }
   ipReserved = typeof ipCount === 'number' && ipCount <= body.ip_daily_limit
-  if (!ipReserved) return { ok: false, code: 'RATE_LIMITED' }
+  if (!ipReserved) { await releaseClaim(); return { ok: false, code: 'RATE_LIMITED' } }
 
   const { data: pData, error: pErr } = await admin
     .from('profiles')
     .select('plan')
     .eq('id', userId)
     .maybeSingle()
-  if (pErr) throw new Error(pErr.message)
+  if (pErr) { await refundReservations(admin, userId, body.ip_hash, false, ipReserved); await releaseClaim(); throw new Error(pErr.message) }
   const plan = ((pData as { plan?: string } | null)?.plan ?? 'free') as string
   if (plan !== 'pro') {
     const { data: rc, error: rErr } = await admin.rpc('reserve_ai_grade', { p_user_id: userId })
-    if (rErr) throw new Error(rErr.message)
+    if (rErr) { await refundReservations(admin, userId, body.ip_hash, false, ipReserved); await releaseClaim(); throw new Error(rErr.message) }
     userReserved = true
     if (typeof rc === 'number' && rc > FREE_DAILY_LIMIT) {
       await refundReservations(admin, userId, body.ip_hash, false, ipReserved)
+      await releaseClaim()
       return { ok: false, code: 'RATE_LIMITED' }
     }
   }
 
-  // 5) Grade (Claude/mock). 6) AI fail → refund quota → AI_UNAVAILABLE.
+  // 5) Grade (Claude/mock). 6) AI fail → refund quota + release claim (cho retry) → AI_UNAVAILABLE.
   const outcome = await gradeWriting({
     task1_prompt: prompts.task1,
     task2_prompt: prompts.task2,
@@ -119,6 +136,7 @@ export async function submitWritingGrade(
   })
   if (!outcome.ok) {
     await refundReservations(admin, userId, body.ip_hash, userReserved, ipReserved)
+    await releaseClaim()
     return { ok: false, code: 'AI_UNAVAILABLE' }
   }
 
@@ -133,19 +151,20 @@ export async function submitWritingGrade(
     graded_at,
   }
 
-  // 8) Persist writing_submissions (service_role; idempotent delete+insert theo attempt). Finalize attempt.
-  await admin.from('writing_submissions').delete().eq('attempt_id', attempt.id).eq('user_id', userId)
-  const { error: wErr } = await admin.from('writing_submissions').insert({
-    attempt_id: attempt.id,
-    user_id: userId,
-    task1_text: body.task1_text,
-    task2_text: body.task2_text,
-    task1_wc,
-    task2_wc,
-    ai_score,
-    graded_at,
-  })
-  if (wErr) throw new Error(wErr.message)
+  // 8) Persist: UPDATE claim row đã sở hữu (không delete+insert → không đua/duplicate). Finalize attempt.
+  const { error: wErr } = await admin
+    .from('writing_submissions')
+    .update({
+      task1_text: body.task1_text,
+      task2_text: body.task2_text,
+      task1_wc,
+      task2_wc,
+      ai_score,
+      graded_at,
+    })
+    .eq('attempt_id', attempt.id)
+    .eq('user_id', userId)
+  if (wErr) { await refundReservations(admin, userId, body.ip_hash, userReserved, ipReserved); await releaseClaim(); throw new Error(wErr.message) }
   // Finalize attempt (band = overall cho history/dashboard M09). Conditional: chỉ khi chưa terminal.
   if (attempt.status === 'in_progress') {
     await admin
