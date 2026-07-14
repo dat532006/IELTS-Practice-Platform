@@ -101,6 +101,23 @@ export function buildSepayQrUrl(input: { amountVnd: number; ref: string }): stri
   return `https://qr.sepay.vn/img?${p.toString()}`
 }
 
+// PAY-002 — chuẩn hoá số tài khoản để so khớp beneficiary: bỏ ký tự không phải chữ/số, viết hoa.
+//   Chống lệch format (khoảng trắng/dấu '-') mà vẫn khớp đúng tài khoản người bán.
+function normalizeAccount(v: string | null | undefined): string {
+  return (v ?? '').replace(/[^0-9a-zA-Z]/g, '').toUpperCase()
+}
+
+// PAY-002 — event SePay (đã verify HMAC) có VÀO ĐÚNG tài khoản người bán (SEPAY_BANK_ACCOUNT) không.
+//   Event ký hợp lệ nhưng accountNumber khác (định tuyến sai / cấu hình người khác) KHÔNG được credit.
+//   Fail-closed: thiếu accountNumber hoặc chưa cấu hình tài khoản → false. So cả subAccount (VA ảo).
+export function sepayBeneficiaryMatches(body: SepayWebhookBody): boolean {
+  const expected = normalizeAccount(env('SEPAY_BANK_ACCOUNT'))
+  if (!expected) return false
+  const acct = normalizeAccount(body.accountNumber)
+  const sub = normalizeAccount(body.subAccount)
+  return (!!acct && acct === expected) || (!!sub && sub === expected)
+}
+
 export function sepayBankInfo(): { account: string; bank: string; name: string | null } {
   return {
     account: env('SEPAY_BANK_ACCOUNT'),

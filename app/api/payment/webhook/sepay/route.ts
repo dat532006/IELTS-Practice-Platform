@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { verifySepayWebhook, extractTopupRef, sepayConfigured, type SepayWebhookBody } from '@/lib/payments/sepay'
+import { verifySepayWebhook, extractTopupRef, sepayBeneficiaryMatches, sepayConfigured, type SepayWebhookBody } from '@/lib/payments/sepay'
 import { settleVerifiedTopup } from '@/lib/payments/settle'
 
 // A1-alt — SePay webhook (biến động số dư, provider='bank'). SePay yêu cầu response HTTP 200/201
@@ -36,6 +36,16 @@ export async function POST(request: Request) {
   if (!ref) {
     // Giao dịch không mang mã TOPUP (CK tay ngoài luồng) → ACK + log để đối soát khi cần.
     console.warn(`[payment/sepay] incoming transfer without TOPUP ref (sepay_id=${body.id ?? '?'})`)
+    return ACK()
+  }
+
+  // PAY-002 — bind beneficiary: tiền phải VÀO ĐÚNG tài khoản người bán. Event ký hợp lệ nhưng
+  //   accountNumber khác (định tuyến sai / cấu hình bên thứ ba) → KHÔNG credit; ACK + log đối soát
+  //   (retry vô ích vì beneficiary sai không tự sửa). Giữ pending để xử lý tay.
+  if (!sepayBeneficiaryMatches(body)) {
+    console.error(
+      `[payment/sepay] beneficiary mismatch ref=${ref} acct=${body.accountNumber ?? 'n/a'} sub=${body.subAccount ?? 'n/a'} (sepay_id=${body.id ?? '?'})`,
+    )
     return ACK()
   }
 
