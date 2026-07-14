@@ -359,7 +359,9 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       duration_sec: Math.max(1, Number(durationMin) || 60) * 60,
       passages: passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), content: p.content })),
       questions: qOut,
-      answer_keys: Object.keys(answer_keys).length ? answer_keys : undefined,
+      // ADMIN-003: LUÔN gửi answer_keys (kể cả {}) → save là AUTHORITATIVE. Xoá hết đáp án → {} → server
+      //   xoá key cũ (không còn stale). Bỏ trống = giữ nguyên chỉ dành cho caller không quản key.
+      answer_keys,
     }
   }
 
