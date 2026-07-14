@@ -3,7 +3,8 @@
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { invalidateHeaderProfile } from '@/lib/auth/client-profile'
+import { performLogout } from '@/lib/auth/logout'
+import { makeActivityBus } from '@/lib/auth/cross-tab'
 
 // Passive logout (2026-07-13, Owner duyệt): treo máy quá hạn → tự đăng xuất + về /login?reason=idle.
 // - Đếm bằng TIMESTAMP + interval (KHÔNG setTimeout thuần): máy sleep/tab bị throttle, tỉnh dậy
@@ -37,9 +38,19 @@ export function IdleLogout() {
       lastActiveRef.current = Date.now() // vừa đăng nhập/refresh = đang hoạt động
     })
 
+    // SEC-003 — chia sẻ mốc hoạt động giữa các tab: tab này chạm → broadcast (throttle 5s); nhận ts từ
+    //   tab khác → nâng lastActive. Nhờ đó tab IDLE KHÔNG đăng xuất khi còn tab khác đang dùng; chỉ khi
+    //   MỌI tab idle quá hạn mới logout (không còn "idle B văng cả tab active A").
+    const bus = makeActivityBus()
+    let lastBroadcast = 0
     const mark = () => {
-      lastActiveRef.current = Date.now()
+      const now = Date.now()
+      lastActiveRef.current = now
+      if (now - lastBroadcast > 5_000) { lastBroadcast = now; bus.post(now) }
     }
+    const unsubBus = bus.subscribe((ts) => {
+      if (ts > lastActiveRef.current) lastActiveRef.current = ts
+    })
     // capture: bắt cả scroll/gõ phím trong container con (scroll không bubble).
     const events: (keyof WindowEventMap)[] = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart']
     for (const ev of events) window.addEventListener(ev, mark, { passive: true, capture: true })
@@ -54,18 +65,8 @@ export function IdleLogout() {
       const limit = p.startsWith('/admin') ? ADMIN_LIMIT_MS : DEFAULT_LIMIT_MS
       if (Date.now() - lastActiveRef.current < limit) return
       loggingOutRef.current = true
-      try {
-        await supabase.auth.signOut() // revoke server-side (global)
-      } catch {
-        // Mạng lỗi → ít nhất xóa session CỤC BỘ (cookie) để logout dính — không thì /login
-        // thấy session còn sống sẽ đẩy ngược về dashboard (guard 2026-07-13).
-        try {
-          await supabase.auth.signOut({ scope: 'local' })
-        } catch {
-          /* hết cách — điều hướng vẫn diễn ra */
-        }
-      }
-      invalidateHeaderProfile() // header public cache email/coin (bài học PR #23)
+      // SEC-002 — checked signOut + local fallback + invalidate header cache (helper) rồi mới điều hướng.
+      await performLogout()
       window.location.href = '/login?reason=idle'
     }
     const interval = setInterval(() => void check(), CHECK_EVERY_MS)
@@ -77,6 +78,8 @@ export function IdleLogout() {
     return () => {
       clearInterval(interval)
       sub.subscription.unsubscribe()
+      unsubBus()
+      bus.close()
       document.removeEventListener('visibilitychange', onVisibility)
       for (const ev of events) window.removeEventListener(ev, mark, { capture: true })
     }
