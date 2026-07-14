@@ -184,13 +184,33 @@ export async function addTestToProduct(
       { onConflict: 'product_id,test_id' },
     )
   if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
-  // Chỉ cặp published/published có mặt trong matview. Upsert vẫn refresh khi retry để
-  // tự chữa trường hợp lần trước ghi link thành công nhưng refresh thất bại.
-  if ((product.status as string) === 'published' && (test.status as string) === 'published') {
-    const refreshed = await refreshProductSearch(admin)
-    if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã gắn đề nhưng refresh catalog lỗi: ${refreshed.detail}` }
-  }
+  // ADMIN-009 — LUÔN refresh sau khi gắn (durable), KHÔNG quyết theo status ĐỌC TRƯỚC upsert: một publish
+  //   chen giữa read↔decision có thể khiến cặp vừa-published bị BỎ refresh → catalog cũ (missed invalidation).
+  //   Bind là thao tác admin hiếm; refresh dư khi product/test còn draft (không đổi matview) chấp nhận được.
+  //   Đồng nhất với đường unbind (DELETE) vốn đã luôn refresh.
+  const refreshed = await refreshProductSearch(admin)
+  if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã gắn đề nhưng refresh catalog lỗi: ${refreshed.detail}` }
   return { ok: true, product_id: productId, test_id: parsed.data.test_id, position: parsed.data.position }
+}
+
+// ADMIN-010 — Hoán đổi thứ tự 2 đề trong product ATOMIC (RPC 1 transaction, khoá FOR UPDATE) → không để
+//   swap nửa vời/trùng position như đường UI-2-request cũ. position là thứ tự nội bộ (KHÔNG nằm trong
+//   matview product_search) → không cần refresh catalog.
+export async function reorderProductTests(
+  admin: SupabaseClient,
+  productId: string,
+  testA: string,
+  testB: string,
+): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'INTERNAL'; detail?: string }> {
+  const { data, error } = await admin.rpc('reorder_product_tests', {
+    p_product_id: productId,
+    p_test_a: testA,
+    p_test_b: testB,
+  })
+  if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
+  const res = data as { ok?: boolean; code?: string } | null
+  if (!res?.ok) return res?.code === 'NOT_FOUND' ? { ok: false, code: 'NOT_FOUND' } : { ok: false, code: 'INTERNAL' }
+  return { ok: true }
 }
 
 // Publish draft→published + refresh product_search (service_role). Trả status mới.
