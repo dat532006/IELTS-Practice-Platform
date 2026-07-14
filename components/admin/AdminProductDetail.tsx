@@ -195,6 +195,8 @@ export function AdminProductDetail({ productId }: { productId: string }) {
     }
   }
 
+  // ADMIN-010 — đổi thứ tự qua 1 endpoint ATOMIC (swap trong 1 transaction), KIỂM kết quả. Đường cũ gọi 2
+  //   bind tuần tự + bỏ qua {ok} → fail giữa chừng để swap nửa vời/trùng position mà vẫn báo thành công.
   async function move(idx: number, dir: -1 | 1) {
     const ordered = [...tests].sort((a, b) => a.position - b.position || a.test_id.localeCompare(b.test_id))
     const j = idx + dir
@@ -204,11 +206,17 @@ export function AdminProductDetail({ productId }: { productId: string }) {
     const a = ordered[idx],
       b = ordered[j]
     try {
-      await bindTest(a.test_id, b.position)
-      await bindTest(b.test_id, a.position)
-      await load()
+      const r = await fetch(`/api/admin/products/${productId}/tests/reorder`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ test_id_a: a.test_id, test_id_b: b.test_id }),
+      })
+      const jb = await r.json().catch(() => null)
+      if (!r.ok) setBindErr((jb?.message as string) || 'Không đổi được thứ tự.')
+      await load() // luôn reload → UI phản ánh trạng thái server thật (thành công HAY thất bại)
     } catch {
-      setBindErr('Không đổi được thứ tự.')
+      setBindErr('Lỗi kết nối khi đổi thứ tự.')
+      await load()
     } finally {
       setBusy('')
     }
