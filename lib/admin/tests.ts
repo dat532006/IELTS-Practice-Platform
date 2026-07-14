@@ -253,34 +253,24 @@ export type DeleteTestOutcome =
   | { ok: true; action: 'deleted' | 'hidden' }
   | { ok: false; code: 'NOT_FOUND' | 'INTERNAL'; detail?: string }
 export async function deleteTestTwoTier(admin: SupabaseClient, testId: string): Promise<DeleteTestOutcome> {
-  const { data: t, error: tErr } = await admin.from('tests').select('id, status').eq('id', testId).maybeSingle()
-  if (tErr) return { ok: false, code: 'INTERNAL', detail: tErr.message }
-  if (!t) return { ok: false, code: 'NOT_FOUND' }
-
-  const { count, error: cErr } = await admin
-    .from('attempts')
-    .select('id', { count: 'exact', head: true })
-    .eq('test_id', testId)
-  if (cErr) return { ok: false, code: 'INTERNAL', detail: cErr.message }
-
-  const attempts = count ?? 0
-  if ((t as { status: string }).status === 'draft' && attempts === 0) {
-    for (const table of ['answer_keys', 'collection_tests', 'test_unlocks', 'bookmarks'] as const) {
-      const { error } = await admin.from(table).delete().eq('test_id', testId)
-      if (error) return { ok: false, code: 'INTERNAL', detail: `${table}: ${error.message}` }
-    }
-    const { error } = await admin.from('tests').delete().eq('id', testId)
-    if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
-    return { ok: true, action: 'deleted' }
-  }
-
-  const { error } = await admin.from('tests').update({ status: 'hidden' }).eq('id', testId)
+  // ADMIN-005 — quyết định (đọc status + count dưới KHOÁ) và toàn bộ cleanup dependents + xoá/ẩn nằm
+  //   TRONG 1 RPC = 1 transaction (admin_delete_test): loại TOCTOU publish/start-attempt và cleanup
+  //   nửa vời. TS chỉ còn map lỗi + refresh matview cho nhánh hidden (refresh concurrently không đặt
+  //   được trong transaction).
+  const { data, error } = await admin.rpc('admin_delete_test', { p_test_id: testId })
   if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
-  // Luôn refresh cả khi test đã hidden: retry sẽ tự chữa lần hide trước ghi thành công
-  // nhưng refresh thất bại.
-  const refreshed = await refreshProductSearch(admin)
-  if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã ẩn đề nhưng refresh catalog lỗi: ${refreshed.detail}` }
-  return { ok: true, action: 'hidden' }
+  const res = data as { ok?: boolean; code?: string; action?: 'deleted' | 'hidden' } | null
+  if (!res?.ok) {
+    if (res?.code === 'NOT_FOUND') return { ok: false, code: 'NOT_FOUND' }
+    return { ok: false, code: 'INTERNAL', detail: res?.code ?? 'unknown' }
+  }
+  if (res.action === 'hidden') {
+    // Đề rời catalog → refresh matview. Luôn refresh cả khi đã hidden sẵn: retry tự chữa lần hide trước
+    // ghi thành công nhưng refresh thất bại. Xoá cứng (deleted) là draft — chưa từng vào matview.
+    const refreshed = await refreshProductSearch(admin)
+    if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã ẩn đề nhưng refresh catalog lỗi: ${refreshed.detail}` }
+  }
+  return { ok: true, action: res.action ?? 'hidden' }
 }
 
 // Preview admin-only: full test + answer_keys (kênh riêng, KHÔNG phải /api/exam). Chỉ gọi sau requireAdmin.
