@@ -14,12 +14,20 @@ export async function POST(request: Request) {
   const user = await getSessionUser()
   if (!user) return fail('UNAUTHORIZED', 'Bạn cần đăng nhập', { status: 401 })
 
+  // PAY-001 — fail-closed intent: CHỈ "không body" (rỗng) mới rơi xuống checkout cart (backward-compat).
+  //   Body CÓ mặt nhưng sai (không phải JSON / thiếu/xấu product_id) → 400, KHÔNG suy diễn thành mua cart.
+  const rawBody = (await request.text()).trim()
   let productId: string | undefined
-  try {
-    const parsed = BuyNowSchema.safeParse(await request.json())
-    if (parsed.success) productId = parsed.data.product_id
-  } catch {
-    /* không có body / JSON rỗng → checkout cart */
+  if (rawBody !== '') {
+    let json: unknown
+    try {
+      json = JSON.parse(rawBody)
+    } catch {
+      return fail('VALIDATION_ERROR', 'Body JSON không hợp lệ', { status: 400 })
+    }
+    const parsed = BuyNowSchema.safeParse(json)
+    if (!parsed.success) return fail('VALIDATION_ERROR', 'Yêu cầu mua không hợp lệ', { status: 400 })
+    productId = parsed.data.product_id
   }
 
   const admin = createAdminClient()
