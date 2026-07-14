@@ -60,22 +60,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // B-04: đếm pending chưa hết hạn của user TRƯỚC khi insert — vượt cap → 429 (không tạo thêm rác pending).
-  const { count: pendingCount, error: cntErr } = await admin
-    .from('transactions')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('type', 'topup')
-    .eq('status', 'pending')
-    .gt('expires_at', new Date().toISOString())
-  if (cntErr) return fail('INTERNAL', 'Không khởi tạo được thanh toán', { status: 500 })
-  if ((pendingCount ?? 0) >= getMaxPendingTopups()) {
-    return fail('RATE_LIMITED', 'Bạn có quá nhiều giao dịch nạp đang chờ, vui lòng hoàn tất hoặc chờ hết hạn', {
-      status: 429,
-    })
-  }
-
-  // live: provider phải có creds TRƯỚC khi insert (thiếu → 503, không tạo pending rác).
+  // live: provider phải có creds TRƯỚC khi admit (thiếu → 503, không tạo pending rác).
   //   'bank' = chuyển khoản VietQR qua SePay (A1-alt) — không cần merchant gateway.
   if (mode === 'live') {
     const configured =
@@ -87,18 +72,26 @@ export async function POST(request: Request) {
     }
   }
 
+  // PAY-003 — admission ATOMIC: cap pending (B-04, chống spam pending) + insert trong 1 RPC có advisory
+  //   lock per-user (admit_topup). Trước đây count rồi insert tách rời → đua đồng thời vượt cap. amount_coins
+  //   / provider_txn_id / expires_at do SERVER tính (không tin client); coin CHỈ cộng ở webhook sau verify.
   const provider_txn_id = 'TOPUP-' + randomBytes(9).toString('hex')
-  const { error } = await admin.from('transactions').insert({
-    user_id: user.id,
-    amount_vnd: parsed.data.amount_vnd, // fiat phải trả (webhook/IPN verify khớp)
-    amount_coins: conv.coins,           // server tính; coin CHỈ cộng ở webhook/IPN sau verify
-    type: 'topup',
-    provider: parsed.data.provider,
-    provider_txn_id,
-    status: 'pending',
-    expires_at: new Date(Date.now() + TOPUP_PENDING_TTL_MS).toISOString(),
+  const expires_at = new Date(Date.now() + TOPUP_PENDING_TTL_MS).toISOString()
+  const { data: admit, error } = await admin.rpc('admit_topup', {
+    p_user_id: user.id,
+    p_amount_vnd: parsed.data.amount_vnd,
+    p_amount_coins: conv.coins,
+    p_provider: parsed.data.provider,
+    p_provider_txn_id: provider_txn_id,
+    p_expires_at: expires_at,
+    p_max_pending: getMaxPendingTopups(),
   })
   if (error) return fail('INTERNAL', 'Không khởi tạo được thanh toán', { status: 500 })
+  if (!(admit as { ok?: boolean } | null)?.ok) {
+    return fail('RATE_LIMITED', 'Bạn có quá nhiều giao dịch nạp đang chờ, vui lòng hoàn tất hoặc chờ hết hạn', {
+      status: 429,
+    })
+  }
 
   let redirect_url: string
   if (mode === 'live' && parsed.data.provider === 'vnpay') {
