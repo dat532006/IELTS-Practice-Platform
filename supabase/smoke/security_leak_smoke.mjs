@@ -57,6 +57,8 @@ const ADMIN_ENDPOINTS = [
   ['POST', '/api/admin/tests', {}],
   ['PATCH', '/api/admin/tests', {}],
   ['POST', '/api/admin/payments/reconcile'],
+  ['GET', '/api/admin/payments/exceptions', undefined],
+  ['POST', `/api/admin/payments/exceptions/${DUMMY}/resolve`, { status: 'resolved' }],
   ['POST', '/api/admin/products', {}],
   ['PATCH', '/api/admin/products', {}],
   ['GET', '/api/admin/products', undefined],

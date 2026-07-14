@@ -13,6 +13,28 @@ export type SettleResult =
   | { ok: true; credited: boolean; marked_failed?: boolean }
   | { ok: false; code: 'PAYMENT_AMOUNT_MISMATCH' | 'INTERNAL' }
 
+// PAY-004 — ghi payment exception bền + dedup qua RPC (best-effort: lỗi ghi case KHÔNG được nuốt
+//   quyết định fail-closed của settle, chỉ log). detail redacted (chỉ số tiền, KHÔNG secret/PII thô).
+async function recordException(
+  admin: SupabaseClient,
+  provider: 'vnpay' | 'momo' | 'bank',
+  txnId: string,
+  paidVnd: number | null,
+  expectedVnd: number | null,
+  userId: string | null,
+): Promise<void> {
+  const { error } = await admin.rpc('record_payment_exception', {
+    p_provider: provider,
+    p_txn_id: txnId,
+    p_kind: 'amount_mismatch',
+    p_paid_vnd: paidVnd,
+    p_expected_vnd: expectedVnd,
+    p_user: userId,
+    p_detail: { paid_vnd: paidVnd, expected_vnd: expectedVnd },
+  })
+  if (error) console.error(`[payments/settle] record_payment_exception failed txn=${txnId}: ${error.message}`)
+}
+
 export async function settleVerifiedTopup(
   admin: SupabaseClient,
   provider: 'vnpay' | 'momo' | 'bank',
@@ -38,19 +60,22 @@ export async function settleVerifiedTopup(
 
   const { data: txn } = await admin
     .from('transactions')
-    .select('amount_vnd')
+    .select('amount_vnd, user_id')
     .eq('provider', provider)
     .eq('provider_txn_id', txnId)
     .eq('type', 'topup')
     .in('status', ['pending', 'expired'])
     .maybeSingle()
-  const row = txn as { amount_vnd: number | null } | null
+  const row = txn as { amount_vnd: number | null; user_id: string | null } | null
   if (row && row.amount_vnd == null) {
     console.error(`[payments/settle] missing amount_vnd on creditable txn=${txnId} — fail-closed`)
+    // PAY-004 — ghi case bền để đối soát (dedup); KHÔNG credit.
+    await recordException(admin, provider, txnId, amountVnd, null, row.user_id ?? null)
     return { ok: false, code: 'PAYMENT_AMOUNT_MISMATCH' }
   }
   if (row && amountVnd !== row.amount_vnd) {
     console.error(`[payments/settle] amount mismatch txn=${txnId} paid=${amountVnd} expected=${row.amount_vnd}`)
+    await recordException(admin, provider, txnId, amountVnd, row.amount_vnd, row.user_id ?? null)
     return { ok: false, code: 'PAYMENT_AMOUNT_MISMATCH' }
   }
 

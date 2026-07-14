@@ -781,5 +781,19 @@ begin
   raise notice 'PASS check37: ban enforcement (is_user_banned + restrictive RLS) đúng';
 end $$;
 
+-- ---------- Check 38 (PAY-004): payment_exceptions deny client (chỉ service_role) ----------
+do $$
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated;
+  begin
+    perform 1 from public.payment_exceptions limit 1;
+    raise exception 'FAIL check38: authenticated đọc được payment_exceptions';
+  exception when insufficient_privilege then
+    raise notice 'PASS check38: payment_exceptions denied to client (service_role only)';
+  end;
+  reset role;
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
 
