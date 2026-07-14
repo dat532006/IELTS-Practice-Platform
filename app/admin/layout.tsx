@@ -12,6 +12,7 @@ const navItems = [
   { href: '/admin/users', label: 'Người dùng' },
   { href: '/admin/activation-codes', label: 'Mã kích hoạt' },
   { href: '/admin/grants', label: 'Cấp quyền' },
+  { href: '/admin/payments', label: 'Đối soát' },
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
