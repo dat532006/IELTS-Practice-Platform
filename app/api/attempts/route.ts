@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthedUser } from '@/lib/auth/guards'
 import { ok, fail } from '@/lib/api/response'
 
 // GET /api/attempts — lịch sử làm bài (M09, W17).
@@ -11,9 +12,7 @@ const PRO_CAP = 500
 
 export async function GET() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthedUser(supabase)
   if (!user) return fail('UNAUTHORIZED', 'Bạn cần đăng nhập', { status: 401 })
 
   const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle()

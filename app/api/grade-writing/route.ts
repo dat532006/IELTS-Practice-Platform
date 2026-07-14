@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthedUser } from '@/lib/auth/guards'
 import { submitWritingGrade } from '@/lib/exam/writing'
 import { ok, fail } from '@/lib/api/response'
 import { extractTrustedClientIp, getAiGradeIpDailyLimit, hashAiGradeIp } from '@/lib/rate-limit/ai-ip'
@@ -18,9 +19,7 @@ const BodySchema = z.object({
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getAuthedUser(supabase)
     if (!user) return fail('UNAUTHORIZED', 'Cần đăng nhập để chấm bài Writing', { status: 401 })
 
     const raw = await request.json().catch(() => null)

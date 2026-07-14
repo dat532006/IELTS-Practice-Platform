@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthedUser } from '@/lib/auth/guards'
 import { ok, fail } from '@/lib/api/response'
 import { isUuid } from '@/lib/utils'
 import { HighlightsSchema } from '@/lib/exam/highlights'
@@ -28,9 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!isUuid(id)) return fail('NOT_FOUND', 'Không tìm thấy bài làm', { status: 404 })
 
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getAuthedUser(supabase)
     if (!user) return fail('UNAUTHORIZED', 'Bạn cần đăng nhập', { status: 401 })
 
     const raw = await request.json().catch(() => null)

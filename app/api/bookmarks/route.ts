@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthedUser } from '@/lib/auth/guards'
 import { ok, fail } from '@/lib/api/response'
 
 // POST /api/bookmarks — toggle test-level bookmark (M09). Idempotent.
@@ -15,9 +16,7 @@ const BodySchema = z.object({
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getAuthedUser(supabase)
     if (!user) return fail('UNAUTHORIZED', 'Bạn cần đăng nhập', { status: 401 })
 
     const raw = await request.json().catch(() => null)

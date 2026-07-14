@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getAuthedUser } from '@/lib/auth/guards'
 import { fail } from '@/lib/api/response'
 
 // GET /api/vocab/export — xuất sổ từ vựng của CHÍNH user ra CSV (M09, W17).
@@ -14,9 +15,7 @@ function csvCell(value: unknown): string {
 
 export async function GET() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthedUser(supabase)
   if (!user) return fail('UNAUTHORIZED', 'Bạn cần đăng nhập', { status: 401 })
 
   const { data, error } = await supabase
