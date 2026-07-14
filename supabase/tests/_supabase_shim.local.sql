@@ -12,6 +12,7 @@ create table if not exists auth.users (
   id                 uuid primary key default gen_random_uuid(),
   email              text,
   raw_user_meta_data jsonb default '{}'::jsonb,
+  banned_until       timestamptz,           -- Supabase thật có cột này (ban_duration); SEC-001 is_user_banned() đọc.
   created_at         timestamptz default now()
 );
 

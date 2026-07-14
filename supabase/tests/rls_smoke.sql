@@ -733,5 +733,53 @@ begin
   reset role;
 end $$;
 
+-- ============================================================
+-- SEC-001 — Ban enforcement (migration 20260714000100). User bị ban KHÔNG ghi được
+-- qua RLS dù token còn hạn; is_user_banned() phản ánh auth.users.banned_until.
+-- ============================================================
+
+-- ---------- Check 37: is_user_banned() + restrictive RLS chặn write của user bị ban ----------
+do $$
+declare rc int;
+begin
+  -- Ban user B (banned_until tương lai). User A KHÔNG ban (control).
+  update auth.users set banned_until = now() + interval '1 hour' where id = '00000000-0000-0000-0000-00000000000b';
+  update auth.users set banned_until = null where id = '00000000-0000-0000-0000-00000000000a';
+
+  if public.is_user_banned('00000000-0000-0000-0000-00000000000b') is not true
+    then raise exception 'FAIL check37: is_user_banned(B) phải TRUE khi banned_until tương lai'; end if;
+  if public.is_user_banned('00000000-0000-0000-0000-00000000000a') is not false
+    then raise exception 'FAIL check37: is_user_banned(A) phải FALSE (không ban)'; end if;
+
+  -- Banned B: INSERT bookmarks bị RLS with-check chặn (raise).
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+  set local role authenticated;
+  begin
+    insert into public.bookmarks (user_id, test_id)
+      values ('00000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-000000000021');
+    raise exception 'FAIL check37: banned B INSERT bookmarks KHÔNG bị chặn';
+  exception when insufficient_privilege then
+    raise notice 'PASS check37a: banned B insert bookmarks bị RLS chặn';
+  end;
+
+  -- Banned B: UPDATE profiles own row → restrictive using chặn → 0 rows.
+  update public.profiles set name = 'banned-write' where id = '00000000-0000-0000-0000-00000000000b';
+  get diagnostics rc = row_count;
+  if rc <> 0 then raise exception 'FAIL check37: banned B update profiles ảnh hưởng % row (phải 0)', rc; end if;
+  reset role;
+
+  -- Control: user A (không ban) VẪN ghi vocab_log được.
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated;
+  insert into public.vocab_log (user_id, word) values ('00000000-0000-0000-0000-00000000000a', 'control-word');
+  get diagnostics rc = row_count;
+  if rc <> 1 then raise exception 'FAIL check37: control A insert vocab_log = % row (phải 1)', rc; end if;
+  reset role;
+
+  -- Cleanup: gỡ ban B để không ảnh hưởng lần chạy sau (idempotent).
+  update auth.users set banned_until = null where id = '00000000-0000-0000-0000-00000000000b';
+  raise notice 'PASS check37: ban enforcement (is_user_banned + restrictive RLS) đúng';
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
 

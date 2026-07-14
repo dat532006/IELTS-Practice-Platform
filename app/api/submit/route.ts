@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthedUser } from '@/lib/auth/guards'
 import { submitAttempt } from '@/lib/exam/attempt'
 import { ok, fail } from '@/lib/api/response'
 
@@ -30,9 +31,7 @@ const SubmitBody = z.object({
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getAuthedUser(supabase)
     if (!user) return fail('UNAUTHORIZED', 'Cần đăng nhập để nộp bài', { status: 401 })
 
     const json = await request.json().catch(() => null)

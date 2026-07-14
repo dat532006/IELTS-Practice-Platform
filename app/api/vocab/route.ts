@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthedUser } from '@/lib/auth/guards'
 import { ok, fail } from '@/lib/api/response'
 
 // /api/vocab — sổ từ vựng cá nhân (M09, W17). OWN-ONLY qua RLS (vocab_log policy RW own + with check user_id=auth.uid()).
@@ -15,9 +16,7 @@ const DeleteSchema = z.object({ id: z.string().uuid() })
 
 export async function GET() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthedUser(supabase)
   if (!user) return fail('UNAUTHORIZED', 'Bạn cần đăng nhập', { status: 401 })
 
   const { data, error } = await supabase
@@ -31,9 +30,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthedUser(supabase)
   if (!user) return fail('UNAUTHORIZED', 'Bạn cần đăng nhập', { status: 401 })
 
   const raw = await request.json().catch(() => null)
@@ -55,9 +52,7 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthedUser(supabase)
   if (!user) return fail('UNAUTHORIZED', 'Bạn cần đăng nhập', { status: 401 })
 
   const raw = await request.json().catch(() => null)

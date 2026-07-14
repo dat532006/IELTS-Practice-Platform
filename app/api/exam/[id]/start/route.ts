@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthedUser } from '@/lib/auth/guards'
 import { startAttempt } from '@/lib/exam/attempt'
 import { ok, fail } from '@/lib/api/response'
 import { isUuid } from '@/lib/utils'
@@ -12,10 +13,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (!isUuid(id)) return fail('NOT_FOUND', 'Không tìm thấy đề thi', { status: 404 })
 
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    // Attempt gắn với user (ghi lịch sử/kết quả) → bắt buộc đăng nhập.
+    const user = await getAuthedUser(supabase)
+    // Attempt gắn với user (ghi lịch sử/kết quả) → bắt buộc đăng nhập (và không bị ban).
     if (!user) return fail('UNAUTHORIZED', 'Cần đăng nhập để bắt đầu làm bài', { status: 401 })
 
     const admin = createAdminClient()

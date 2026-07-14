@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getAuthedUser } from '@/lib/auth/guards'
 import { getSignedAudioUrl, hasTestUnlock } from '@/lib/exam/access'
 import { ok, fail } from '@/lib/api/response'
 import { isUuid } from '@/lib/utils'
@@ -21,9 +22,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { id } = await params
     if (!isUuid(id)) return fail('NOT_FOUND', 'Không tìm thấy đề thi', { status: 404 })
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // Ban-aware: user bị ban → coi như anon (mất quyền test_unlocks; chỉ xem được đề is_free).
+    const user = await getAuthedUser(supabase)
 
     // 1) Metadata qua RLS client (published-only; passages/questions KHÔNG grant → không thể chạm ở bước này).
     const { data, error } = await supabase
