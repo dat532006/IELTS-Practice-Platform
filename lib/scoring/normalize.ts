@@ -17,12 +17,17 @@ export function normalizeAnswer(input: unknown, match: MatchMode = 'ci'): string
 }
 
 // ============================================================
-// 2026-07-12 — Tương đương SỐ chữ ↔ số ('seven' == '7', 'twenty-one days' == '21 days').
-// Chuẩn IELTS chấp nhận cả 2 cách viết số; admin không phải liệt kê thủ công từng biến thể.
-// PURE + deterministic: đổi các CỤM từ-số (cardinal 0–999,999, gồm hundred/thousand/and,
-//   nối bằng space/hyphen) trong chuỗi ĐÃ lowercase thành chữ số; token khác giữ nguyên.
-// Hai vế so sánh cùng qua transform này → chỉ tạo lớp tương đương, không đổi kết quả các
-//   đáp án không chứa từ-số (MCQ 'a'/'b', tfng 'true'… không phải từ-số → giữ nguyên).
+// EXAM-005 (2026-07-15, sửa lại) — Tương đương SỐ chữ ↔ chữ-số CHỈ khi CẢ CHUỖI là số đếm THUẦN
+//   ('seven' == '7', 'twenty-one' == '21', 'one hundred and five' == '105').
+// Trước đây canonicalizeNumberWords đổi TỪNG cụm từ-số nhúng trong chuỗi bất kỳ → false positive
+//   ngữ nghĩa: 'One Direction' → '1 direction' == key '1 direction' (chấm ĐÚNG sai). 'one' còn là
+//   mạo từ/đại từ ('one way', 'one another'), ordinal/idiom cũng dính.
+// Fix (conservative token grammar): chỉ coi là số khi TOÀN BỘ chuỗi là cardinal (digit thuần hoặc
+//   từ-số nối space/hyphen/'and'); có BẤT KỲ token phi-số ('direction', 'days', 'cloud') → KHÔNG phải
+//   số → null → không canon → không false positive. Hệ quả: số+đơn vị ('21 days' vs 'twenty-one days')
+//   KHÔNG tự tương đương nữa — admin liệt kê biến thể ở answers[] (đã hỗ trợ), hoặc Owner thêm mode
+//   numeric tường minh sau. Đổi lấy: KHÔNG bao giờ canon sai cụm ngữ nghĩa.
+// PURE + deterministic. Chỉ dùng ở scoring mode 'ci' (exact = khớp tuyệt đối, không canon).
 // ============================================================
 
 const NUM_UNITS: Record<string, number> = {
@@ -65,39 +70,25 @@ function evalNumWords(words: string[]): number | null {
   return total + current
 }
 
-// Đổi mọi cụm từ-số trong chuỗi (đã normalize ci) thành chữ số. 'and' chỉ nuốt khi nằm GIỮA cụm số.
-export function canonicalizeNumberWords(s: string): string {
+// Giá trị số ĐẾM của TOÀN BỘ chuỗi, hoặc null nếu chuỗi KHÔNG phải cardinal thuần.
+//   - digit thuần: '7' → 7, '105' → 105 (tối đa 9 chữ số, chống overflow/id lạ).
+//   - từ-số: 'seven' → 7, 'twenty one'/'twenty-one' → 21, 'one hundred and five' → 105.
+//   - CÓ token phi-số ('one direction', 'cloud nine', 'first', 'won', '21 days') → null.
+// 'and' chỉ hợp lệ khi nằm GIỮA hai từ-số. Deterministic, không throw.
+export function cardinalValue(input: unknown): number | null {
+  const s = normalizeAnswer(input, 'ci') // luôn lowercase để đọc từ-số; collapse whitespace
+  if (s === '') return null
+  if (/^\d{1,9}$/.test(s)) return Number(s)
+  // tách hyphen chỉ khi 2 phía đều là từ-số ('twenty-one' → [twenty, one]; 'e-mail' giữ nguyên → null sau).
   const tokens = s.split(' ').flatMap((t) => (t.includes('-') && t.split('-').every(isNumWord) ? t.split('-') : [t]))
-  const out: string[] = []
-  let i = 0
-  while (i < tokens.length) {
-    if (!isNumWord(tokens[i])) {
-      out.push(tokens[i])
-      i++
-      continue
-    }
-    // Gom cụm số dài nhất (cho phép 'and' giữa cụm nếu 2 phía đều là từ-số).
-    const group: string[] = []
-    let j = i
-    while (j < tokens.length) {
-      if (isNumWord(tokens[j])) group.push(tokens[j])
-      else if (tokens[j] === 'and' && group.length > 0 && j + 1 < tokens.length && isNumWord(tokens[j + 1])) {
-        j++
-        continue
-      } else break
-      j++
-    }
-    const val = evalNumWords(group)
-    if (val == null) {
-      // Cụm không hợp lệ (vd 'five six') → vẫn canon TOKEN ĐẦU đứng riêng (nếu tự nó là số hợp lệ)
-      //   rồi đi tiếp — giữ transform NHẤT QUÁN ('five and six' == '5 and 6').
-      const single = evalNumWords([tokens[i]])
-      out.push(single == null ? tokens[i] : String(single))
-      i++
-    } else {
-      out.push(String(val))
-      i = j
-    }
+  const words: string[] = []
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]
+    if (isNumWord(t)) { words.push(t); continue }
+    // 'and' nối giữa cụm số → bỏ qua; token khác bất kỳ → KHÔNG phải cardinal thuần.
+    if (t === 'and' && words.length > 0 && i + 1 < tokens.length && isNumWord(tokens[i + 1])) continue
+    return null
   }
-  return out.join(' ')
+  if (words.length === 0) return null
+  return evalNumWords(words)
 }
