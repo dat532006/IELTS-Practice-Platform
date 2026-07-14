@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/auth/guards'
 import { buildSepayQrUrl, sepayConfigured } from '@/lib/payments/sepay'
+import { fetchWithDeadline, readCappedArrayBuffer, QR_MAX_BYTES } from '@/lib/net/fetch-deadline'
 
 // A1-alt — proxy ảnh VietQR qua server (same-origin): adblock/DNS phía client chặn qr.sepay.vn
 //   sẽ không làm hỏng trang thanh toán; URL ảnh cũng không lộ số tài khoản/bank ra markup.
@@ -28,7 +29,8 @@ export async function GET(request: Request) {
   if (!txn || txn.amount_vnd == null) return NextResponse.json({ message: 'not found' }, { status: 404 })
 
   try {
-    const upstream = await fetch(buildSepayQrUrl({ amountVnd: txn.amount_vnd, ref }), {
+    // PAY-006 — deadline: upstream QR treo → abort (không treo request). Host cố định (sepay) → không SSRF.
+    const upstream = await fetchWithDeadline(buildSepayQrUrl({ amountVnd: txn.amount_vnd, ref }), {
       // QR là hàm thuần của (acc,bank,amount,des) — cache theo URL upstream vô hại.
       next: { revalidate: 3600 },
     })
@@ -39,7 +41,12 @@ export async function GET(request: Request) {
       console.error(`[payment/qr-image] upstream không trả ảnh (status=${upstream.status}, type=${upstreamType})`)
       return NextResponse.json({ message: 'qr upstream error' }, { status: 502 })
     }
-    const png = await upstream.arrayBuffer()
+    // PAY-006 — đọc CÓ CAP: body vượt QR_MAX_BYTES → hủy stream → 502 (chống body khổng lồ).
+    const png = await readCappedArrayBuffer(upstream, QR_MAX_BYTES)
+    if (!png) {
+      console.error(`[payment/qr-image] upstream body vượt cap ${QR_MAX_BYTES}B (type=${upstreamType})`)
+      return NextResponse.json({ message: 'qr upstream error' }, { status: 502 })
+    }
     return new NextResponse(png, {
       status: 200,
       headers: {
@@ -48,6 +55,7 @@ export async function GET(request: Request) {
       },
     })
   } catch {
+    // Bao gồm TimeoutError (quá hạn) — trả 502 an toàn, KHÔNG lộ chi tiết upstream.
     return NextResponse.json({ message: 'qr upstream error' }, { status: 502 })
   }
 }

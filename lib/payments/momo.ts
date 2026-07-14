@@ -1,5 +1,6 @@
 import 'server-only'
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { fetchWithDeadline } from '@/lib/net/fetch-deadline'
 
 // A1 — MoMo adapter (API v2, requestType captureWallet). SERVER-ONLY.
 //   Env: MOMO_PARTNER_CODE, MOMO_ACCESS_KEY, MOMO_SECRET, MOMO_ENDPOINT (mặc định test-payment sandbox).
@@ -43,7 +44,8 @@ export async function createMomoPayment(input: {
 
   const endpoint = (process.env.MOMO_ENDPOINT || MOMO_SANDBOX_ENDPOINT).replace(/\/$/, '')
   try {
-    const res = await fetch(`${endpoint}/v2/gateway/api/create`, {
+    // PAY-006 — deadline: MoMo treo → abort (không treo request vô hạn). Host cố định từ env/sandbox.
+    const res = await fetchWithDeadline(`${endpoint}/v2/gateway/api/create`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -65,8 +67,10 @@ export async function createMomoPayment(input: {
       return { ok: false, reason: `MOMO_CREATE_FAILED_${body?.resultCode ?? res.status}` }
     }
     return { ok: true, payUrl: body.payUrl }
-  } catch {
-    return { ok: false, reason: 'MOMO_NETWORK_ERROR' }
+  } catch (e) {
+    // Quá hạn (TimeoutError) vs lỗi mạng — reason redacted, KHÔNG lộ secret/payload.
+    const timedOut = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')
+    return { ok: false, reason: timedOut ? 'MOMO_TIMEOUT' : 'MOMO_NETWORK_ERROR' }
   }
 }
 
