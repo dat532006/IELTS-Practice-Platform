@@ -41,7 +41,10 @@ export async function POST(request: Request) {
       const { error } = await admin.from('tests').update({ audio_key: objectKey }).eq('id', test_id)
       if (error) return fail('INTERNAL', 'Không gán audio_key', { status: 500 })
     }
-    return ok({ method: 'PUT', upload_url: signed.url, audio_key: objectKey })
+    // SEC-004 — KHÔNG trả raw audio_key (định danh storage riêng tư) ra client, kể cả admin: lộ topology
+    //   private không cần thiết. Client chỉ cần upload_url để PUT; audio_key do server quản lý.
+    //   (STORE-002 finalize-after-verify là follow-up khi có R2 config — xem FIX_LOG.)
+    return ok({ method: 'PUT', upload_url: signed.url })
   }
 
   // image → Supabase Storage signed upload URL. Thiếu bucket → STORAGE_NOT_CONFIGURED.
