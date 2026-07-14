@@ -9,7 +9,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export type ScoreBandRow = { raw_min: number; raw_max: number; band: number }
 
 // PURE: row đầu tiên có raw_min ≤ raw ≤ raw_max → band; không có → null.
+// EXAM-007 — validate raw phải là số nguyên hữu hạn TRƯỚC khi tra bảng (defense-in-depth): raw phân số
+//   (vd 30.5) KHÔNG được rơi vào range integer và trả band sai. Non-integer/NaN/Infinity → null (unmapped).
 export function bandFromRows(rawScore: number, rows: ScoreBandRow[]): number | null {
+  if (!Number.isInteger(rawScore)) return null
   for (const r of rows) {
     if (rawScore >= r.raw_min && rawScore <= r.raw_max) return r.band
   }
