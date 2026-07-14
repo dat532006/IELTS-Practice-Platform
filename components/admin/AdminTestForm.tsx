@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RichTextEditor, plainToHtml, looksRich } from './RichTextEditor'
+import { sanitizePassageHtmlClient } from '@/lib/sanitize/passage-html-client'
 import { ExamRunner } from '@/components/exam/ExamRunner'
 import { examFontVars } from '@/app/exam-fonts'
 import type { ExamPayload } from '@/types/exam'
@@ -404,9 +405,10 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
     const ps = Array.isArray(data.passages) ? data.passages : []
     const mappedP: Passage[] = ps.map((raw) => {
       const p = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-      // OCR draft là text thuần → bọc thành <p> cho editor WYSIWYG; nếu đã là HTML thì giữ nguyên.
+      // OCR draft là text thuần → bọc thành <p> cho editor WYSIWYG; nếu đã là HTML thì SANITIZE (SEC-006:
+      //   import có thể chứa <img onerror>/<svg onload>/script → chống XSS admin-origin trước khi vào DOM).
       const rawContent = str(p.body) || str(p.content)
-      const content = rawContent && !looksRich(rawContent) ? plainToHtml(rawContent) : rawContent
+      const content = rawContent && !looksRich(rawContent) ? plainToHtml(rawContent) : sanitizePassageHtmlClient(rawContent)
       const out: Passage = { id: String(p.id ?? uid('p')), title: str(p.title), content }
       if (str(p.subtitle)) out.subtitle = str(p.subtitle)
       return out
@@ -1095,7 +1097,8 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                     {p.subtitle?.trim() && <div className="text-[12.5px] italic text-[#857F96]">{p.subtitle}</div>}
                     {p.content.trim() ? (
                       looksRich(p.content) ? (
-                        <div className="dcx-rich mt-1.5 text-[13.5px] leading-[1.7] text-[#3B364A]" dangerouslySetInnerHTML={{ __html: p.content }} />
+                        // SEC-006: sanitize lần nữa ngay tại sink preview (phòng content chưa qua applyDraft).
+                        <div className="dcx-rich mt-1.5 text-[13.5px] leading-[1.7] text-[#3B364A]" dangerouslySetInnerHTML={{ __html: sanitizePassageHtmlClient(p.content) }} />
                       ) : (
                         <p className="mt-1.5 whitespace-pre-wrap text-[13.5px] leading-[1.7] text-[#3B364A]">{p.content}</p>
                       )

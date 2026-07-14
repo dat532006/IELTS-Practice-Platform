@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, type ClipboardEvent, type CSSProperties } from 'react'
+import { sanitizePassageHtmlClient } from '@/lib/sanitize/passage-html-client'
 
 // M11 — Trình soạn thảo passage kiểu Word (WYSIWYG). contentEditable + toolbar → xuất HTML.
 //   CHỈ dùng ở form admin (client). An toàn thực thi do SERVER sanitize allowlist (lib/sanitize/passage-html)
@@ -85,7 +86,8 @@ export function RichTextEditor({
     } catch {
       /* execCommand không hỗ trợ → bỏ qua */
     }
-    if (value !== last.current && value !== el.innerHTML) el.innerHTML = value || ''
+    // SEC-006: value từ import/nạp draft có thể chứa HTML độc → sanitize allowlist TRƯỚC khi vào innerHTML.
+    if (value !== last.current && value !== el.innerHTML) el.innerHTML = sanitizePassageHtmlClient(value)
   }, [value])
 
   const emit = useCallback(() => {
