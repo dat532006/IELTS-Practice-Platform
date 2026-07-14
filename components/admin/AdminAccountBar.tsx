@@ -2,22 +2,19 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { invalidateHeaderProfile } from '@/lib/auth/client-profile'
+import { performLogout } from '@/lib/auth/logout'
 
 // Thanh tài khoản admin (góc phải header khu quản trị, 2026-07-12).
 //   Email đang đăng nhập → link tới hồ sơ chi tiết của CHÍNH tài khoản này trong /admin/users
-//   (ví/giao dịch/lịch sử làm bài). Đăng xuất: signOut + invalidateHeaderProfile (bài học PR #23 —
-//   header public cache email/coin, không gọi sẽ hiện user cũ) → về /login.
+//   (ví/giao dịch/lịch sử làm bài). Đăng xuất: performLogout (SEC-002 checked signOut + local fallback +
+//   invalidateHeaderProfile — bài học PR #23: header public cache email/coin) → về /login.
 export function AdminAccountBar({ email, userId }: { email: string | null; userId: string }) {
   const [busy, setBusy] = useState(false)
 
   async function logout() {
     setBusy(true)
     try {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      invalidateHeaderProfile()
+      await performLogout()
       window.location.href = '/login'
     } catch {
       setBusy(false)

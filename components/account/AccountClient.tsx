@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { performLogout } from '@/lib/auth/logout'
 import { FishBone } from '@/components/brand/FishBone'
 import { AccountAvatar } from './AccountAvatar'
 import { ProfilePanel } from './ProfilePanel'
@@ -68,8 +68,8 @@ export function AccountClient({ data }: { data: AccountData }) {
   const { profile, transactions, library } = data
 
   async function logout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    // SEC-002 — checked signOut + local fallback + invalidate header cache (helper), rồi mới điều hướng.
+    await performLogout()
     window.location.href = '/'
   }
 

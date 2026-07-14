@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { getHeaderProfile, invalidateHeaderProfile } from '@/lib/auth/client-profile'
+import { getHeaderProfile, invalidateHeaderProfile, subscribeHeaderProfile } from '@/lib/auth/client-profile'
+import { performLogout } from '@/lib/auth/logout'
 import { MAIN_NAV } from '@/lib/nav'
 import { Logo } from '@/components/brand/Logo'
 import { FishBone } from '@/components/brand/FishBone'
@@ -16,22 +17,32 @@ export function Header() {
 
   useEffect(() => {
     let active = true
-    // Cached promise (lib/auth/client-profile): remount giữa landing ↔ marketing không refetch.
-    getHeaderProfile().then((p) => {
+    const apply = (p: { email: string | null; coins: number | null; avatar: string | null }) => {
       if (!active) return
       setEmail(p.email)
       setCoins(p.coins)
       setAvatar(p.avatar)
+    }
+    // Cached promise (lib/auth/client-profile): remount giữa landing ↔ marketing không refetch.
+    const reload = () => void getHeaderProfile().then(apply)
+    reload()
+    // UI-002 — cập nhật KHÔNG cần reload: bus invalidate (login/logout/mua hàng/avatar, trong tab hoặc
+    //   cross-tab) → subscribe refetch; onAuthStateChange trong tab → invalidate (drop cache + báo tab khác).
+    const unsub = subscribeHeaderProfile(reload)
+    const supabase = createClient()
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') invalidateHeaderProfile()
     })
     return () => {
       active = false
+      unsub()
+      sub.subscription.unsubscribe()
     }
   }, [])
 
   async function logout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    invalidateHeaderProfile()
+    // SEC-002 — checked signOut + local fallback (helper) TRƯỚC khi điều hướng → không kẹt cookie/loop.
+    await performLogout()
     window.location.href = '/'
   }
 
