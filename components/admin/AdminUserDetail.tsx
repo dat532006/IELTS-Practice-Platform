@@ -51,7 +51,14 @@ type Detail = {
     task1_wc: number | null
     task2_wc: number | null
   }[]
+  counts: { unlocks: number; transactions: number; attempts: number; writing: number }
+  limits: { unlocks: number; transactions: number; attempts: number; writing: number }
 }
+
+// ADMIN-004 — nhãn TRUNG THỰC: nếu tổng thật > số đang hiển thị (đã cap) → "N gần nhất / M tổng";
+//   ngược lại chỉ hiện tổng. Không bao giờ trình bày độ dài mảng đã cap NHƯ LÀ tổng.
+const countLabel = (shown: number, total: number): string =>
+  total > shown ? `${shown} gần nhất / ${total} tổng` : `${total}`
 
 const inputCls =
   'rounded-[11px] border border-[#E4DEEE] bg-white px-3.5 py-2.5 text-sm text-[#2A2740] focus:border-[#7C5CE6] focus:outline-none'
@@ -293,7 +300,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
         {/* right column: unlocks + transactions + attempts */}
         <div className="flex flex-col gap-4">
           <div className={cardCls}>
-            <div className={secTitleCls}>Gói đề sở hữu ({d.unlocks.length})</div>
+            <div className={secTitleCls}>Gói đề sở hữu ({countLabel(d.unlocks.length, d.counts.unlocks)})</div>
             {d.unlocks.length === 0 ? (
               <p className="mt-2 text-sm text-[#A8A2BA]">Chưa sở hữu gói nào.</p>
             ) : (
@@ -310,7 +317,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
           </div>
 
           <div className={cardCls}>
-            <div className={secTitleCls}>Lịch sử giao dịch ({d.transactions.length})</div>
+            <div className={secTitleCls}>Lịch sử giao dịch ({countLabel(d.transactions.length, d.counts.transactions)})</div>
             {d.transactions.length === 0 ? (
               <p className="mt-2 text-sm text-[#A8A2BA]">Chưa có giao dịch nào.</p>
             ) : (
@@ -364,7 +371,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
           </div>
 
           <div className={cardCls}>
-            <div className={secTitleCls}>Lịch sử làm bài ({d.attempts.length})</div>
+            <div className={secTitleCls}>Lịch sử làm bài ({countLabel(d.attempts.length, d.counts.attempts)})</div>
             {d.attempts.length === 0 ? (
               <p className="mt-2 text-sm text-[#A8A2BA]">Chưa làm đề nào.</p>
             ) : (

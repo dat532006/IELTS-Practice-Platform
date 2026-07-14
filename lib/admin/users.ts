@@ -98,7 +98,14 @@ export type AdminUserDetail = {
     task1_wc: number | null
     task2_wc: number | null
   }[]
+  // ADMIN-004 — TỔNG THẬT mỗi danh sách (count exact) để UI KHÔNG nhầm độ dài mảng ĐÃ CAP là tổng.
+  //   shown = độ dài mảng (giới hạn DETAIL_LIMITS); total > shown ⇒ UI gắn nhãn "N gần nhất / M tổng".
+  counts: { unlocks: number; transactions: number; attempts: number; writing: number }
+  limits: { unlocks: number; transactions: number; attempts: number; writing: number }
 }
+
+// Cap mỗi danh sách lịch sử ở trang chi tiết admin (preview, không phải export). Total thật lấy riêng (counts).
+export const USER_DETAIL_LIMITS = { unlocks: 200, transactions: 100, attempts: 100, writing: 100 } as const
 
 export async function getUserDetail(admin: SupabaseClient, userId: string): Promise<AdminUserDetail | null> {
   const { data: profile, error } = await admin
@@ -119,31 +126,38 @@ export async function getUserDetail(admin: SupabaseClient, userId: string): Prom
   }
   const banned = bannedUntil != null && new Date(bannedUntil).getTime() > Date.now()
 
-  const [unlocksRes, txnsRes, attemptsRes, writingRes] = await Promise.all([
+  const L = USER_DETAIL_LIMITS
+  // Preview (đã cap) + TỔNG THẬT (count exact, head — chỉ đếm, không kéo row) song song. Đếm trên
+  //   cột user_id (đã index) → rẻ; trang chi tiết 1 user nên chi phí đếm chấp nhận được (Owner note).
+  const [unlocksRes, txnsRes, attemptsRes, writingRes, unlocksCnt, txnsCnt, attemptsCnt, writingCnt] = await Promise.all([
     admin
       .from('product_unlocks')
       .select('product_id, via, created_at, products(title, slug)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(200),
+      .limit(L.unlocks),
     admin
       .from('transactions')
       .select('id, type, status, amount_coins, amount_vnd, provider, note, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(100),
+      .limit(L.transactions),
     admin
       .from('attempts')
       .select('id, test_id, status, raw_score, band, time_spent, started_at, submitted_at, tests(title, type)')
       .eq('user_id', userId)
       .order('started_at', { ascending: false })
-      .limit(100),
+      .limit(L.attempts),
     admin
       .from('writing_submissions')
       .select('attempt_id, graded_at, task1_wc, task2_wc, ai_score')
       .eq('user_id', userId)
       .order('graded_at', { ascending: false })
-      .limit(100),
+      .limit(L.writing),
+    admin.from('product_unlocks').select('user_id', { count: 'exact', head: true }).eq('user_id', userId),
+    admin.from('transactions').select('user_id', { count: 'exact', head: true }).eq('user_id', userId),
+    admin.from('attempts').select('user_id', { count: 'exact', head: true }).eq('user_id', userId),
+    admin.from('writing_submissions').select('user_id', { count: 'exact', head: true }).eq('user_id', userId),
   ])
 
   type UnlockRow = { product_id: string; via: string; created_at: string; products: { title: string | null; slug: string | null } | null }
@@ -195,5 +209,12 @@ export async function getUserDetail(admin: SupabaseClient, userId: string): Prom
         task2_wc: w.task2_wc,
       }
     }),
+    counts: {
+      unlocks: unlocksCnt.count ?? (unlocksRes.data?.length ?? 0),
+      transactions: txnsCnt.count ?? (txnsRes.data?.length ?? 0),
+      attempts: attemptsCnt.count ?? (attemptsRes.data?.length ?? 0),
+      writing: writingCnt.count ?? (writingRes.data?.length ?? 0),
+    },
+    limits: { ...L },
   }
 }
