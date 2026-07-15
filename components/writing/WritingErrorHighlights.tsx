@@ -1,4 +1,5 @@
 import type { WritingErrorHighlight } from '@/types/exam'
+import { buildSegments } from '@/lib/writing/highlight-segments'
 
 // W11 — Writing error highlights (M07). Render error_highlights từ DTO (đã Zod-sanitize ở BE).
 // LUẬT THÉP: KHÔNG tự chấm; chỉ hiển thị DTO whitelist (quote/type/suggestion). KHÔNG system prompt/AI key.
@@ -20,33 +21,6 @@ const TYPE_BADGE: Record<WritingErrorHighlight['type'], string> = {
 }
 const typeLabel = (t: WritingErrorHighlight['type']) => TYPE_LABELS[t] ?? t
 const typeBadge = (t: WritingErrorHighlight['type']) => TYPE_BADGE[t] ?? 'bg-slate-100 text-slate-600'
-
-type Segment = { text: string; hl?: WritingErrorHighlight }
-
-// Match KHÔNG chồng lấn của từng quote trong essay (exact, fallback case-insensitive). Pure, không đụng DOM.
-function buildSegments(essay: string, highlights: WritingErrorHighlight[]): Segment[] {
-  const ranges: { start: number; end: number; hl: WritingErrorHighlight }[] = []
-  for (const hl of highlights) {
-    const q = hl.quote
-    if (!q) continue
-    let idx = essay.indexOf(q)
-    if (idx < 0) idx = essay.toLowerCase().indexOf(q.toLowerCase()) // forgiving: giữ index trong essay gốc
-    if (idx < 0) continue
-    ranges.push({ start: idx, end: idx + q.length, hl })
-  }
-  ranges.sort((a, b) => a.start - b.start)
-
-  const segments: Segment[] = []
-  let cursor = 0
-  for (const r of ranges) {
-    if (r.start < cursor) continue // chồng lấn → bỏ qua (giữ match trước)
-    if (r.start > cursor) segments.push({ text: essay.slice(cursor, r.start) })
-    segments.push({ text: essay.slice(r.start, r.end), hl: r.hl })
-    cursor = r.end
-  }
-  if (cursor < essay.length) segments.push({ text: essay.slice(cursor) })
-  return segments
-}
 
 export function WritingErrorHighlights({
   highlights,

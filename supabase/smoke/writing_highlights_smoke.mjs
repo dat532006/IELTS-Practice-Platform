@@ -1,33 +1,9 @@
 // W11 Frontend smoke — Writing error-highlights anchoring (M07).
-// NOTE: This is a LOGIC sanity check that MIRRORS the pure anchoring in
-//   components/writing/WritingErrorHighlights.tsx (buildSegments). It is NOT a substitute for the
-//   desktop/mobile browser smoke (Claude Preview) which verifies DOM/tooltip/a11y/no-console-error/no-leak.
-//   Browser smoke requires local Next + Supabase (see W11 FE contract "Browser Smoke Plan").
+// TEST-006: KHÔNG còn COPY logic. Import & CHẠY buildSegments PRODUCTION (lib/writing/highlight-segments.ts)
+//   → production đổi/hỏng thì smoke ĐỎ (không còn xanh giả). Không còn assert tautology `true`.
+//   Node type-strip import trực tiếp (module PURE, chỉ import type). KHÔNG thay browser smoke (DOM/a11y).
 // Usage: node supabase/smoke/writing_highlights_smoke.mjs
-
-// --- mirror of WritingErrorHighlights.buildSegments (keep in sync) ---
-function buildSegments(essay, highlights) {
-  const ranges = []
-  for (const hl of highlights) {
-    const q = hl.quote
-    if (!q) continue
-    let idx = essay.indexOf(q)
-    if (idx < 0) idx = essay.toLowerCase().indexOf(q.toLowerCase())
-    if (idx < 0) continue
-    ranges.push({ start: idx, end: idx + q.length, hl })
-  }
-  ranges.sort((a, b) => a.start - b.start)
-  const segments = []
-  let cursor = 0
-  for (const r of ranges) {
-    if (r.start < cursor) continue
-    if (r.start > cursor) segments.push({ text: essay.slice(cursor, r.start) })
-    segments.push({ text: essay.slice(r.start, r.end), hl: r.hl })
-    cursor = r.end
-  }
-  if (cursor < essay.length) segments.push({ text: essay.slice(cursor) })
-  return segments
-}
+const { buildSegments } = await import('../../lib/writing/highlight-segments.ts')
 
 let pass = 0
 let fail = 0
@@ -76,10 +52,36 @@ const ESSAY = 'The goverment should invest more. Many people thinks it is good f
   ])
   check('disjoint → 2 mark', marks(segs).length === 2)
   check('disjoint → reconstructs lossless', reconstruct(segs) === ESSAY)
+  check('disjoint → mark theo thứ tự vị trí', marks(segs)[0].text === 'goverment' && marks(segs)[1].text === 'thinks')
 }
-// 6) no essay path (review page) → component sẽ chỉ render list; ở đây chỉ xác nhận buildSegments không được gọi
+// 6) Unicode/emoji — index theo UTF-16 code unit, tô đúng cụm dấu + không vỡ ký tự
 {
-  check('review-page degrade documented (essay undefined → list-only, không gọi buildSegments)', true)
+  const U = 'Tôi thích café ☕ rất nhiều nhé.'
+  const segs = buildSegments(U, [{ quote: 'café', type: 'lexical_resource', suggestion: 'coffee' }])
+  check('unicode → 1 mark đúng "café"', marks(segs).length === 1 && marks(segs)[0].text === 'café')
+  check('unicode → reconstruct lossless (không vỡ dấu/emoji)', reconstruct(segs) === U)
+}
+// 7) duplicate quote (xuất hiện 2 lần) — chỉ tô lần XUẤT HIỆN đầu (indexOf), phần sau nằm segment thường
+{
+  const D = 'good plan is good.'
+  const segs = buildSegments(D, [{ quote: 'good', type: 'lexical_resource', suggestion: 'strong' }])
+  check('duplicate → đúng 1 mark (first occurrence)', marks(segs).length === 1)
+  check('duplicate → mark là "good" đầu tiên (index 0)', marks(segs)[0].text === 'good' && segs[0].hl)
+  check('duplicate → reconstruct lossless (giữ "good" thứ 2)', reconstruct(segs) === D)
+}
+// 8) empty essay + empty highlights → 0 mark, không crash
+{
+  check('essay rỗng → [] (không crash)', buildSegments('', [{ quote: 'x', type: 'grammar', suggestion: 'y' }]).length === 0)
+  check('highlights rỗng → 1 segment text nguyên essay', (() => { const s = buildSegments(ESSAY, []); return s.length === 1 && !s[0].hl && s[0].text === ESSAY })())
+}
+
+// 9) MUTATION GUARD — chứng minh smoke KHÔNG tautology: nếu buildSegments TRẢ SAI (ví dụ nhân đôi text),
+//   assertion "reconstruct lossless" phải ĐỎ. Ở đây tạo một buildSegments đột biến cục bộ để xác nhận
+//   bộ assertion phân biệt đúng/sai (guard cho chính test — không phụ thuộc production).
+{
+  const mutant = (essay, hls) => { const s = buildSegments(essay, hls); return [...s, { text: 'EXTRA' }] } // production + rác
+  const segs = mutant(ESSAY, [{ quote: 'goverment', type: 'grammar', suggestion: 'government' }])
+  check('mutation guard → reconstruct KHÁC essay khi output bị bẩn (assertion không tautology)', reconstruct(segs) !== ESSAY)
 }
 
 console.log(`\nWRITING_HIGHLIGHTS LOGIC: ${pass} passed, ${fail} failed`)
