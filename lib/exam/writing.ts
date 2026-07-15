@@ -1,4 +1,5 @@
 import 'server-only'
+import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { gradeWriting } from '@/lib/ai/writing-grader'
 import { computeOverallBand } from '@/lib/scoring/writing-band'
@@ -86,16 +87,24 @@ export async function submitWritingGrade(
   //   (ai_score=null) vào writing_submissions; unique(attempt_id) đảm bảo CHỈ 1 request thắng claim.
   //   Request thua (unique_violation 23505) → KHÔNG reserve quota, KHÔNG gọi provider → GRADING_CONFLICT.
   //   → dưới concurrency: đúng 1 provider call, 1 quota, 1 row, 1 winner finalize.
-  const { error: claimErr } = await admin
-    .from('writing_submissions')
-    .insert({ attempt_id: attempt.id, user_id: userId, ai_score: null })
-  if (claimErr) {
-    if ((claimErr as { code?: string }).code === '23505') return { ok: false, code: 'GRADING_CONFLICT' }
-    throw new Error(claimErr.message)
+  const claimToken = randomUUID()
+  const { data: claimData, error: claimErr } = await admin.rpc('claim_writing_grade', {
+    p_attempt: attempt.id,
+    p_user: userId,
+    p_claim_token: claimToken,
+  })
+  if (claimErr) throw new Error(claimErr.message)
+  const claim = claimData as { ok?: boolean; code?: string } | null
+  if (claim?.ok !== true) {
+    if (claim?.code === 'ATTEMPT_TERMINAL') return { ok: false, code: 'ATTEMPT_TERMINAL' }
+    if (claim?.code === 'NOT_FOUND') return { ok: false, code: 'NOT_FOUND' }
+    return { ok: false, code: 'GRADING_CONFLICT' }
   }
   // Từ đây winner SỞ HỮU claim row; mọi return sớm PHẢI release (xoá placeholder) để cho phép retry.
   const releaseClaim = async () => {
-    await admin.from('writing_submissions').delete().eq('attempt_id', attempt.id).eq('user_id', userId).is('ai_score', null)
+    await admin.from('writing_submissions').delete()
+      .eq('attempt_id', attempt.id).eq('user_id', userId)
+      .eq('claim_token', claimToken).is('ai_score', null)
   }
 
   // 4) Rate limit — IP/day atomic first, then per-user free quota. Pro bypasses per-user, not IP anti-abuse.
@@ -152,28 +161,32 @@ export async function submitWritingGrade(
   }
 
   // 8) Persist: UPDATE claim row đã sở hữu (không delete+insert → không đua/duplicate). Finalize attempt.
-  const { error: wErr } = await admin
-    .from('writing_submissions')
-    .update({
-      task1_text: body.task1_text,
-      task2_text: body.task2_text,
-      task1_wc,
-      task2_wc,
-      ai_score,
-      graded_at,
-    })
-    .eq('attempt_id', attempt.id)
-    .eq('user_id', userId)
-  if (wErr) { await refundReservations(admin, userId, body.ip_hash, userReserved, ipReserved); await releaseClaim(); throw new Error(wErr.message) }
-  // Finalize attempt (band = overall cho history/dashboard M09). Conditional: chỉ khi chưa terminal.
-  if (attempt.status === 'in_progress') {
-    await admin
-      .from('attempts')
-      .update({ status: 'submitted', submitted_at: graded_at, band: overall_band })
-      .eq('id', attempt.id)
-      .eq('user_id', userId)
-      .eq('status', 'in_progress')
+  const { data: finalizeData, error: wErr } = await admin.rpc('finalize_writing_grade', {
+    p_attempt: attempt.id,
+    p_user: userId,
+    p_claim_token: claimToken,
+    p_task1_text: body.task1_text,
+    p_task2_text: body.task2_text,
+    p_task1_wc: task1_wc,
+    p_task2_wc: task2_wc,
+    p_ai_score: ai_score,
+    p_graded_at: graded_at,
+    p_band: overall_band,
+  })
+  if (wErr) {
+    await refundReservations(admin, userId, body.ip_hash, userReserved, ipReserved)
+    await releaseClaim()
+    throw new Error(wErr.message)
   }
+  const finalized = finalizeData as { ok?: boolean; code?: string } | null
+  if (finalized?.ok !== true) {
+    await refundReservations(admin, userId, body.ip_hash, userReserved, ipReserved)
+    await releaseClaim()
+    if (finalized?.code === 'ATTEMPT_TERMINAL') return { ok: false, code: 'ATTEMPT_TERMINAL' }
+    if (finalized?.code === 'NOT_FOUND') return { ok: false, code: 'NOT_FOUND' }
+    return { ok: false, code: 'GRADING_CONFLICT' }
+  }
+  // Finalize attempt (band = overall cho history/dashboard M09). Conditional: chỉ khi chưa terminal.
 
   const result: WritingGradeResult = {
     attempt_id: attempt.id,

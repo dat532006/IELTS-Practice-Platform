@@ -10,7 +10,15 @@ import { isUuid } from '@/lib/utils'
 const Body = z.object({
   status: z.enum(['resolved', 'ignored']),
   note: z.string().max(2000).optional().default(''),
-}).strict()
+  coin_delta: z.number().int().optional().default(0),
+}).strict().superRefine((value, ctx) => {
+  if (value.status === 'resolved' && value.coin_delta === 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['coin_delta'], message: 'resolved requires a non-zero coin_delta' })
+  }
+  if (value.status === 'ignored' && value.coin_delta !== 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['coin_delta'], message: 'ignored requires coin_delta=0' })
+  }
+})
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const g = await requireAdminApi()
@@ -24,12 +32,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!parsed.success) return fail('VALIDATION_ERROR', 'Dữ liệu không hợp lệ', { status: 400 })
 
   const admin = createAdminClient()
-  const { data, error } = await admin.rpc('resolve_payment_exception', {
-    p_id: id, p_admin: g.userId, p_status: parsed.data.status, p_note: parsed.data.note,
+  const { data, error } = await admin.rpc('resolve_payment_exception_v2', {
+    p_id: id, p_admin: g.userId, p_status: parsed.data.status, p_note: parsed.data.note, p_coin_delta: parsed.data.coin_delta,
   })
   if (error) return fail('INTERNAL', 'Không cập nhật được case', { status: 500 })
   if ((data as { ok?: boolean } | null)?.ok !== true) {
     return fail('VALIDATION_ERROR', 'Case đã được xử lý hoặc không còn ở trạng thái mở', { status: 409 })
   }
-  return ok({ id, status: parsed.data.status })
+  const resolved = data as { ledger_txn_id?: string | null; coins?: number | null }
+  return ok({ id, status: parsed.data.status, ledger_txn_id: resolved.ledger_txn_id ?? null, coins: resolved.coins ?? null })
 }

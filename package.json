@@ -9,7 +9,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "db:verify": "powershell -ExecutionPolicy Bypass -File scripts/verify-db.ps1",
-    "smoke": "node scripts/run-smokes.mjs"
+    "smoke": "node scripts/run-smokes.mjs",
+    "auth:configure-email": "node scripts/configure-auth-email.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",

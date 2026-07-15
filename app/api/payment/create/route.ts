@@ -8,7 +8,7 @@ import { vndToCoins, COIN_VND_RATE, MIN_TOPUP_VND, MAX_TOPUP_VND } from '@/lib/p
 import { getGatewayMode } from '@/lib/payments/gateway'
 import { buildVnpayPayUrl, vnpayConfigured } from '@/lib/payments/vnpay'
 import { createMomoPayment, momoConfigured } from '@/lib/payments/momo'
-import { sepayConfigured } from '@/lib/payments/sepay'
+import { sepayBankInfo, sepayConfigured } from '@/lib/payments/sepay'
 import { extractTrustedClientIp } from '@/lib/rate-limit/ai-ip'
 import { SITE_URL } from '@/lib/site'
 
@@ -78,7 +78,8 @@ export async function POST(request: Request) {
   //   / provider_txn_id / expires_at do SERVER tính (không tin client); coin CHỈ cộng ở webhook sau verify.
   const provider_txn_id = 'TOPUP-' + randomBytes(9).toString('hex')
   const expires_at = new Date(Date.now() + TOPUP_PENDING_TTL_MS).toISOString()
-  const { data: admit, error } = await admin.rpc('admit_topup', {
+  const beneficiary = parsed.data.provider === 'bank' ? sepayBankInfo() : null
+  const { data: admit, error } = await admin.rpc('admit_topup_v2', {
     p_user_id: user.id,
     p_amount_vnd: parsed.data.amount_vnd,
     p_amount_coins: conv.coins,
@@ -86,6 +87,8 @@ export async function POST(request: Request) {
     p_provider_txn_id: provider_txn_id,
     p_expires_at: expires_at,
     p_max_pending: getMaxPendingTopups(),
+    p_beneficiary_account: beneficiary?.account ?? null,
+    p_beneficiary_bank: beneficiary?.bank ?? null,
   })
   if (error) return fail('INTERNAL', 'Không khởi tạo được thanh toán', { status: 500 })
   if (!(admit as { ok?: boolean } | null)?.ok) {

@@ -6,6 +6,7 @@
 //   Import trực tiếp lib/ai/provider-select.ts (Node type-strip: không server-only, không import).
 //     node supabase/smoke/writing_grader_reliability_gate.mjs
 import http from 'node:http'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
@@ -43,6 +44,15 @@ check('unset + cả 2 key → anthropic ưu tiên',
   selectProvider({ ANTHROPIC_API_KEY: 'x', OPENAI_API_KEY: 'y' }).provider === 'anthropic')
 check('unset + không key → default anthropic (nhánh live throw → AI_UNAVAILABLE)',
   selectProvider({}).reason === 'default')
+console.log('\nAI-001 — OpenAI Responses API contract:')
+const graderSource = readFileSync(resolve(root, 'lib', 'ai', 'writing-grader.ts'), 'utf8')
+check('uses Responses API (not legacy Chat Completions)',
+  graderSource.includes('https://api.openai.com/v1/responses') &&
+  !graderSource.includes('https://api.openai.com/v1/chat/completions'))
+check('uses strict Structured Outputs', /text:\s*\{[\s\S]*format:\s*\{[\s\S]*type: 'json_schema'[\s\S]*strict: true/.test(graderSource))
+check('OpenAI key remains server-only', /process\.env\.OPENAI_API_KEY/.test(graderSource) && !/NEXT_PUBLIC_OPENAI/.test(graderSource))
+check('balanced default model is explicit', /WRITING_GRADER_OPENAI_MODEL \|\| 'gpt-5\.6-terra'/.test(graderSource))
+
 check('rỗng "" coi như unset', selectProvider({ WRITING_AI_PROVIDER: '', OPENAI_API_KEY: 'y' }).provider === 'openai')
 
 // ---------- AI-001: deadline bounded ----------

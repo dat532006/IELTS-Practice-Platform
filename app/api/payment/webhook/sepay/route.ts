@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { verifySepayWebhook, extractTopupRef, sepayBeneficiaryMatches, sepayConfigured, type SepayWebhookBody } from '@/lib/payments/sepay'
-import { settleVerifiedTopup } from '@/lib/payments/settle'
+import { recordPaymentException, settleVerifiedTopup } from '@/lib/payments/settle'
 import { requestIdFrom } from '@/lib/api/response'
 import { logEvent } from '@/lib/obs/log-event'
 
@@ -42,19 +42,35 @@ export async function POST(request: Request) {
     return ACK()
   }
 
-  // PAY-002 — bind beneficiary: tiền phải VÀO ĐÚNG tài khoản người bán. Event ký hợp lệ nhưng
-  //   accountNumber khác (định tuyến sai / cấu hình bên thứ ba) → KHÔNG credit; ACK + log đối soát
-  //   (retry vô ích vì beneficiary sai không tự sửa). Giữ pending để xử lý tay.
-  if (!sepayBeneficiaryMatches(body)) {
-    logEvent('payment.sepay_beneficiary_mismatch', 'error', { ref, acct: body.accountNumber ?? null, sub: body.subAccount ?? null, sepay_id: body.id ?? null }, { request_id: rid })
-    return ACK()
-  }
-
   const amount = Number.isInteger(body.transferAmount) && (body.transferAmount as number) > 0
     ? (body.transferAmount as number)
     : undefined
+  const admin = createAdminClient()
+  const { data: txnData, error: txnError } = await admin
+    .from('transactions')
+    .select('beneficiary_account, amount_vnd, user_id')
+    .eq('provider', 'bank').eq('provider_txn_id', ref).eq('type', 'topup')
+    .maybeSingle()
+  if (txnError) return NextResponse.json({ success: false, message: 'internal' }, { status: 500 })
+  const txn = txnData as {
+    beneficiary_account: string | null; amount_vnd: number | null; user_id: string | null
+  } | null
 
-  const result = await settleVerifiedTopup(createAdminClient(), 'bank', ref, amount, 'success')
+  // PAY-002 — bind beneficiary: tiền phải VÀO ĐÚNG tài khoản người bán. Event ký hợp lệ nhưng
+  //   accountNumber khác (định tuyến sai / cấu hình bên thứ ba) → KHÔNG credit; ACK + log đối soát
+  //   (retry vô ích vì beneficiary sai không tự sửa). Giữ pending để xử lý tay.
+  if (!sepayBeneficiaryMatches(body, txn?.beneficiary_account ?? undefined)) {
+    logEvent('payment.sepay_beneficiary_mismatch', 'error', { ref, sepay_id: body.id ?? null }, { request_id: rid })
+    const recorded = await recordPaymentException(
+      admin, 'bank', ref, 'beneficiary_mismatch',
+      amount ?? null, txn?.amount_vnd ?? null, txn?.user_id ?? null,
+    )
+    if (!recorded) return NextResponse.json({ success: false, message: 'internal' }, { status: 500 })
+    return ACK()
+  }
+
+
+  const result = await settleVerifiedTopup(admin, 'bank', ref, amount, 'success')
   if (!result.ok) {
     if (result.code === 'PAYMENT_AMOUNT_MISMATCH') {
       // User chuyển sai số tiền → KHÔNG credit, giữ pending để đối soát tay; ACK vì retry vô ích.

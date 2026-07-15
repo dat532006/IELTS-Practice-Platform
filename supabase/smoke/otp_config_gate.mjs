@@ -34,6 +34,20 @@ check('[auth.email] enable_confirmations = true (OTP xác nhận)', get('auth.em
 check('[auth.email] otp_length = 6', get('auth.email', 'otp_length') === '6', `got ${get('auth.email', 'otp_length')}`)
 check('[auth.email] otp_expiry đặt (giây)', /^\d+$/.test(get('auth.email', 'otp_expiry') ?? ''), `got ${get('auth.email', 'otp_expiry')}`)
 
+console.log('\nDEPLOY-002 — production SMTP automation contract:')
+const configure = readFileSync(resolve(root, 'scripts', 'configure-auth-email.mjs'), 'utf8')
+const envExample = readFileSync(resolve(root, '.env.example'), 'utf8')
+const template = readFileSync(resolve(root, 'supabase', 'templates', 'confirmation.html'), 'utf8')
+check('template uses a six-digit OTP token', template.includes('{{ .Token }}'))
+check('Management API config keeps confirmation enabled and autoconfirm off',
+  /external_email_enabled: true/.test(configure) && /mailer_autoconfirm: false/.test(configure))
+check('SMTP, Site URL, allow-list and template are patched together',
+  /smtp_host: smtpHost/.test(configure) && /site_url: siteUrl/.test(configure) &&
+  /uri_allow_list:/.test(configure) && /mailer_templates_confirmation_content/.test(configure))
+check('deployment secrets are documented but never NEXT_PUBLIC',
+  ['SUPABASE_ACCESS_TOKEN', 'SUPABASE_PROJECT_REF', 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'SMTP_ADMIN_EMAIL']
+    .every((name) => envExample.includes(`${name}=`)) && !/NEXT_PUBLIC_SMTP|NEXT_PUBLIC_SUPABASE_ACCESS_TOKEN/.test(envExample))
+
 console.log(`\nRESULT: ${pass} passed, ${fail} failed`)
-console.log('NOTE: E2E signup→mail→OTP cần `supabase start` (nay đã bật inbucket). Prod SMTP/template/Site URL = Owner dashboard.')
+console.log('NOTE: production delivery still requires real SMTP credentials and a verified sender domain.')
 process.exitCode = fail ? 1 : 0

@@ -130,7 +130,10 @@ async function saveTest(admin: SupabaseClient, parsed: TestInput): Promise<Admin
     p_keys: parsed.answer_keys ?? null,
     p_replace_keys: replaceKeys,
   })
-  if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
+  if (error) {
+    if (error.message.startsWith('INVALID_GRAPH:')) return { ok: false, code: 'VALIDATION_ERROR', detail: error.message.slice(14).trim() }
+    return { ok: false, code: 'INTERNAL', detail: error.message }
+  }
   const res = data as { ok?: boolean; code?: string; test_id?: string; status?: string } | null
   if (res?.ok !== true) {
     if (res?.code === 'NOT_FOUND') return { ok: false, code: 'NOT_FOUND' }
@@ -306,34 +309,20 @@ export async function getTestPreview(admin: SupabaseClient, testId: string) {
 //   (chấm bằng AI). (KHÁC bundle-có-test-draft: đó là incremental release cố ý, test draft bị RLS ẩn.)
 export async function publishTest(admin: SupabaseClient, testId: string): Promise<AdminTestOutcome> {
   // ADMIN-002 — đọc TOÀN BỘ graph rồi validate trước khi publish (không chỉ đếm keys).
-  const { data: t, error: tErr } = await admin
-    .from('tests')
-    .select('type, passages, questions, audio_key')
-    .eq('id', testId)
-    .maybeSingle()
-  if (tErr) return { ok: false, code: 'INTERNAL', detail: tErr.message }
-  if (!t) return { ok: false, code: 'NOT_FOUND' }
-  const row = t as { type?: string; passages?: unknown; questions?: unknown; audio_key?: string | null }
-  const { data: ak } = await admin.from('answer_keys').select('keys').eq('test_id', testId).maybeSingle()
-  const keys = (ak as { keys?: Record<string, unknown> } | null)?.keys ?? null
-
-  const graphError = validateExamGraph({
-    type: row.type ?? '',
-    passages: row.passages,
-    questions: row.questions,
-    keys,
-    audioKey: row.audio_key ?? null,
-  })
-  if (graphError) return { ok: false, code: 'VALIDATION_ERROR', detail: graphError }
-
-  const { data, error } = await admin
-    .from('tests')
-    .update({ status: 'published' })
-    .eq('id', testId)
-    .select('id, status')
-    .single()
-  if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
-  if (!data) return { ok: false, code: 'NOT_FOUND' }
+  const { data: rpcData, error: rpcError } = await admin.rpc('admin_publish_test', { p_test_id: testId })
+  if (rpcError) {
+    if (rpcError.message.startsWith('INVALID_GRAPH:')) {
+      return { ok: false, code: 'VALIDATION_ERROR', detail: rpcError.message.slice(14).trim() }
+    }
+    if (rpcError.code === 'P0002') return { ok: false, code: 'NOT_FOUND' }
+    return { ok: false, code: 'INTERNAL', detail: rpcError.message }
+  }
+  const published = rpcData as { ok?: boolean; code?: string; test_id?: string; status?: string } | null
+  if (published?.ok !== true) {
+    if (published?.code === 'NOT_FOUND') return { ok: false, code: 'NOT_FOUND' }
+    return { ok: false, code: 'INTERNAL', detail: 'admin_publish_test failed' }
+  }
+  const data = { id: published.test_id as string, status: published.status as string }
   // Đề vừa published bắt đầu được matview đếm (skills/test_count của VOL chứa nó).
   const refreshed = await refreshProductSearch(admin)
   if (!refreshed.ok) return { ok: false, code: 'INTERNAL', detail: `đã publish đề nhưng refresh catalog lỗi: ${refreshed.detail}` }

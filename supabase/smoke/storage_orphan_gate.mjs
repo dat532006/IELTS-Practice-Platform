@@ -38,6 +38,9 @@ check('sweep media(tests.cover_image) + avatars(profiles.avatar)', /sweepBucket\
 check('CHỈ xoá khi enabled (dry-run KHÔNG remove)', /if \(enabled && orphanPaths\.length > 0\)/.test(cron))
 check('reference-check: object đang tham chiếu KHÔNG xoá (collectReferenced)', /collectReferenced\(admin, table, column, bucket\)/.test(cron))
 check('list có cap (bounded)', /MAX_OBJECTS/.test(cron))
+check('DB/list error aborts sweep before delete (STORE-004)',
+  /if \(error\) throw new Error\(`reference_query_failed:/.test(cron) &&
+  /if \(error\) throw new Error\(`storage_list_failed:/.test(cron))
 check('ghi cron_runs (job cleanup-orphans) + detail dry_run', /job: 'cleanup-orphans'/.test(cron) && /dry_run: !enabled/.test(cron))
 
 console.log('\nSTORE-001 — vercel.json cron + env contract:')

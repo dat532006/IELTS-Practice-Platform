@@ -23,7 +23,8 @@ function write(row, answers, expectedRev, { terminal = false } = {}) {
 
 console.log('EXAM-004 — checkAnswersRev (lõi quyết định):')
 check('expected === current → ok, nextRev = current+1', (() => { const r = checkAnswersRev(3, 3); return r.ok && r.nextRev === 4 })())
-check('expected undefined (client cũ) → ok, vẫn bump (không regression)', (() => { const r = checkAnswersRev(2, undefined); return r.ok && r.nextRev === 3 })())
+check('legacy write without rev is allowed only for untouched rev 0', checkAnswersRev(0, undefined).ok)
+check('legacy write without rev is stale after any write', (() => { const r = checkAnswersRev(2, undefined); return !r.ok && r.reason === 'stale' })())
 check('expected < current (tab cũ) → stale', (() => { const r = checkAnswersRev(3, 0); return !r.ok && r.reason === 'stale' })())
 check('expected > current (bất thường) → stale (defensive)', (() => { const r = checkAnswersRev(1, 5); return !r.ok && r.reason === 'stale' })())
 

@@ -5,7 +5,7 @@
 //   Phân loại required/optional ở OPTIONAL bên dưới (Owner tinh chỉnh — mục "Owner: classify optional").
 // Dùng: node scripts/run-smokes.mjs [--only <substr>]   (SMOKE_BASE/env truyền như bình thường)
 // ============================================================
-import { readdirSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
@@ -13,6 +13,18 @@ import { aggregateSmokes } from '../supabase/smoke/_harness.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const smokeDir = resolve(root, 'supabase', 'smoke')
+// Hermetic local runner: load the same .env.local contract that individual
+// smokes use. Explicit process env always wins (CI/staging overrides).
+try {
+  for (const line of readFileSync(resolve(root, '.env.local'), 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
+    if (!match || process.env[match[1]]) continue
+    const value = match[2].replace(/^(['"])(.*)\1$/, '$2')
+    process.env[match[1]] = value
+  }
+} catch {
+  // CI may provide all variables without an .env.local file.
+}
 
 // OPTIONAL: smoke phụ thuộc provider/dịch vụ NGOÀI (live gateway, live AI eval) — SKIP không chặn CI.
 //   Owner phân loại lại tuỳ hạ tầng pre-prod. Mặc định: MỌI smoke khác = REQUIRED (fail-closed).
@@ -31,7 +43,14 @@ const files = readdirSync(smokeDir)
 const results = []
 for (const f of files) {
   const required = !OPTIONAL.has(f)
-  const r = spawnSync(process.execPath, [resolve(smokeDir, f)], { encoding: 'utf8', env: process.env })
+  const smokeEnv = { ...process.env }
+  // The generic HMAC webhook is intentionally disabled in live mode. Allow CI
+  // to route only its legacy sandbox contract to a separately configured app;
+  // SePay/VNPay/MoMo live smokes continue to use SMOKE_BASE.
+  if (f === 'payment_smoke.mjs' && process.env.SMOKE_SANDBOX_BASE) {
+    smokeEnv.SMOKE_BASE = process.env.SMOKE_SANDBOX_BASE
+  }
+  const r = spawnSync(process.execPath, [resolve(smokeDir, f)], { encoding: 'utf8', env: smokeEnv })
   const out = `${r.stdout || ''}${r.stderr || ''}`
   const m = out.match(/SMOKE_RESULT (\{.*\})/)
   let status
@@ -43,6 +62,7 @@ for (const f of files) {
   results.push({ name: f, status, required })
   const tag = status === 'PASSED' ? '✅' : status === 'SKIPPED' ? (required ? '⛔SKIP' : '⏭️skip') : status === 'BLOCKED' ? '⛔BLOCKED' : '❌FAIL'
   console.log(`${tag}  ${f}${required ? '' : ' (optional)'}`)
+  if (status !== 'PASSED' && out.trim()) console.error(out.trim())
 }
 
 const { exit, totals } = aggregateSmokes(results)

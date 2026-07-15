@@ -35,7 +35,10 @@ function bearerMatches(header: string | null, secret: string): boolean {
 // Tập path đang được DB tham chiếu (chỉ path thuộc bucket đang xét) — object trong tập này KHÔNG BAO GIỜ xoá.
 async function collectReferenced(admin: StorageAdmin, table: string, column: string, bucket: string): Promise<Set<string>> {
   const set = new Set<string>()
-  const { data } = await admin.from(table).select(column).not(column, 'is', null)
+  const { data, error } = await admin.from(table).select(column).not(column, 'is', null)
+  // STORE-004: abort before deletion if the DB reference query fails.
+  // A failed query must never be interpreted as an empty reference set.
+  if (error) throw new Error(`reference_query_failed:${table}.${column}`)
   for (const row of (data ?? []) as unknown as Record<string, unknown>[]) {
     const obj = parsePublicObjectPath(row[column] as string)
     if (obj && obj.bucket === bucket) set.add(obj.path)
@@ -52,7 +55,8 @@ async function listAllObjects(admin: StorageAdmin, bucket: string): Promise<{ pa
     let offset = 0
     for (;;) {
       const { data, error } = await admin.storage.from(bucket).list(prefix, { limit: LIST_PAGE, offset, sortBy: { column: 'name', order: 'asc' } })
-      if (error || !data || data.length === 0) break
+      if (error) throw new Error(`storage_list_failed:${bucket}`)
+      if (!data || data.length === 0) break
       for (const e of data) {
         const full = prefix ? `${prefix}/${e.name}` : e.name
         if (e.id === null) queue.push(full) // folder → đệ quy
