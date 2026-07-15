@@ -21,17 +21,26 @@ const vnd = (n: number) => n.toLocaleString('vi-VN')
 
 export function TopupQrPanel({ refCode, amountVnd, amountCoins, initialStatus, expiresAt, qrUrl, bank }: Props) {
   const [status, setStatus] = useState(initialStatus)
-  const [now, setNow] = useState(() => Date.now())
+  // UI-007: KHÔNG khởi tạo bằng Date.now() (server và client lệch nhau → hydration mismatch/flicker khi
+  //   qua ranh giới giây). `now=null` cho tới sau mount → SSR và lần render client đầu KHÔNG có phần đếm
+  //   ngược (đồng nhất), rồi mount xong mới bật đồng hồ (mount-only countdown).
+  const [now, setNow] = useState<number | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
 
   const expiresMs = expiresAt ? new Date(expiresAt).getTime() : null
-  const expired = status === 'expired' || (status === 'pending' && expiresMs != null && now > expiresMs)
+  const expired = status === 'expired' || (status === 'pending' && now != null && expiresMs != null && now > expiresMs)
+
+  // UI-007: đồng hồ chỉ chạy sau mount (client). Set ngay + tick mỗi giây (đếm ngược mượt).
+  useEffect(() => {
+    setNow(Date.now())
+    const tick = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(tick)
+  }, [])
 
   // Poll trạng thái mỗi 4s khi còn pending (webhook có thể đến muộn hơn expire → vẫn poll nhẹ khi expired).
   useEffect(() => {
     if (status === 'success') return
     const t = setInterval(async () => {
-      setNow(Date.now())
       try {
         const r = await fetch(`/api/payment/status?ref=${refCode}`)
         const b = await r.json().catch(() => null)
@@ -50,7 +59,9 @@ export function TopupQrPanel({ refCode, amountVnd, amountCoins, initialStatus, e
       setCopied(tag)
       setTimeout(() => setCopied(null), 1600)
     } catch {
-      /* clipboard bị chặn — user tự chọn/copy */
+      // UI-006: clipboard bị chặn → KHÔNG im lặng; báo user tự copy (không giả vờ đã copy).
+      setCopied(`${tag}:fail`)
+      setTimeout(() => setCopied((c) => (c === `${tag}:fail` ? null : c)), 2400)
     }
   }
 
@@ -74,7 +85,7 @@ export function TopupQrPanel({ refCode, amountVnd, amountCoins, initialStatus, e
     )
   }
 
-  const secondsLeft = expiresMs != null ? Math.max(0, Math.floor((expiresMs - now) / 1000)) : null
+  const secondsLeft = expiresMs != null && now != null ? Math.max(0, Math.floor((expiresMs - now) / 1000)) : null
   const mm = secondsLeft != null ? String(Math.floor(secondsLeft / 60)).padStart(2, '0') : null
   const ss = secondsLeft != null ? String(secondsLeft % 60).padStart(2, '0') : null
 
@@ -122,7 +133,7 @@ export function TopupQrPanel({ refCode, amountVnd, amountCoins, initialStatus, e
                     onClick={() => copy('raw' in row && row.raw ? row.raw : row.value, row.tag as string)}
                     className="rounded-[7px] border border-[#E4DEEE] bg-white px-2 py-0.5 text-[11px] font-bold text-[#6A48D6] hover:border-[#CCC3DC]"
                   >
-                    {copied === row.tag ? '✓' : 'Copy'}
+                    {copied === row.tag ? '✓' : copied === `${row.tag}:fail` ? 'Chép tay' : 'Copy'}
                   </button>
                 )}
               </span>

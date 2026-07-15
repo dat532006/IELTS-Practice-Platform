@@ -77,7 +77,13 @@ export default function VocabPage() {
         Bạn cần <Link href="/login" className="font-bold text-[#6A48D6] underline">đăng nhập</Link> để dùng sổ từ vựng.
       </p>
     )
-  if (state === 'error') return <p className="text-[14px] text-rose-600">Không tải được sổ từ vựng. Vui lòng thử lại.</p>
+  if (state === 'error')
+    return (
+      <p role="alert" className="text-[14px] text-rose-600">
+        Không tải được sổ từ vựng —{' '}
+        <button type="button" onClick={() => { setState('loading'); void load() }} className="font-bold underline">thử lại</button>.
+      </p>
+    )
 
   return (
     <div>
