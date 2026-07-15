@@ -1,5 +1,6 @@
 import 'server-only'
 import { AnswerKeyEntrySchema, isAnswerCorrect } from '@/lib/scoring/score-reading'
+import { normalizeEvidence } from '@/lib/exam/evidence-locate'
 import type { ReviewItem } from '@/types/exam'
 
 // ============================================================
@@ -48,7 +49,8 @@ export function buildReviewItems(
       is_correct: isAnswerCorrect(ans[qid], entry),
       // P3: giải thích chỉ đính khi có (đã qua owner+terminal guard ở getResult, giống correct_answers).
       ...(entry.explanation ? { explanation: entry.explanation } : {}),
-      ...(entry.evidence ? { evidence: entry.evidence } : {}),
+      // EXAM-006: chuẩn hóa string(legacy)|object → descriptor {quote, occurrence?, context_*}; rỗng → bỏ.
+      ...((() => { const ev = normalizeEvidence(entry.evidence); return ev ? { evidence: ev } : {} })()),
     })
   }
   // sắp theo number nếu có (ổn định cho UI), giữ nguyên thứ tự key khi thiếu number.

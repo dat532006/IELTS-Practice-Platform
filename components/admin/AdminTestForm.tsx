@@ -36,6 +36,10 @@ type QField = {
   // review evidence (P3) — vào answer_keys entry, KHÔNG vào questions
   explanation?: string
   evidence?: string // trích nguyên văn từ passage → review-in-exam highlight + đánh số [n]
+  // EXAM-006: khử trùng khi quote lặp trong passage (tùy chọn). occurrence = lần thứ mấy (1-based).
+  evidence_occurrence?: string
+  evidence_context_before?: string
+  evidence_context_after?: string
 }
 
 const Q_TYPES = ['gap_filling', 'summary', 'mcq', 'mcq_multi', 'tfng', 'ynng', 'matching', 'matching_information', 'matching_features', 'short_answer', 'diagram', 'map']
@@ -324,6 +328,9 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           options: (base.options ?? []).map((o) => ({ ...o })),
           explanation: k === 0 ? base.explanation : undefined,
           evidence: k === 0 ? base.evidence : undefined,
+          evidence_occurrence: k === 0 ? base.evidence_occurrence : undefined,
+          evidence_context_before: k === 0 ? base.evidence_context_before : undefined,
+          evidence_context_after: k === 0 ? base.evidence_context_after : undefined,
         }
       })
       const next = [...qs]
@@ -336,7 +343,8 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
   function buildPayload() {
     // ⚠️ questions KHÔNG mang đáp án; đáp án + explanation → answer_keys (tách, server-only).
     const qOut = questions.map(emitQuestion)
-    type KeyEntry = { answers: string[]; match: 'ci'; points: number; type?: string; explanation?: string; evidence?: string }
+    type EvidenceObj = { quote: string; occurrence?: number; context_before?: string; context_after?: string }
+    type KeyEntry = { answers: string[]; match: 'ci'; points: number; type?: string; explanation?: string; evidence?: string | EvidenceObj }
     const answer_keys: Record<string, KeyEntry> = {}
     for (const q of questions) {
       const ans = q.answers.split(',').map((s) => s.trim()).filter(Boolean)
@@ -348,7 +356,21 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       const exp = q.explanation?.trim()
       if (exp) entry.explanation = exp
       const ev = q.evidence?.trim()
-      if (ev) entry.evidence = ev.slice(0, 2000)
+      if (ev) {
+        // EXAM-006: có occurrence/context → lưu dạng object (khử trùng); không → string legacy (gọn).
+        const occ = Number(q.evidence_occurrence)
+        const cb = q.evidence_context_before?.trim()
+        const ca = q.evidence_context_after?.trim()
+        if ((Number.isInteger(occ) && occ > 0) || cb || ca) {
+          const obj: EvidenceObj = { quote: ev.slice(0, 2000) }
+          if (Number.isInteger(occ) && occ > 0) obj.occurrence = occ
+          if (cb) obj.context_before = cb.slice(0, 200)
+          if (ca) obj.context_after = ca.slice(0, 200)
+          entry.evidence = obj
+        } else {
+          entry.evidence = ev.slice(0, 2000)
+        }
+      }
       answer_keys[q.id] = entry
     }
     return {
@@ -438,7 +460,16 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       if (q.x != null) out.x = String(q.x)
       if (q.y != null) out.y = String(q.y)
       if (key && typeof key.explanation === 'string') out.explanation = key.explanation
-      if (key && typeof key.evidence === 'string') out.evidence = key.evidence
+      // EXAM-006: evidence có thể là string (legacy) hoặc object {quote, occurrence?, context_*}.
+      if (key && typeof key.evidence === 'string') {
+        out.evidence = key.evidence
+      } else if (key && key.evidence && typeof key.evidence === 'object') {
+        const ev = key.evidence as { quote?: unknown; occurrence?: unknown; context_before?: unknown; context_after?: unknown }
+        if (typeof ev.quote === 'string') out.evidence = ev.quote
+        if (typeof ev.occurrence === 'number') out.evidence_occurrence = String(ev.occurrence)
+        if (typeof ev.context_before === 'string') out.evidence_context_before = ev.context_before
+        if (typeof ev.context_after === 'string') out.evidence_context_after = ev.context_after
+      }
       return out
     })
 
@@ -1022,6 +1053,30 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                       onChange={(e) => setQ(i, { evidence: e.target.value || undefined })}
                       placeholder="Copy đúng câu trong passage chứa đáp án — sẽ được highlight + đánh số khi thí sinh 'Xem lại trong bài'. Sai 1 chữ = không tìm thấy (không highlight)."
                     />
+                    {/* EXAM-006: khử trùng nếu quote lặp trong passage. Bỏ trống nếu quote chỉ xuất hiện 1 lần.
+                        Nếu quote lặp mà KHÔNG điền ở đây → hệ thống bỏ qua (không tô nhầm lần đầu). */}
+                    <div className="mt-1.5 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                      <input
+                        type="number"
+                        min={1}
+                        className="rounded-[8px] border border-[#D6EFE0] bg-white px-2.5 py-1.5 text-[12px] text-[#2A2740] outline-none"
+                        value={q.evidence_occurrence ?? ''}
+                        onChange={(e) => setQ(i, { evidence_occurrence: e.target.value || undefined })}
+                        placeholder="Lần thứ mấy (nếu quote lặp)"
+                      />
+                      <input
+                        className="rounded-[8px] border border-[#D6EFE0] bg-white px-2.5 py-1.5 text-[12px] text-[#2A2740] outline-none"
+                        value={q.evidence_context_before ?? ''}
+                        onChange={(e) => setQ(i, { evidence_context_before: e.target.value || undefined })}
+                        placeholder="Vài chữ ngay TRƯỚC (tùy chọn)"
+                      />
+                      <input
+                        className="rounded-[8px] border border-[#D6EFE0] bg-white px-2.5 py-1.5 text-[12px] text-[#2A2740] outline-none"
+                        value={q.evidence_context_after ?? ''}
+                        onChange={(e) => setQ(i, { evidence_context_after: e.target.value || undefined })}
+                        placeholder="Vài chữ ngay SAU (tùy chọn)"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
