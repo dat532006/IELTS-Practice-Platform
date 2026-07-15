@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { AnswerKeyEntrySchema } from '@/lib/scoring/score-reading'
 import { sanitizePassages } from '@/lib/sanitize/passage-html'
 import { refreshProductSearch } from '@/lib/admin/product-search'
+import { deleteStorageObjectByUrl } from '@/lib/storage/delete-object'
 
 // ============================================================
 // W12 — Admin test content orchestration (M11/M05). SERVER-ONLY.
@@ -228,6 +229,14 @@ export async function setTestMeta(
   if (patch.is_free !== undefined) update.is_free = patch.is_free
   if (patch.cover_image !== undefined) update.cover_image = patch.cover_image
   if (Object.keys(update).length === 0) return { ok: false, code: 'VALIDATION_ERROR', detail: 'Không có field nào để cập nhật' }
+
+  // STORE-001: đọc cover CŨ TRƯỚC khi đổi để xoá object cũ (compensated-delete) sau khi commit ref mới.
+  let oldCover: string | null = null
+  if (patch.cover_image !== undefined) {
+    const { data: cur } = await admin.from('tests').select('cover_image').eq('id', testId).maybeSingle()
+    oldCover = (cur as { cover_image: string | null } | null)?.cover_image ?? null
+  }
+
   const { data, error } = await admin
     .from('tests')
     .update(update)
@@ -236,6 +245,11 @@ export async function setTestMeta(
     .maybeSingle()
   if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
   if (!data) return { ok: false, code: 'NOT_FOUND' }
+
+  // STORE-001: cover đổi/gỡ → xoá object cũ (per-entity, không shared). Best-effort sau khi ref đã commit.
+  if (patch.cover_image !== undefined && oldCover && oldCover !== patch.cover_image) {
+    await deleteStorageObjectByUrl(admin, oldCover)
+  }
   // is_free của đề published nuôi has_free_test của matview (cover_image thì không).
   if (patch.is_free !== undefined && (data.status as string) === 'published') {
     const refreshed = await refreshProductSearch(admin)

@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { parsePublicObjectPath } from '@/lib/storage/media-url'
 import { UserIcon } from '@/components/brand/icons'
 import { AccountAvatar } from './AccountAvatar'
 import type { AccountProfile } from './types'
@@ -11,6 +12,19 @@ const CARD =
   'rounded-[20px] border border-[#EEEAF3] bg-white p-[26px] shadow-[0_22px_44px_-36px_rgba(90,60,160,0.4)]'
 const AVATAR_BUCKET = 'avatars'
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024 // 2MB
+
+// STORE-001: xoá object avatar CŨ khi thay/gỡ (compensated-delete). Best-effort — lỗi bỏ qua (orphan job
+//   server-side dọn nốt). URL cũ trùng URL mới (không đổi thật) → bỏ qua. RLS avatars_owner_delete cho phép.
+async function removeStorageObject(
+  supabase: ReturnType<typeof createClient>,
+  oldUrl: string | null | undefined,
+  newUrl: string | null,
+): Promise<void> {
+  if (!oldUrl || oldUrl === newUrl) return
+  const obj = parsePublicObjectPath(oldUrl)
+  if (!obj) return
+  try { await supabase.storage.from(obj.bucket).remove([obj.path]) } catch { /* orphan job dọn nốt */ }
+}
 
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'
@@ -60,8 +74,11 @@ export function ProfilePanel({ profile }: { profile: AccountProfile }) {
       })
       if (upErr) throw upErr
       const { data: pub } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
+      const oldAvatar = profile.avatar
       const { error: updErr } = await supabase.from('profiles').update({ avatar: pub.publicUrl }).eq('id', profile.id)
       if (updErr) throw updErr
+      // STORE-001: xoá avatar CŨ sau khi commit ref mới (compensated-delete; best-effort — orphan job dọn nốt).
+      await removeStorageObject(supabase, oldAvatar, pub.publicUrl)
       setMsg({ tone: 'ok', text: 'Đã cập nhật ảnh đại diện.' })
       router.refresh()
     } catch {
@@ -77,8 +94,11 @@ export function ProfilePanel({ profile }: { profile: AccountProfile }) {
     setBusy(true)
     try {
       const supabase = createClient()
+      const oldAvatar = profile.avatar
       const { error } = await supabase.from('profiles').update({ avatar: null }).eq('id', profile.id)
       if (error) throw error
+      // STORE-001: gỡ avatar → xoá object cũ (compensated-delete; best-effort).
+      await removeStorageObject(supabase, oldAvatar, null)
       setMsg({ tone: 'ok', text: 'Đã gỡ ảnh đại diện.' })
       router.refresh()
     } catch {

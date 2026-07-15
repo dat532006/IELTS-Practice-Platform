@@ -62,6 +62,8 @@ export const ENV_REGISTRY: EnvVar[] = [
   // Storage / R2
   { name: 'SUPABASE_STORAGE_BUCKET', scope: 'server', describe: 'Bucket Storage cho audio/media' },
   { name: 'MEDIA_ALLOWED_ORIGINS', scope: 'server', describe: 'Origin CDN bổ sung cho cover (STORE-003)' },
+  { name: 'STORAGE_ORPHAN_GRACE_DAYS', scope: 'server', describe: 'Grace dọn orphan object (STORE-001, mặc định 7)' },
+  { name: 'STORAGE_ORPHAN_CLEANUP_ENABLED', scope: 'server', describe: 'true = xoá thật orphan (STORE-001, mặc định dry-run)' },
   { name: 'R2_ACCOUNT_ID', scope: 'server', describe: 'Cloudflare R2 account id' },
   { name: 'R2_ACCESS_KEY_ID', scope: 'server', secret: true, describe: 'R2 access key id' },
   { name: 'R2_SECRET_ACCESS_KEY', scope: 'server', secret: true, describe: 'R2 secret access key' },
