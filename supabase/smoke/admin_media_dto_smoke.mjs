@@ -54,16 +54,16 @@ const run = async () => {
     check('audio presign → 200', res.status === 200, `status=${res.status} ${JSON.stringify(res.body)}`)
     check('response CÓ upload_url', typeof res.body?.data?.upload_url === 'string')
 
-    // SEC-004: bỏ FIELD audio_key thừa (định danh private tái sử dụng trực tiếp). Lưu ý: upload_url của
-    //   presigned PUT BẮT BUỘC chứa object path (client PUT thẳng lên URL đó) — đó là ràng buộc thiết kế
-    //   presign, không phải field lộ thừa; muốn ẩn hẳn path phải proxy PUT qua server (redesign STORE-002).
+    // SEC-004: bỏ FIELD audio_key thừa (định danh private). STORE-002 (2026-07-16): thêm upload_ref =
+    //   AES-GCM MÃ HÓA objectKey (client không giải ngược được → không lộ raw key). allowlist giờ 3 field.
     const keys = Object.keys(res.body?.data ?? {})
     check('SEC-004: response KHÔNG có field audio_key', res.body?.data?.audio_key === undefined, JSON.stringify(keys))
-    check('SEC-004: DTO allowlist chỉ {method, upload_url}', keys.length === 2 && keys.includes('method') && keys.includes('upload_url'), JSON.stringify(keys))
+    check('STORE-002: DTO allowlist {method, upload_url, upload_ref}', keys.length === 3 && keys.includes('method') && keys.includes('upload_url') && keys.includes('upload_ref'), JSON.stringify(keys))
+    check('SEC-004: upload_ref KHÔNG chứa scope audio/{testId} plaintext (đã mã hóa)', typeof res.body?.data?.upload_ref === 'string' && !res.body.data.upload_ref.includes(`audio/${testId}`))
 
-    // Server VẪN set tests.audio_key (listening authoring dùng) — chỉ là không LỘ ra client.
+    // STORE-002: presign KHÔNG còn set audio_key (object chưa PUT) — chỉ finalize (sau HEAD verify) mới set.
     const row = await root.from('tests').select('audio_key').eq('id', testId).single()
-    check('server VẪN set tests.audio_key (không lộ ≠ không set)', typeof row.data?.audio_key === 'string' && row.data.audio_key.startsWith(`audio/${testId}/`), JSON.stringify(row.data))
+    check('STORE-002: audio_key VẪN null sau presign (chưa finalize)', row.data?.audio_key == null, JSON.stringify(row.data))
   } finally {
     if (testId) await root.from('tests').delete().eq('id', testId)
     await root.auth.admin.deleteUser(adminId).catch(() => {})

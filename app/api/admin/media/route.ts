@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminApi } from '@/lib/admin/guard'
 import { signR2PutUrl } from '@/lib/storage/r2'
+import { sealUploadRef } from '@/lib/storage/upload-ref'
 import { ok, fail } from '@/lib/api/response'
 
 // POST /api/admin/media — admin upload presign (M03/M11, W12). requireAdmin TRƯỚC.
@@ -36,15 +37,13 @@ export async function POST(request: Request) {
     // R2 PUT presign (server-only secret). Thiếu R2 env → R2_NOT_CONFIGURED.
     const signed = signR2PutUrl(objectKey)
     if (!signed.url) return fail('STORAGE_NOT_CONFIGURED', 'R2 chưa được cấu hình (audio upload)', { status: 503 })
-    // set audio_key (server-only column; client deny — check20) nếu gắn với test.
-    if (test_id) {
-      const { error } = await admin.from('tests').update({ audio_key: objectKey }).eq('id', test_id)
-      if (error) return fail('INTERNAL', 'Không gán audio_key', { status: 500 })
-    }
-    // SEC-004 — KHÔNG trả raw audio_key (định danh storage riêng tư) ra client, kể cả admin: lộ topology
-    //   private không cần thiết. Client chỉ cần upload_url để PUT; audio_key do server quản lý.
-    //   (STORE-002 finalize-after-verify là follow-up khi có R2 config — xem FIX_LOG.)
-    return ok({ method: 'PUT', upload_url: signed.url })
+    // STORE-002 — KHÔNG set audio_key ở đây: object CHƯA được PUT → key sẽ trỏ object không tồn tại. Thay vào
+    //   đó trả upload_ref (AES-GCM MÃ HÓA objectKey, KHÔNG lộ raw key ra client — SEC-004). Client PUT xong gọi
+    //   /api/admin/media/finalize → server HEAD verify object tồn tại → MỚI set tests.audio_key.
+    const secret = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!secret) return fail('STORAGE_NOT_CONFIGURED', 'Server chưa cấu hình', { status: 503 })
+    const upload_ref = sealUploadRef(objectKey, secret)
+    return ok({ method: 'PUT', upload_url: signed.url, upload_ref })
   }
 
   // image → Supabase Storage signed upload URL. Thiếu bucket → STORAGE_NOT_CONFIGURED.
