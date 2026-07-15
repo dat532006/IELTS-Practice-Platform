@@ -5,6 +5,7 @@ import { scoreReading, type AnswerKeys } from '@/lib/scoring/score-reading'
 import { convertToBand } from '@/lib/scoring/band-convert'
 import { sanitizeHighlights } from '@/lib/exam/highlights'
 import { sanitizeAnswers } from '@/lib/exam/answers'
+import { checkAnswersRev } from '@/lib/exam/answers-rev'
 import type { AttemptDTO, SubmitResult } from '@/types/exam'
 
 // ============================================================
@@ -32,6 +33,7 @@ type AttemptRow = {
   highlights: unknown
   bookmarked_qs: unknown
   answers: unknown
+  answers_rev: number
 }
 
 const nowSec = () => Math.floor(Date.now() / 1000)
@@ -54,11 +56,13 @@ function toAttemptDTO(a: AttemptRow): AttemptDTO {
     bookmarked_qs: Array.isArray(a.bookmarked_qs) ? (a.bookmarked_qs as string[]) : [],
     // W9: seed draft answers (chống mất bài khi reload). Sanitize → DTO KHÔNG echo shape lạ.
     answers: sanitizeAnswers(a.answers),
+    // EXAM-004: seed rev để client gửi lại làm expected_rev (optimistic concurrency chống tab cũ đè).
+    answers_rev: a.answers_rev ?? 0,
   }
 }
 
 const ATTEMPT_COLS =
-  'id, user_id, test_id, status, started_at, duration_sec, time_spent, submitted_at, raw_score, band, highlights, bookmarked_qs, answers'
+  'id, user_id, test_id, status, started_at, duration_sec, time_spent, submitted_at, raw_score, band, highlights, bookmarked_qs, answers, answers_rev'
 
 export type StartResult = { ok: true; attempt: AttemptDTO } | { ok: false; code: 'NOT_FOUND' | 'EXAM_LOCKED' }
 
@@ -123,6 +127,7 @@ export async function startAttempt(
 
 export type SubmitWrap =
   | { error: 'NOT_FOUND' }
+  | { error: 'ANSWERS_STALE' } // EXAM-004: expected_rev lệch → submit từ tab CŨ, KHÔNG ghi đè/chấm
   | { error: null; result: SubmitResult; warnings: string[] }
 
 const toBandNum = (b: number | string | null): number | null => (b == null ? null : Number(b))
@@ -191,6 +196,7 @@ export async function submitAttempt(
   attemptId: string,
   userId: string,
   answers: Record<string, unknown>,
+  expectedRev?: number,
 ): Promise<SubmitWrap> {
   const { data, error } = await admin.from('attempts').select(ATTEMPT_COLS).eq('id', attemptId).maybeSingle()
   if (error) throw new Error(error.message)
@@ -200,6 +206,10 @@ export async function submitAttempt(
 
   // Idempotent: đã terminal → trả trạng thái đã lưu (auto/double submit an toàn). KHÔNG đọc answer_keys; warnings rỗng.
   if (a.status !== 'in_progress') return { error: null, result: terminalResult(a), warnings: [] }
+
+  // EXAM-004: expected_rev lệch answers_rev → submit từ tab CŨ (đã có autosave mới hơn ở tab khác) → TỪ CHỐI,
+  //   KHÔNG chấm/ghi đè (client tải lại lấy đáp án mới rồi nộp lại). Bảo toàn đáp án tab mới.
+  if (!checkAnswersRev(a.answers_rev, expectedRev).ok) return { error: 'ANSWERS_STALE' }
 
   const duration = a.duration_sec ?? 0
   const elapsed = Math.max(0, nowSec() - isoSec(a.started_at))
@@ -211,21 +221,26 @@ export async function submitAttempt(
   // 🔐 Đọc answer_keys + chấm TRƯỚC (cả submitted lẫn expired). Lỗi ở đây → throw → attempt còn in_progress → retry.
   const scored = await scoreSubmission(admin, a.test_id, answers)
 
-  // GHI ATOMIC: 1 conditional update (status + score cùng lúc). `status='in_progress'` → chỉ 1 winner (chống double-submit/race).
+  // GHI ATOMIC: 1 conditional update (status + score + bump rev cùng lúc). `status='in_progress'` → chỉ 1 winner
+  //   (chống double-submit/race). `answers_rev`=rev đã đọc → EXAM-004: autosave chen giữa read↔submit làm rev
+  //   đổi thì update 0 row (không đè đáp án mới hơn). Cả 2 guard atomic dưới row-lock.
   const { data: upd, error: uErr } = await admin
     .from('attempts')
-    .update({ status, answers, time_spent, submitted_at, raw_score: scored.raw_score, band: scored.band })
+    .update({ status, answers, time_spent, submitted_at, raw_score: scored.raw_score, band: scored.band, answers_rev: a.answers_rev + 1 })
     .eq('id', attemptId)
     .eq('user_id', userId)
     .eq('status', 'in_progress')
+    .eq('answers_rev', a.answers_rev)
     .select('id')
     .maybeSingle()
   if (uErr) throw new Error(uErr.message)
 
   if (!upd) {
-    // THUA race (request khác vừa finalize+chấm atomically) → trả hiện trạng ĐÃ LƯU của winner; warnings rỗng.
+    // 0 row → re-select phân biệt: còn in_progress = autosave khác vừa bump rev (EXAM-004 stale) → TỪ CHỐI;
+    //   đã terminal = thua race submit khác → trả hiện trạng ĐÃ LƯU của winner (idempotent), warnings rỗng.
     const { data: re } = await admin.from('attempts').select(ATTEMPT_COLS).eq('id', attemptId).maybeSingle()
     const r = re as AttemptRow | null
+    if (r && r.status === 'in_progress') return { error: 'ANSWERS_STALE' }
     return {
       error: null,
       warnings: [],

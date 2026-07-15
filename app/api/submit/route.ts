@@ -24,6 +24,8 @@ const SubmitBody = z.object({
     .refine((a) => Object.keys(a).length <= MAX_ANSWERS, { message: 'too many answers' })
     .optional()
     .default({}),
+  // EXAM-004: rev client đã thấy (từ /start + autosave) — optimistic concurrency chống tab cũ đè khi nộp.
+  expected_rev: z.number().int().nonnegative().optional(),
 })
 
 // POST /api/submit — submit/expire + SCORING (M05/M06). Owner + status + time guard, server-side.
@@ -39,8 +41,10 @@ export async function POST(request: Request) {
     if (!parsed.success) return fail('VALIDATION_ERROR', 'Dữ liệu nộp bài không hợp lệ', { status: 400 })
 
     const admin = createAdminClient()
-    const res = await submitAttempt(admin, parsed.data.attempt_id, user.id, parsed.data.answers)
+    const res = await submitAttempt(admin, parsed.data.attempt_id, user.id, parsed.data.answers, parsed.data.expected_rev)
     if (res.error === 'NOT_FOUND') return fail('NOT_FOUND', 'Không tìm thấy lượt làm bài', { status: 404 })
+    // EXAM-004: submit từ tab CŨ (rev lệch) → 409, KHÔNG chấm/ghi đè; client tải lại lấy bản mới rồi nộp lại.
+    if (res.error === 'ANSWERS_STALE') return fail('ANSWERS_STALE', 'Bài đã được cập nhật ở nơi khác, hãy tải lại trước khi nộp', { status: 409 })
     return ok(res.result, { warnings: res.warnings })
   } catch {
     return fail('INTERNAL', 'Không nộp được bài', { status: 500 })
