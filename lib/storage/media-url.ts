@@ -28,3 +28,15 @@ export function isAllowedPublicMediaUrl(raw: unknown): boolean {
   if (!u.pathname.startsWith(PUBLIC_OBJECT_PREFIX)) return false
   return true
 }
+
+// STORE-001 — tách {bucket, path} từ URL công khai để xoá object CŨ khi thay/gỡ cover/avatar
+//   (compensated-delete). Chỉ nhận URL hợp lệ (origin allowlist + object public) → KHÔNG suy ra bucket/path
+//   từ URL lạ (chống xoá nhầm). Format: {origin}/storage/v1/object/public/{bucket}/{path}. PURE.
+export function parsePublicObjectPath(raw: unknown): { bucket: string; path: string } | null {
+  if (!isAllowedPublicMediaUrl(raw)) return null
+  const u = new URL(raw as string)
+  const rest = decodeURIComponent(u.pathname.slice(PUBLIC_OBJECT_PREFIX.length)) // "{bucket}/{path...}"
+  const slash = rest.indexOf('/')
+  if (slash <= 0 || slash === rest.length - 1) return null // cần cả bucket lẫn path không rỗng
+  return { bucket: rest.slice(0, slash), path: rest.slice(slash + 1) }
+}
