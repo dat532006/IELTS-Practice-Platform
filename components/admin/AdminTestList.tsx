@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 
 // Admin danh sách đề (M11 mở rộng, 2026-07-12). Client gọi API; guard THẬT ở server.
@@ -46,7 +46,15 @@ export function AdminTestList() {
   const [msg, setMsg] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
 
+  // UI-005: reqId + abort chống response cũ (đổi filter/trang nhanh) ghi đè kết quả mới hơn.
+  const reqIdRef = useRef(0)
+  const acRef = useRef<AbortController | null>(null)
+
   const load = useCallback(async (p: number, query: string, st: string, ty: string) => {
+    const myId = ++reqIdRef.current
+    acRef.current?.abort()
+    const ac = new AbortController()
+    acRef.current = ac
     setLoadErr('')
     const sp = new URLSearchParams()
     if (query.trim()) sp.set('q', query.trim())
@@ -55,8 +63,9 @@ export function AdminTestList() {
     sp.set('page', String(p))
     sp.set('per_page', String(50))
     try {
-      const r = await fetch(`/api/admin/tests?${sp}`)
+      const r = await fetch(`/api/admin/tests?${sp}`, { signal: ac.signal })
       const j = await r.json().catch(() => null)
+      if (myId !== reqIdRef.current) return // load mới hơn đã chạy → bỏ kết quả cũ
       if (r.ok && j?.data) {
         setItems(j.data.items as TestRow[])
         setTotal(j.data.total as number)
@@ -64,6 +73,7 @@ export function AdminTestList() {
       } else if (r.status === 403) setLoadErr('Bạn không có quyền admin.')
       else setLoadErr('Không tải được danh sách đề.')
     } catch {
+      if (ac.signal.aborted || myId !== reqIdRef.current) return // bị load mới hủy → im lặng
       setLoadErr('Lỗi kết nối.')
     }
   }, [])
@@ -181,7 +191,7 @@ export function AdminTestList() {
         </button>
       </form>
 
-      {loadErr && <p className="mt-4 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadErr}</p>}
+      {loadErr && <p role="alert" className="mt-4 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadErr}</p>}
       {msg && <p aria-live="polite" className="mt-4 rounded-[10px] border border-[#D9CFFF] bg-[#FBFAFF] px-3 py-2 text-[13px] font-semibold text-[#5B43C7]">{msg}</p>}
 
       {/* rows */}

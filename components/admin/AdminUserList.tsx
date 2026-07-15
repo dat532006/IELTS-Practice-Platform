@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { FishBone } from '@/components/brand/FishBone'
 
@@ -35,16 +35,27 @@ export function AdminUserList() {
   const [perPage] = useState(20)
   const [q, setQ] = useState('')
   const [loadErr, setLoadErr] = useState('')
+  const [loading, setLoading] = useState(false)
+  // UI-005: chống response cũ ghi đè bộ lọc mới hơn. Mỗi load tăng reqId; chỉ áp kết quả nếu vẫn là load
+  //   mới nhất. acRef hủy request cũ đang bay (tránh phí + swallow lỗi do chính mình hủy).
+  const reqIdRef = useRef(0)
+  const acRef = useRef<AbortController | null>(null)
 
   const load = useCallback(async (p: number, query: string) => {
+    const myId = ++reqIdRef.current
+    acRef.current?.abort()
+    const ac = new AbortController()
+    acRef.current = ac
     setLoadErr('')
+    setLoading(true)
     const sp = new URLSearchParams()
     if (query.trim()) sp.set('q', query.trim())
     sp.set('page', String(p))
     sp.set('per_page', '20')
     try {
-      const r = await fetch(`/api/admin/users?${sp}`)
+      const r = await fetch(`/api/admin/users?${sp}`, { signal: ac.signal })
       const j = await r.json().catch(() => null)
+      if (myId !== reqIdRef.current) return // đã có load mới hơn → bỏ kết quả cũ
       if (r.ok && j?.data) {
         setItems(j.data.items as UserRow[])
         setTotal(j.data.total as number)
@@ -52,7 +63,10 @@ export function AdminUserList() {
       } else if (r.status === 403) setLoadErr('Bạn không có quyền admin.')
       else setLoadErr('Không tải được danh sách người dùng.')
     } catch {
+      if (ac.signal.aborted || myId !== reqIdRef.current) return // bị load mới hủy → im lặng
       setLoadErr('Lỗi kết nối.')
+    } finally {
+      if (myId === reqIdRef.current) setLoading(false)
     }
   }, [])
 
@@ -82,7 +96,7 @@ export function AdminUserList() {
         </button>
       </form>
 
-      {loadErr && <p className="mt-4 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadErr}</p>}
+      {loadErr && <p role="alert" className="mt-4 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{loadErr}</p>}
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[640px] border-collapse text-left text-[13.5px]">
@@ -97,7 +111,12 @@ export function AdminUserList() {
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 && !loadErr && (
+            {loading && items.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-3 py-6 text-center text-sm text-[#A8A2BA]">Đang tải…</td>
+              </tr>
+            )}
+            {!loading && items.length === 0 && !loadErr && (
               <tr>
                 <td colSpan={6} className="px-3 py-6 text-center text-sm text-[#A8A2BA]">
                   Không có tài khoản nào khớp tìm kiếm.
