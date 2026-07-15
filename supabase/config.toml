@@ -102,8 +102,11 @@ openai_api_key = "env(OPENAI_API_KEY)"
 
 # Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
 # are monitored, and you can view the emails that would have been sent from the web interface.
+# DEPLOY-002: BẬT inbucket local → signup/OTP local bắt được mail (web UI :54324). Trước đây tắt trong khi
+#   runbook nói "local OTP sẵn sàng" (overclaim). enable_confirmations=true + otp_length=6 + otp_expiry=3600
+#   đã set ở [auth.email]. Prod dùng SMTP thật (dashboard) — Owner, KHÔNG dùng inbucket.
 [inbucket]
-enabled = false
+enabled = true
 # Port to use for the email testing server web interface.
 port = 54324
 # Uncomment to expose additional ports for testing user applications that send emails.
