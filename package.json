@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:verify": "powershell -ExecutionPolicy Bypass -File scripts/verify-db.ps1"
+    "db:verify": "powershell -ExecutionPolicy Bypass -File scripts/verify-db.ps1",
+    "smoke": "node scripts/run-smokes.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
