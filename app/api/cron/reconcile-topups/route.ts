@@ -10,9 +10,18 @@ import { ok, fail } from '@/lib/api/response'
 //   - Auth bằng bearer CRON_SECRET (so sánh timing-safe), KHÔNG dùng session admin (cron không có cookie).
 //   - Chỉ gọi expire_pending_topups (service_role RPC): pending + expires_at < now() → status='expired' (B-03).
 //     TUYỆT ĐỐI KHÔNG cộng coin ở đây — credit CHỈ ở webhook sau verify chữ ký + số tiền.
-//   - Idempotent: chạy lại nhiều lần an toàn (chỉ đụng pending quá hạn).
+//   - Idempotent: chạy lại nhiều lần an toàn (chỉ đụng pending quá hạn) → overlap 2 run song song vô hại
+//     (run sau thấy đã 'expired', không còn pending). Recovery: miss/lỗi 1 lần → run kế tiếp tự dọn nốt
+//     (không cần retry riêng vì idempotent theo trạng thái, KHÔNG theo thời điểm).
+//   - DEPLOY-001: mỗi lần chạy ghi audit bền vào cron_runs (best-effort) → thất bại/miss quan sát được;
+//     alert/dashboard dựa trên bảng này = Owner.
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+// Ghi audit run (best-effort). Audit lỗi KHÔNG được làm hỏng job → nuốt lỗi tại đây.
+async function recordRun(admin: ReturnType<typeof createAdminClient>, ok: boolean, detail: Record<string, unknown>) {
+  try { await admin.from('cron_runs').insert({ job: 'reconcile-topups', ok, detail }) } catch { /* audit best-effort */ }
+}
 
 function bearerMatches(header: string | null, secret: string): boolean {
   if (!header) return false
@@ -36,8 +45,12 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient()
   const { data, error } = await admin.rpc('expire_pending_topups')
-  if (error) return fail('INTERNAL', 'Không dọn được giao dịch quá hạn', { status: 500 })
+  if (error) {
+    await recordRun(admin, false, { error_code: error.code ?? null }) // KHÔNG log message chi tiết (an toàn)
+    return fail('INTERNAL', 'Không dọn được giao dịch quá hạn', { status: 500 })
+  }
 
   const expired = (data as { expired?: number } | null)?.expired ?? 0
+  await recordRun(admin, true, { expired })
   return ok({ expired })
 }

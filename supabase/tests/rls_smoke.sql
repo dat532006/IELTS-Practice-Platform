@@ -800,5 +800,19 @@ begin
   reset role;
 end $$;
 
+-- ---------- Check 39 (DEPLOY-001): cron_runs deny client (chỉ service_role) ----------
+do $$
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated;
+  begin
+    perform 1 from public.cron_runs limit 1;
+    raise exception 'FAIL check39: authenticated đọc được cron_runs';
+  exception when insufficient_privilege then
+    raise notice 'PASS check39: cron_runs denied to client (service_role only)';
+  end;
+  reset role;
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
 
