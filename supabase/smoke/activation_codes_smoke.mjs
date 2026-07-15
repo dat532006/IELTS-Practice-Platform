@@ -6,8 +6,11 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { createHmac } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import { finishSmoke } from './_harness.mjs'
 
 const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:3100'
+const NAME = 'activation_codes_smoke'
+const NS = 'w14-smoke' // namespace duy nhất — cleanup CHỈ đụng fixture này, không bao giờ chạm data user
 
 let pass = 0, fail = 0
 const check = (n, c, e = '') => { if (c) { pass++; console.log(`  ✅ ${n}`) } else { fail++; console.log(`  ❌ ${n} ${e}`) } }
@@ -59,19 +62,22 @@ const run = async () => {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY
   const pepper = process.env.ACTIVATION_CODE_PEPPER
-  if (!url || !anon || !service) { console.log('SKIP: thiếu env Supabase'); return finish() }
-  if (!pepper) { console.log('BLOCKED — environment: thiếu ACTIVATION_CODE_PEPPER (.env.local)'); return finish() }
+  // TEST-003: thiếu prereq REQUIRED → KHÔNG exit 0. Supabase env thiếu = SKIPPED (exit 3); pepper thiếu = BLOCKED (exit 2).
+  if (!url || !anon || !service) { console.log('SKIP: thiếu env Supabase'); return finishSmoke({ name: NAME, skipped: 1, required: true }) }
+  if (!pepper) { console.log('BLOCKED — environment: thiếu ACTIVATION_CODE_PEPPER (.env.local)'); return finishSmoke({ name: NAME, blocked: 1, required: true }) }
 
   const ADMIN = await signIn(url, anon, service, 'w14-admin@test.dev', 'admin')
   const USER = await signIn(url, anon, service, 'w14-user@test.dev', 'user')
 
-  // clean + seed product
-  await ADMIN.admin.from('products').delete().like('slug', 'w14-smoke%')
-  const { data: prod } = await ADMIN.admin
-    .from('products').insert({ slug: 'w14-smoke-prod', title: '[W14] Smoke Product', kind: 'single', price_coins: 100, status: 'published' })
+  // TEST-002: cleanup FK-safe (children-first) TRƯỚC khi seed → rerunnable ngay cả khi lần trước để lại rác.
+  await cleanup(ADMIN.admin)
+  const { data: prod, error: seedErr } = await ADMIN.admin
+    .from('products').insert({ slug: `${NS}-prod`, title: '[W14] Smoke Product', kind: 'single', price_coins: 100, status: 'published' })
     .select('id').single()
+  if (seedErr || !prod) { console.log('BLOCKED — seed product fail:', seedErr?.message); return finishSmoke({ name: NAME, blocked: 1, required: true }) }
   const productId = prod.id
-  await ADMIN.admin.from('activation_codes').delete().eq('product_id', productId)
+
+  try {
 
   const GEN_BODY = { product_id: productId, count: 5, max_redemptions: 3, expires_at: '2027-01-01T00:00:00.000Z' }
 
@@ -133,12 +139,26 @@ const run = async () => {
   const csvLines = (csv.text ?? '').trim().split(/\r?\n/)
   check('CSV header + 3 code rows', csvLines[0] === 'code,product_id,expires_at' && csvLines.length === 4, `lines=${csvLines.length}`)
   check('CSV KHÔNG lộ pepper/code_hash', !jsonHas(csv.text, pepper) && !jsonHas(csv.text, 'code_hash'))
+  } finally {
+    // TEST-002: dọn trong finally (kể cả khi assertion throw) → residue-free + rerunnable.
+    await cleanup(ADMIN.admin)
+  }
 
-  finish()
+  finishSmoke({ name: NAME, passed: pass, failed: fail, required: true })
 }
 
-function finish() {
-  console.log(`\nRESULT: ${pass} passed, ${fail} failed`)
-  process.exitCode = fail === 0 ? 0 : 1
+// TEST-002 — cleanup FK-safe children-first: activation_codes (con) TRƯỚC products (cha) → không vi phạm FK.
+//   CHỈ đụng fixture namespace NS (slug '<NS>-%') + test user — không bao giờ chạm data user thật.
+async function cleanup(admin) {
+  const { data: prods, error: selErr } = await admin.from('products').select('id').like('slug', `${NS}%`)
+  if (selErr) throw new Error('cleanup select products fail: ' + selErr.message)
+  const ids = (prods ?? []).map((p) => p.id)
+  if (ids.length) {
+    const delCodes = await admin.from('activation_codes').delete().in('product_id', ids)
+    if (delCodes.error) throw new Error('cleanup delete activation_codes fail: ' + delCodes.error.message)
+    const delProds = await admin.from('products').delete().in('id', ids)
+    if (delProds.error) throw new Error('cleanup delete products fail: ' + delProds.error.message)
+  }
 }
-run().catch((e) => { console.error('SMOKE ERROR:', e); process.exitCode = 2 })
+
+run().catch((e) => { console.error('SMOKE ERROR:', e); process.exitCode = 2 }) // crash bất ngờ → ERROR (exit 2)
