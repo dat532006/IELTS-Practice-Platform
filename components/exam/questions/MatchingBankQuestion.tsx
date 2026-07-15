@@ -18,6 +18,7 @@ export function MatchingBankQuestion({
   onToggleBookmark,
   activeQid,
   onActivate,
+  readOnly = false,
 }: {
   questions: ExamQuestion[]
   options: QOption[]
@@ -27,6 +28,7 @@ export function MatchingBankQuestion({
   onToggleBookmark: (qid: string) => void
   activeQid: string | null
   onActivate: (qid: string) => void
+  readOnly?: boolean // EXAM-008: review mode → read-only hoàn toàn (không kéo/thả/chọn/bookmark)
 }) {
   const [picked, setPicked] = useState<string | null>(null) // thẻ đang chọn để bấm-đặt
   const [overQid, setOverQid] = useState<string | null>(null) // ô đang được kéo qua (viền sáng)
@@ -36,6 +38,7 @@ export function MatchingBankQuestion({
 
   // Đặt chữ vào ô: chuẩn hoá + (nếu không cho lặp) TỰ CHUYỂN — xoá chữ đó khỏi ô khác trong nhóm.
   const assign = (qid: string, raw: string) => {
+    if (readOnly) return // EXAM-008: review không đổi đáp án
     const key = raw.toUpperCase().slice(0, 2)
     if (key && !allowReuse) {
       for (const other of questions) if (other.id !== qid && answers[other.id] === key) onAnswer(other.id, '')
@@ -50,23 +53,24 @@ export function MatchingBankQuestion({
       <ul className="dcx-mbank-list">
         {options.map((o) => {
           const isUsed = !allowReuse && used.has(o.key)
+          const locked = isUsed || readOnly // EXAM-008: review khoá mọi tương tác thẻ
           return (
             <li
               key={o.key}
               className={`dcx-chip${picked === o.key ? ' picked' : ''}${isUsed ? ' used' : ''}`}
-              draggable={!isUsed}
+              draggable={!locked}
               onDragStart={(e) => {
-                if (isUsed) { e.preventDefault(); return }
+                if (locked) { e.preventDefault(); return }
                 e.dataTransfer.setData('text/plain', o.key)
                 e.dataTransfer.effectAllowed = 'copy'
               }}
               role="button"
-              tabIndex={isUsed ? -1 : 0}
+              tabIndex={locked ? -1 : 0}
               aria-pressed={picked === o.key}
-              aria-disabled={isUsed}
-              onClick={() => { if (!isUsed) setPicked((p) => (p === o.key ? null : o.key)) }}
+              aria-disabled={locked}
+              onClick={() => { if (!locked) setPicked((p) => (p === o.key ? null : o.key)) }}
               onKeyDown={(e) => {
-                if (isUsed) return
+                if (locked) return
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
                   setPicked((p) => (p === o.key ? null : o.key))
@@ -98,11 +102,12 @@ export function MatchingBankQuestion({
                 type="text"
                 autoComplete="off"
                 value={v}
+                readOnly={readOnly}
                 onChange={(e) => assign(q.id, e.target.value)}
-                onClick={() => { if (picked) assign(q.id, picked) }}
-                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setOverQid(q.id) }}
-                onDragLeave={() => setOverQid((o) => (o === q.id ? null : o))}
-                onDrop={(e) => {
+                onClick={() => { if (!readOnly && picked) assign(q.id, picked) }}
+                onDragOver={readOnly ? undefined : (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setOverQid(q.id) }}
+                onDragLeave={readOnly ? undefined : () => setOverQid((o) => (o === q.id ? null : o))}
+                onDrop={readOnly ? undefined : (e) => {
                   e.preventDefault()
                   setOverQid(null)
                   const key = e.dataTransfer.getData('text/plain')
@@ -110,18 +115,20 @@ export function MatchingBankQuestion({
                 }}
                 placeholder={String(q.number ?? '')}
                 aria-label={`Câu ${q.number ?? i + 1} — kéo thẻ vào hoặc gõ chữ cái`}
-                className={`dcx-gap-input dcx-mbank-box${overQid === q.id ? ' drop-over' : ''}${picked ? ' droppable' : ''}`}
+                className={`dcx-gap-input dcx-mbank-box${overQid === q.id ? ' drop-over' : ''}${!readOnly && picked ? ' droppable' : ''}`}
               />
-              <button
-                type="button"
-                onClick={() => onToggleBookmark(q.id)}
-                aria-pressed={flagged}
-                aria-label={flagged ? 'Bỏ đánh dấu câu' : 'Đánh dấu câu'}
-                title="Đánh dấu câu để xem lại"
-                className={`dcx-flag${flagged ? ' on' : ''}`}
-              >
-                <FlagIcon filled={flagged} className="h-4 w-4" />
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => onToggleBookmark(q.id)}
+                  aria-pressed={flagged}
+                  aria-label={flagged ? 'Bỏ đánh dấu câu' : 'Đánh dấu câu'}
+                  title="Đánh dấu câu để xem lại"
+                  className={`dcx-flag${flagged ? ' on' : ''}`}
+                >
+                  <FlagIcon filled={flagged} className="h-4 w-4" />
+                </button>
+              )}
             </div>
           )
         })}

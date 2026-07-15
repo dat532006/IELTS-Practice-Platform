@@ -943,13 +943,14 @@ export function ExamRunner({
                                 onToggleBookmark={toggleQuestionBookmark}
                                 activeQid={activeQid}
                                 onActivate={setActiveQid}
+                                readOnly={!!review}
                               />
                             </div>
                           )
                         if (item.kind === 'summary')
                           return (
                             <div key={`summary-${item.qs[0].id}`}>
-                              <SummaryQuestion questions={item.qs} template={item.template} options={item.options} answers={answers} onAnswer={onAnswerChange} />
+                              <SummaryQuestion questions={item.qs} template={item.template} options={item.options} answers={answers} onAnswer={onAnswerChange} readOnly={!!review} />
                             </div>
                           )
                         if (item.kind === 'matchbank')
@@ -964,6 +965,7 @@ export function ExamRunner({
                                 onToggleBookmark={toggleQuestionBookmark}
                                 activeQid={activeQid}
                                 onActivate={setActiveQid}
+                                readOnly={!!review}
                               />
                             </div>
                           )

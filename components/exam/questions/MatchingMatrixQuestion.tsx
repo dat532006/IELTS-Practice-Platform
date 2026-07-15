@@ -14,6 +14,7 @@ export function MatchingMatrixQuestion({
   onToggleBookmark,
   activeQid,
   onActivate,
+  readOnly = false,
 }: {
   questions: ExamQuestion[]
   options: QOption[]
@@ -24,6 +25,7 @@ export function MatchingMatrixQuestion({
   onToggleBookmark: (qid: string) => void
   activeQid: string | null
   onActivate: (qid: string) => void
+  readOnly?: boolean // EXAM-008: review mode → read-only hoàn toàn (không đổi chọn/bookmark)
 }) {
   return (
     <div className="dcx-mtable">
@@ -48,30 +50,33 @@ export function MatchingMatrixQuestion({
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                     <b className="dcx-mnum">{q.number ?? i + 1}</b>
                     <span style={{ minWidth: 0 }}>{q.statement ?? q.prompt}</span>
-                    <button
-                      type="button"
-                      onClick={() => onToggleBookmark(q.id)}
-                      aria-pressed={flagged}
-                      aria-label={flagged ? 'Bỏ đánh dấu câu' : 'Đánh dấu câu'}
-                      title="Đánh dấu câu để xem lại"
-                      className={`dcx-flag${flagged ? ' on' : ''}`}
-                      style={{ marginLeft: 'auto' }}
-                    >
-                      <FlagIcon filled={flagged} className="h-4 w-4" />
-                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleBookmark(q.id)}
+                        aria-pressed={flagged}
+                        aria-label={flagged ? 'Bỏ đánh dấu câu' : 'Đánh dấu câu'}
+                        title="Đánh dấu câu để xem lại"
+                        className={`dcx-flag${flagged ? ' on' : ''}`}
+                        style={{ marginLeft: 'auto' }}
+                      >
+                        <FlagIcon filled={flagged} className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
                 {options.map((o) => {
                   const sel = v === o.key
                   return (
-                    <td key={o.key} className={`cell${sel ? ' sel' : ''}`} onClick={() => onAnswer(q.id, o.key)}>
-                      <label style={{ display: 'inline-flex', cursor: 'pointer' }}>
+                    <td key={o.key} className={`cell${sel ? ' sel' : ''}`} onClick={readOnly ? undefined : () => onAnswer(q.id, o.key)}>
+                      <label style={{ display: 'inline-flex', cursor: readOnly ? 'default' : 'pointer' }}>
                         <input
                           type="radio"
                           name={`q-${q.id}`}
                           value={o.key}
                           checked={sel}
                           onChange={() => onAnswer(q.id, o.key)}
+                          disabled={readOnly}
                           aria-label={`Câu ${q.number ?? i + 1}, đáp án ${o.key}`}
                           className="sr-only"
                         />
