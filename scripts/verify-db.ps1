@@ -8,7 +8,9 @@
 # ============================================================
 $ErrorActionPreference = 'Continue'
 $pg   = 'ielts_pg_verify'
-$img  = 'postgres:16-alpine'
+# TEST-004: khớp Postgres major với PRODUCTION (Supabase = PG17). Trước đây hardcode PG16 → false confidence
+#   version-specific. Override qua $env:PG_IMAGE (vd chạy matrix 16/17 trong CI).
+$img  = if ($env:PG_IMAGE) { $env:PG_IMAGE } else { 'postgres:17-alpine' }
 $root = Split-Path -Parent $PSScriptRoot
 
 function Cleanup { docker rm -f $pg 2>&1 | Out-Null }
@@ -45,7 +47,9 @@ function Apply([string]$file) {
 Apply (Join-Path $root 'supabase\tests\_supabase_shim.local.sql')
 Get-ChildItem (Join-Path $root 'supabase\migrations\*.sql') | Sort-Object Name | ForEach-Object { Apply $_.FullName }
 Apply (Join-Path $root 'supabase\tests\rls_smoke.sql')
+# TEST-005: kiểm THẬT policy Storage (shim đã cấp storage schema → nhánh bucket của migration đã chạy).
+Apply (Join-Path $root 'supabase\tests\storage_policy_check.sql')
 
 Write-Host ''
-Write-Host '==> ALL PASSED' -ForegroundColor Green
+Write-Host "==> ALL PASSED (PG image: $img, Storage policies verified)" -ForegroundColor Green
 Cleanup
