@@ -14,6 +14,15 @@ export function Header() {
   const [email, setEmail] = useState<string | null>(null)
   const [coins, setCoins] = useState<number | null>(null)
   const [avatar, setAvatar] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false) // UI-004: mobile nav (md:hidden)
+
+  // UI-004: Escape đóng mobile menu (bàn phím). Chỉ gắn listener khi đang mở.
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
 
   useEffect(() => {
     let active = true
@@ -120,8 +129,53 @@ export function Header() {
               </Link>
             </>
           )}
+
+          {/* UI-004: hamburger mở nav chính trên mobile (nav desktop bị ẩn dưới md) */}
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={menuOpen ? 'Đóng menu' : 'Mở menu'}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
+            className="flex flex-none items-center justify-center rounded-[10px] border border-[#EDE7F5] bg-white p-2 text-[#2A2740] shadow-[0_4px_12px_rgba(42,39,64,0.05)] md:hidden"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+              {menuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>}
+            </svg>
+          </button>
         </div>
       </div>
+
+      {/* UI-004: panel nav mobile — chứa MAIN_NAV (+ Dashboard khi đăng nhập) để route không mất trên <768px */}
+      {menuOpen && (
+        <nav id="mobile-nav" className="border-t border-[rgba(42,39,64,0.07)] bg-[rgba(251,249,255,0.98)] px-[3.5vw] py-3 md:hidden">
+          <ul className="flex flex-col gap-0.5">
+            {email && (
+              <li>
+                <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="block rounded-[10px] px-3 py-2.5 text-[15px] font-bold text-[#2A2740] hover:bg-[#F0ECFF]">
+                  Dashboard
+                </Link>
+              </li>
+            )}
+            {MAIN_NAV.map((item) =>
+              item.comingSoon ? (
+                <li key={item.label}>
+                  <span aria-disabled="true" className="flex items-center gap-1.5 px-3 py-2.5 text-[15px] font-bold text-[#A8A2BA]">
+                    {item.label}
+                    <span className="rounded-[5px] bg-[#EFEBF4] px-[5px] py-0.5 text-[9px] font-extrabold uppercase text-[#9D96AE]">soon</span>
+                  </span>
+                </li>
+              ) : (
+                <li key={item.label}>
+                  <Link href={item.href} onClick={() => setMenuOpen(false)} className="block rounded-[10px] px-3 py-2.5 text-[15px] font-bold text-[#564F6B] hover:bg-[#F0ECFF] hover:text-[#7C5CE6]">
+                    {item.label}
+                  </Link>
+                </li>
+              ),
+            )}
+          </ul>
+        </nav>
+      )}
     </header>
   )
 }
