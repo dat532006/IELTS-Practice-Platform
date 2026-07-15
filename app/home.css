@@ -71,7 +71,7 @@
   padding: 60px 0 18px;
   display: flex; gap: 52px; align-items: center; flex-wrap: wrap;
 }
-.dc-home .hero-copy { flex: 1 1 440px; min-width: 320px; }
+.dc-home .hero-copy { flex: 1 1 440px; min-width: min(320px, 100%); }
 .dc-home .hero-pill {
   display: inline-flex; align-items: center; gap: 9px;
   background: var(--brand-soft); color: var(--brand-deep);
@@ -131,7 +131,7 @@
 
 /* ── Hero visual ── */
 .dc-home .hero-visual {
-  flex: 1 1 410px; min-width: 320px;
+  flex: 1 1 410px; min-width: min(320px, 100%);
   display: flex; justify-content: center; position: relative; padding: 18px 0;
 }
 .dc-home .hero-visual-inner { position: relative; width: 100%; max-width: 418px; }
@@ -240,7 +240,7 @@
   display: flex; gap: 42px; align-items: center; flex-wrap: wrap;
   border: 1px solid rgba(42, 39, 64, .05);
 }
-.dc-home .skill-copy { flex: 1 1 350px; min-width: 300px; }
+.dc-home .skill-copy { flex: 1 1 350px; min-width: min(300px, 100%); }
 .dc-home .skill-name-row { display: inline-flex; align-items: center; gap: 12px; }
 .dc-home .skill-icon {
   width: 46px; height: 46px; border-radius: 13px; color: #fff;
@@ -258,7 +258,7 @@
   padding: 13px 22px; border-radius: 12px; transition: background .15s;
 }
 .dc-home .btn-dark:hover { background: #17152a; }
-.dc-home .skill-card { flex: 1 1 320px; min-width: 280px; background: #fff; border-radius: 20px; padding: 24px; box-shadow: 0 20px 44px -22px rgba(42, 39, 64, .32); }
+.dc-home .skill-card { flex: 1 1 320px; min-width: min(280px, 100%); background: #fff; border-radius: 20px; padding: 24px; box-shadow: 0 20px 44px -22px rgba(42, 39, 64, .32); }
 .dc-home .skill-card-eyebrow { font-size: 12px; font-weight: 700; color: #9d96ae; text-transform: uppercase; letter-spacing: .05em; }
 .dc-home .skill-sample { font-size: 17.5px; font-weight: 700; margin-top: 8px; line-height: 1.45; color: #2a2740; }
 .dc-home .skill-bullets { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
@@ -305,7 +305,7 @@
   display: flex; gap: 48px; align-items: center; flex-wrap: wrap;
   border: 1px solid rgba(124, 92, 230, .1);
 }
-.dc-home .ai-copy { flex: 1 1 380px; min-width: 300px; }
+.dc-home .ai-copy { flex: 1 1 380px; min-width: min(300px, 100%); }
 .dc-home .ai-pill {
   display: inline-flex; align-items: center; gap: 8px; background: #fff;
   color: var(--brand-deep); font-weight: 700; font-size: 12.5px;
@@ -321,7 +321,7 @@
   box-shadow: 0 4px 10px rgba(90, 60, 160, .12);
 }
 .dc-home .ai-pt-dot { width: 9px; height: 9px; border-radius: 3px; background: var(--brand); transform: rotate(45deg); display: block; }
-.dc-home .ai-card { flex: 1 1 340px; min-width: 300px; background: #fff; border-radius: 22px; padding: 28px; box-shadow: 0 26px 50px -26px rgba(90, 60, 160, .4); }
+.dc-home .ai-card { flex: 1 1 340px; min-width: min(300px, 100%); background: #fff; border-radius: 22px; padding: 28px; box-shadow: 0 26px 50px -26px rgba(90, 60, 160, .4); }
 .dc-home .ai-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
 .dc-home .ai-band-lbl { font-size: 12.5px; font-weight: 700; color: #9d96ae; }
 .dc-home .ai-band-num { font-size: 36px; font-weight: 800; color: var(--brand); line-height: 1; margin-top: 4px; }
@@ -392,7 +392,7 @@
 .dc-home .lead-h2 { font-size: clamp(26px, 3vw, 36px); font-weight: 800; color: #fff; letter-spacing: -.025em; line-height: 1.1; }
 .dc-home .lead-sub { font-size: 16px; color: #c8c2da; margin-top: 12px; line-height: 1.6; }
 .dc-home .lead-form { display: flex; gap: 10px; margin: 26px auto 0; max-width: 440px; flex-wrap: wrap; }
-.dc-home .lead-email { flex: 1; min-width: 200px; border: none; outline: none; font-size: 15px; padding: 15px 18px; border-radius: 13px; background: #fff; color: #2a2740; font-family: inherit; }
+.dc-home .lead-email { flex: 1; min-width: min(200px, 100%); border: none; outline: none; font-size: 15px; padding: 15px 18px; border-radius: 13px; background: #fff; color: #2a2740; font-family: inherit; }
 .dc-home .btn-send { background: var(--brand); color: #fff; font-weight: 700; font-size: 15px; padding: 0 26px; border-radius: 13px; transition: background .15s; }
 .dc-home .btn-send:hover { background: var(--brand-deep); }
 .dc-home .lead-thanks { margin-top: 20px; color: #c8c2da; font-size: 15px; font-weight: 600; }
