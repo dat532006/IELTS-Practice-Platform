@@ -15,12 +15,14 @@ export function SummaryQuestion({
   options,
   answers,
   onAnswer,
+  readOnly = false,
 }: {
   questions: ExamQuestion[]
   template: string
   options?: QOption[]
   answers: Record<string, AnswerValue>
   onAnswer: (qid: string, v: AnswerValue) => void
+  readOnly?: boolean // EXAM-008: review mode → read-only hoàn toàn (không kéo/thả/chọn/gõ)
 }) {
   const byNum = new Map<number, ExamQuestion>()
   for (const q of questions) if (typeof q.number === 'number') byNum.set(q.number, q)
@@ -37,6 +39,7 @@ export function SummaryQuestion({
 
   // Bank mode: chuẩn hoá chữ + (nếu không cho lặp) TỰ CHUYỂN khỏi ô khác. Không bank: điền tự do.
   const place = (qid: string, raw: string) => {
+    if (readOnly) return // EXAM-008: review không đổi đáp án
     if (!hasBank) { onAnswer(qid, raw); setPicked(null); return }
     const key = raw.toUpperCase().slice(0, 2)
     if (key && !allowReuse) {
@@ -61,11 +64,12 @@ export function SummaryQuestion({
               type="text"
               autoComplete="off"
               value={v}
+              readOnly={readOnly}
               onChange={(e) => place(q.id, e.target.value)}
-              onClick={() => { if (picked) place(q.id, picked) }}
-              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setOverId(q.id) }}
-              onDragLeave={() => setOverId((o) => (o === q.id ? null : o))}
-              onDrop={(e) => {
+              onClick={() => { if (!readOnly && picked) place(q.id, picked) }}
+              onDragOver={readOnly ? undefined : (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setOverId(q.id) }}
+              onDragLeave={readOnly ? undefined : () => setOverId((o) => (o === q.id ? null : o))}
+              onDrop={readOnly ? undefined : (e) => {
                 e.preventDefault()
                 setOverId(null)
                 const key = e.dataTransfer.getData('text/plain')
@@ -90,23 +94,24 @@ export function SummaryQuestion({
           <ul className="dcx-mbank-list dcx-summary-bank">
             {options!.map((o) => {
               const isUsed = !allowReuse && used.has(o.key)
+              const locked = isUsed || readOnly // EXAM-008: review khoá tương tác thẻ
               return (
                 <li
                   key={o.key}
                   className={`dcx-chip${picked === o.key ? ' picked' : ''}${isUsed ? ' used' : ''}`}
-                  draggable={!isUsed}
+                  draggable={!locked}
                   onDragStart={(e) => {
-                    if (isUsed) { e.preventDefault(); return }
+                    if (locked) { e.preventDefault(); return }
                     e.dataTransfer.setData('text/plain', o.key)
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
                   role="button"
-                  tabIndex={isUsed ? -1 : 0}
+                  tabIndex={locked ? -1 : 0}
                   aria-pressed={picked === o.key}
-                  aria-disabled={isUsed}
-                  onClick={() => { if (!isUsed) setPicked((p) => (p === o.key ? null : o.key)) }}
+                  aria-disabled={locked}
+                  onClick={() => { if (!locked) setPicked((p) => (p === o.key ? null : o.key)) }}
                   onKeyDown={(e) => {
-                    if (isUsed) return
+                    if (locked) return
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
                       setPicked((p) => (p === o.key ? null : o.key))
