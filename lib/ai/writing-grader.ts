@@ -4,6 +4,7 @@ import { isValidBand, roundHalf } from '@/lib/scoring/writing-band'
 import { WRITING_GRADER_SYSTEM_PROMPT } from '@/lib/ai/ielts-writing-rubric'
 import { selectProvider, gradeTimeoutMs } from '@/lib/ai/provider-select'
 import { fetchWithDeadline } from '@/lib/net/fetch-deadline'
+import { logEvent } from '@/lib/obs/log-event'
 
 // ============================================================
 // W10/W11 — Writing AI grader (M07). SERVER-ONLY.
@@ -200,8 +201,10 @@ async function gradeWithAnthropic(input: GraderInput): Promise<GradeOutcome> {
     const grade = validateAiGradeOutput(toolUse.input)
     if (!grade) return { ok: false, code: 'AI_INVALID_OUTPUT' }
     return { ok: true, grade, mock: false, usage: res.usage as GradeUsage }
-  } catch {
-    // KHÔNG log secret/chi tiết provider. Fail an toàn.
+  } catch (err) {
+    // DEPLOY-005: quan sát được sự cố provider (timeout/mạng) — CHỈ tên lỗi (vd AbortError), KHÔNG
+    //   message/secret/essay. Trước đây catch {} nuốt hoàn toàn → chấm điểm hỏng mà không thấy gì.
+    logEvent('scoring.provider_error', 'error', { provider: 'anthropic', kind: (err as Error)?.name ?? 'unknown' })
     return { ok: false, code: 'AI_UNAVAILABLE' }
   }
 }
@@ -295,8 +298,9 @@ async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
       mock: false,
       usage: { input_tokens: body?.usage?.prompt_tokens, output_tokens: body?.usage?.completion_tokens },
     }
-  } catch {
-    // KHÔNG log secret/chi tiết provider. Fail an toàn.
+  } catch (err) {
+    // DEPLOY-005: xem gradeWithAnthropic — chỉ tên lỗi, KHÔNG message/secret/essay.
+    logEvent('scoring.provider_error', 'error', { provider: 'openai', kind: (err as Error)?.name ?? 'unknown' })
     return { ok: false, code: 'AI_UNAVAILABLE' }
   }
 }

@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { logEvent } from '@/lib/obs/log-event'
 
 // A1 — settle topup từ IPN provider ĐÃ verify chữ ký (vnpay.ts / momo.ts gọi qua route riêng).
 // Giữ NGUYÊN bất biến payment_redeem_contract §3:
@@ -32,7 +33,8 @@ async function recordException(
     p_user: userId,
     p_detail: { paid_vnd: paidVnd, expected_vnd: expectedVnd },
   })
-  if (error) console.error(`[payments/settle] record_payment_exception failed txn=${txnId}: ${error.message}`)
+  // KHÔNG log error.message thô (có thể chứa chi tiết nội bộ) — chỉ code có cấu trúc, đã redact.
+  if (error) logEvent('payment.exception_record_error', 'error', { provider, txn: txnId, code: error.code ?? null })
 }
 
 export async function settleVerifiedTopup(
@@ -68,13 +70,13 @@ export async function settleVerifiedTopup(
     .maybeSingle()
   const row = txn as { amount_vnd: number | null; user_id: string | null } | null
   if (row && row.amount_vnd == null) {
-    console.error(`[payments/settle] missing amount_vnd on creditable txn=${txnId} — fail-closed`)
+    logEvent('payment.amount_missing', 'critical', { provider, txn: txnId })
     // PAY-004 — ghi case bền để đối soát (dedup); KHÔNG credit.
     await recordException(admin, provider, txnId, amountVnd, null, row.user_id ?? null)
     return { ok: false, code: 'PAYMENT_AMOUNT_MISMATCH' }
   }
   if (row && amountVnd !== row.amount_vnd) {
-    console.error(`[payments/settle] amount mismatch txn=${txnId} paid=${amountVnd} expected=${row.amount_vnd}`)
+    logEvent('payment.amount_mismatch', 'error', { provider, txn: txnId, paid: amountVnd, expected: row.amount_vnd })
     await recordException(admin, provider, txnId, amountVnd, row.amount_vnd, row.user_id ?? null)
     return { ok: false, code: 'PAYMENT_AMOUNT_MISMATCH' }
   }

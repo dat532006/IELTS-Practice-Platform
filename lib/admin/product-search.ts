@@ -1,5 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { logEvent } from '@/lib/obs/log-event'
 
 export type ProductSearchRefreshOutcome =
   | { ok: true }
@@ -13,7 +14,9 @@ export type ProductSearchRefreshOutcome =
 export async function refreshProductSearch(admin: SupabaseClient): Promise<ProductSearchRefreshOutcome> {
   const { error } = await admin.rpc('refresh_product_search')
   if (error) {
-    console.error('[product_search] refresh thất bại; mutation đã ghi nhưng catalog còn stale:', error.message)
+    // Catalog stale sau mutation = sự cố tới hạn; log code có cấu trúc (KHÔNG message thô). detail giữ
+    //   nguyên cho caller (dùng để retry idempotent) nhưng KHÔNG đẩy ra client (route đã bọc).
+    logEvent('catalog.refresh_error', 'critical', { code: error.code ?? null })
     return { ok: false, detail: error.message }
   }
   return { ok: true }

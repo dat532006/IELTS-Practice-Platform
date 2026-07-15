@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { randomBytes } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/auth/guards'
-import { ok, fail } from '@/lib/api/response'
+import { ok, fail, requestIdFrom } from '@/lib/api/response'
+import { logEvent } from '@/lib/obs/log-event'
 import { vndToCoins, COIN_VND_RATE, MIN_TOPUP_VND, MAX_TOPUP_VND } from '@/lib/payments/topup'
 import { getGatewayMode } from '@/lib/payments/gateway'
 import { buildVnpayPayUrl, vnpayConfigured } from '@/lib/payments/vnpay'
@@ -115,8 +116,8 @@ export async function POST(request: Request) {
     })
     if (!momo.ok) {
       // Txn giữ pending → cron reconcile dọn sau TTL; KHÔNG credit, KHÔNG lộ chi tiết lỗi cổng.
-      console.error(`[payment/create] momo create failed: ${momo.reason} txn=${provider_txn_id}`)
-      return fail('PAYMENT_GATEWAY_ERROR', 'Không kết nối được cổng thanh toán, vui lòng thử lại', { status: 502 })
+      logEvent('payment.gateway_error', 'error', { provider: 'momo', txn: provider_txn_id, reason: momo.reason }, { request_id: requestIdFrom(request.headers) })
+      return fail('PAYMENT_GATEWAY_ERROR', 'Không kết nối được cổng thanh toán, vui lòng thử lại', { status: 502, request_id: requestIdFrom(request.headers) })
     }
     redirect_url = momo.payUrl
   } else if (mode === 'live' && parsed.data.provider === 'bank') {
