@@ -23,6 +23,24 @@ html {
   scroll-behavior: smooth;
 }
 
+/* UI-008 — Tôn trọng prefers-reduced-motion: người dùng chọn giảm chuyển động thì tắt animation/
+   transition trang trí + cuộn mượt. Nội dung thiết yếu (skeleton/spinner) vẫn HIỂN THỊ (chỉ đứng yên),
+   loading state đều có chữ mô tả tiến trình nên không mất thông tin. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 body {
   font-family: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, sans-serif;
 }

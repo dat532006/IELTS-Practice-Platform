@@ -68,14 +68,14 @@ export function LoginForm({ next = '/', reason }: { next?: string; reason?: 'idl
 
           <PasswordField
             className="mt-4"
-            labelRow={
+            labelRow={(id) => (
               <div className="mb-[7px] flex items-center justify-between">
-                <FieldLabel>Mật khẩu</FieldLabel>
+                <FieldLabel htmlFor={id}>Mật khẩu</FieldLabel>
                 <Link href="/forgot-password" className="text-[12.5px] font-bold text-[#6A48D6]">
                   Quên mật khẩu?
                 </Link>
               </div>
-            }
+            )}
             required
             icon={<LockIcon />}
             value={password}

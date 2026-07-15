@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { AttemptDTO, ExamPayload, WritingGradeResult } from '@/types/exam'
 import { WritingResultView } from '@/components/writing/WritingResultView'
+import { A11yDialog } from '@/components/a11y/A11yDialog'
 import { MenuIcon, CloseIcon, CheckIcon, SparkleIcon, ArrowLeft } from '@/components/exam/ExamIcons'
 
 // W10 — Writing UI (M07). dc-exam restyle: tab Task1/Task2 + 1 editor, word count realtime,
@@ -275,15 +276,15 @@ export function WritingRunner({ testId }: { testId: string }) {
 
       {/* AI result modal */}
       {aiOpen && modalGrade && result && (
-        <div className="dcx-overlay" role="dialog" aria-modal="true" onClick={() => setAiOpen(false)}>
-          <div className="dcx-ai-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="dcx-overlay" onClick={() => setAiOpen(false)}>
+          <A11yDialog className="dcx-ai-modal" onClose={() => setAiOpen(false)} labelledBy="dcx-ai-title" onClick={(e) => e.stopPropagation()}>
             <div className="dcx-ai-head">
               <button className="dcx-ai-close" onClick={() => setAiOpen(false)} aria-label="Đóng">
                 <CloseIcon className="h-4 w-4" />
               </button>
               <div className="dcx-ai-head-row">
                 <div>
-                  <div className="dcx-ai-band-lbl">Band ước tính (Task {tab}) · Overall {result.overall_band.toFixed(1)}</div>
+                  <div id="dcx-ai-title" className="dcx-ai-band-lbl">Band ước tính (Task {tab}) · Overall {result.overall_band.toFixed(1)}</div>
                   <div className="dcx-ai-band">{modalGrade.band.toFixed(1)}</div>
                 </div>
                 <span className="dcx-ai-tag">✦ AI đã chấm</span>
@@ -327,7 +328,7 @@ export function WritingRunner({ testId }: { testId: string }) {
                 </button>
               </div>
             </div>
-          </div>
+          </A11yDialog>
         </div>
       )}
     </div>
