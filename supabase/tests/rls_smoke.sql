@@ -814,5 +814,19 @@ begin
   reset role;
 end $$;
 
+-- ---------- Check 40 (EXAM-003/009): attempt_content_snapshots deny client (chỉ service_role) ----------
+do $$
+begin
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
+  set local role authenticated;
+  begin
+    perform 1 from public.attempt_content_snapshots limit 1;
+    raise exception 'FAIL check40: authenticated đọc được attempt_content_snapshots';
+  exception when insufficient_privilege then
+    raise notice 'PASS check40: attempt_content_snapshots denied to client (service_role only)';
+  end;
+  reset role;
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
 

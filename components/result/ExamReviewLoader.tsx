@@ -1,9 +1,9 @@
 'use client'
 
 // 2026-07-12 — Xem lại bài ĐÃ NỘP trong giao diện thi thật (review-in-exam).
-// Fetch 2 nguồn ĐÃ CÓ GUARD server: /api/result/[attemptId] (owner + terminal → review items,
-// gồm evidence/explanation) + /api/exam/[testId] (payload sau access check is_free|unlock).
-// KHÔNG API mới, KHÔNG chấm lại — chỉ ghép dữ liệu cho ExamRunner chế độ review (read-only).
+// EXAM-003/009 (2026-07-15): CHỈ 1 nguồn = /api/result/[attemptId] (owner + terminal). Payload nội dung
+//   (passages/questions/audio) nay lấy từ dto.content = BẢN CHỤP lúc START → KHÔNG còn phụ thuộc
+//   /api/exam published-only (đề đã ẩn vẫn xem lại được) và nội dung cố định (đề bị sửa không làm trôi).
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ExamRunner } from '@/components/exam/ExamRunner'
@@ -24,20 +24,20 @@ export function ExamReviewLoader({ attemptId }: { attemptId: string }) {
         const rr = await fetch(`/api/result/${attemptId}`)
         const rb = await rr.json().catch(() => null)
         if (!alive) return
-        if (rr.status === 403) return setPhase('forbidden')
+        if (rr.status === 403) return setPhase('forbidden') // RESULT_NOT_READY: bài chưa nộp
         if (rr.status === 404) return setPhase('notfound')
         if (!rr.ok || !rb?.success) return setPhase('error')
         const result = rb.data as ResultDTO
 
-        const pr = await fetch(`/api/exam/${result.test.id}`)
-        const pb = await pr.json().catch(() => null)
-        if (!alive) return
-        // Payload cần quyền truy cập đề (free|unlock) — mất quyền (hiếm) → coi như forbidden.
-        if (pr.status === 403) return setPhase('forbidden')
-        if (!pr.ok || !pb?.success) return setPhase('error')
-
+        // EXAM-003/009: payload từ bản chụp (dto.content) — KHÔNG gọi /api/exam. is_free không còn liên quan
+        //   (owner+terminal đã là guard đúng cho việc xem lại bài của chính mình).
         setDto(result)
-        setPayload(pb.data as ExamPayload)
+        setPayload({
+          test: { id: result.test.id, title: result.test.title, skill: result.test.skill, is_free: true },
+          passages: result.content.passages,
+          questions: result.content.questions,
+          audio_url: result.content.audio_url,
+        })
         setPhase('ready')
       } catch {
         if (alive) setPhase('error')
@@ -57,6 +57,7 @@ export function ExamReviewLoader({ attemptId }: { attemptId: string }) {
           items: dto.review,
           attemptId,
           highlights: Array.isArray(dto.highlights) ? (dto.highlights as HighlightAnchor[]) : [],
+          contentStale: dto.content_stale,
         }}
       />
     )

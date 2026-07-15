@@ -237,7 +237,7 @@ export function ExamRunner({
 }: {
   testId: string
   preview?: { payload: ExamPayload; durationSec: number }
-  review?: { payload: ExamPayload; items: ReviewItem[]; attemptId: string; highlights?: HighlightAnchor[] }
+  review?: { payload: ExamPayload; items: ReviewItem[]; attemptId: string; highlights?: HighlightAnchor[]; contentStale?: boolean }
 }) {
   const router = useRouter()
   const [phase, setPhase] = useState<Phase>('loading')
@@ -855,6 +855,13 @@ export function ExamRunner({
         </header>
 
         {errorMsg && <p className="dcx-error">{errorMsg}</p>}
+
+        {/* EXAM-003/009: attempt cũ không có bản chụp → nội dung là bản HIỆN TẠI, có thể đã khác lúc thi */}
+        {review?.contentStale && (
+          <div role="note" className="dcx-banner" style={{ background: '#fff7ed', color: '#9a3412', padding: '8px 14px', fontSize: 13 }}>
+            Bài làm này không có bản lưu nội dung gốc, nên phần đề hiển thị là bản mới nhất — có thể đã khác so với lúc bạn làm bài.
+          </div>
+        )}
 
         {/* EXAM-004: bài được cập nhật ở tab/thiết bị khác → banner non-destructive, mời tải lại (không mất đáp án) */}
         {staleConflict && (
