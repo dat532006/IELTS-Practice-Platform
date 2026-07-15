@@ -560,7 +560,9 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
     }
   }
 
-  async function doMedia(kind: 'image' | 'audio') {
+  // STORE-002 — upload audio THẬT: presign PUT (R2) → PUT file → finalize (server HEAD verify → set audio_key).
+  //   KHÔNG còn set audio_key ở bước presign (chống key trỏ object chưa tồn tại). Cần R2 config (Owner).
+  async function uploadAudio(file: File) {
     if (!created) return
     setBusy('media')
     setMediaMsg('')
@@ -568,12 +570,25 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       const r = await fetch('/api/admin/media', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ kind, filename: `${kind}-${Date.now()}.${kind === 'audio' ? 'mp3' : 'png'}`, test_id: created.test_id }),
+        body: JSON.stringify({ kind: 'audio', filename: file.name, content_type: file.type, test_id: created.test_id }),
       })
       const j = await r.json().catch(() => null)
-      if (r.ok && j?.data?.upload_url) setMediaMsg(`✓ Đã tạo upload URL (${kind}). FE PUT file lên URL này.`)
-      else if (j?.meta?.error_code === 'STORAGE_NOT_CONFIGURED') setMediaMsg(`⚠️ Storage chưa cấu hình (${kind}) — cần creds R2/bucket (Owner/DevOps).`)
-      else setMediaMsg('Không tạo được upload URL.')
+      if (!r.ok || !j?.data?.upload_url) {
+        setMediaMsg(j?.meta?.error_code === 'STORAGE_NOT_CONFIGURED' ? '⚠️ R2 chưa cấu hình (audio) — cần creds R2/bucket (Owner/DevOps).' : 'Không tạo được upload URL audio.')
+        return
+      }
+      const { upload_url, upload_ref } = j.data as { upload_url: string; upload_ref: string }
+      // PUT file thật lên R2 (presigned PUT). SignedHeaders=host → content-type không ký, R2 vẫn nhận.
+      const put = await fetch(upload_url, { method: 'PUT', body: file, headers: file.type ? { 'content-type': file.type } : undefined })
+      if (!put.ok) { setMediaMsg('Upload audio lên R2 thất bại.'); return }
+      // Finalize: server HEAD verify object tồn tại rồi MỚI set audio_key.
+      const fr = await fetch('/api/admin/media/finalize', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ test_id: created.test_id, upload_ref }),
+      })
+      const fj = await fr.json().catch(() => null)
+      setMediaMsg(fr.ok && fj?.success ? '✓ Đã upload + gán audio cho đề.' : (fj?.message || 'Finalize audio thất bại.'))
     } finally {
       setBusy('')
     }
@@ -1235,9 +1250,16 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
             >
               {created.status === 'published' ? 'Đã publish' : 'Publish đề →'}
             </button>
-            <button type="button" onClick={() => doMedia('audio')} disabled={busy === 'media'} className="rounded-[11px] bg-[#F4F1FB] px-4 py-2.5 text-sm font-bold text-[#2A2740] hover:bg-[#EAE4F6]">
-              Upload audio
-            </button>
+            <label className={`cursor-pointer rounded-[11px] bg-[#F4F1FB] px-4 py-2.5 text-sm font-bold text-[#2A2740] hover:bg-[#EAE4F6] ${busy === 'media' ? 'opacity-60' : ''}`}>
+              {busy === 'media' ? 'Đang upload…' : 'Upload audio'}
+              <input
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                disabled={busy === 'media'}
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void uploadAudio(f) }}
+              />
+            </label>
           </div>
 
           {/* Ảnh minh họa đề (cover) — hiện ở trang pre-exam /tests/[id] */}

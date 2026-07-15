@@ -81,10 +81,11 @@ function clampTtl(ttlSec?: number): number {
   return Math.min(MAX_TTL_SEC, Math.max(MIN_TTL_SEC, Math.floor(base)))
 }
 
-// SigV4 query-presigned URL (path-style: https://host/bucket/key?X-Amz-...). method = GET | PUT.
+// SigV4 query-presigned URL (path-style: https://host/bucket/key?X-Amz-...). method = GET | PUT | HEAD.
 // ttlSec optional: bỏ trống → clampTtl ưu tiên env R2_URL_TTL_SEC rồi mới DEFAULT_TTL_SEC.
 // W12: thêm method param để dùng cho PUT presign (audio upload) — GET output KHÔNG đổi.
-function signR2Url(method: 'GET' | 'PUT', objectKey: string, ttlSec?: number): SignResult {
+// STORE-002: thêm HEAD để verify object tồn tại trước khi finalize (set audio_key).
+function signR2Url(method: 'GET' | 'PUT' | 'HEAD', objectKey: string, ttlSec?: number): SignResult {
   const cfg = readConfig()
   if (!cfg) return { url: null, warning: 'R2_NOT_CONFIGURED' }
   if (!objectKey) return { url: null, warning: 'R2_NOT_CONFIGURED' }
@@ -149,4 +150,17 @@ export function signR2GetUrl(objectKey: string, ttlSec?: number): SignResult {
 //   Secret CHỈ dùng để ký; KHÔNG nhúng secret vào URL. Thiếu R2 env → { url: null, warning: 'R2_NOT_CONFIGURED' }.
 export function signR2PutUrl(objectKey: string, ttlSec?: number): SignResult {
   return signR2Url('PUT', objectKey, ttlSec)
+}
+
+// STORE-002 — verify object THẬT tồn tại trên R2 (HEAD) trước khi finalize (set audio_key). Chống set key
+//   trỏ object CHƯA upload. Thiếu R2 env → { configured:false }. HEAD lỗi/timeout/không thấy → exists:false.
+export async function r2ObjectExists(objectKey: string, timeoutMs = 5000): Promise<{ exists: boolean; configured: boolean }> {
+  const signed = signR2Url('HEAD', objectKey)
+  if (!signed.url) return { exists: false, configured: false }
+  try {
+    const res = await fetch(signed.url, { method: 'HEAD', signal: AbortSignal.timeout(timeoutMs) })
+    return { exists: res.ok, configured: true } // 200 = tồn tại; 404/403 = không → exists:false
+  } catch {
+    return { exists: false, configured: true } // mạng/timeout → coi như chưa xác nhận (fail-closed)
+  }
 }
