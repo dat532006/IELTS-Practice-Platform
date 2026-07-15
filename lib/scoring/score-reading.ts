@@ -57,7 +57,19 @@ export const AnswerKeyEntrySchema = z.object({
   explanation: z.string().max(4000).optional(),
   // 2026-07-12 (review-in-exam): câu evidence TRÍCH NGUYÊN VĂN từ passage — client tìm text-match
   //   để highlight + đánh số trong bài đọc khi xem lại. Cùng guard owner+terminal như explanation.
-  evidence: z.string().max(2000).optional(),
+  // EXAM-006 (2026-07-15): quote trùng cần khử — cho phép dạng object {quote, occurrence?, context_*}.
+  //   Vẫn nhận string (legacy) → chuẩn hóa ở normalizeEvidence. Không ảnh hưởng scoring.
+  evidence: z
+    .union([
+      z.string().max(2000),
+      z.object({
+        quote: z.string().min(1).max(2000),
+        occurrence: z.number().int().positive().max(50).optional(),
+        context_before: z.string().max(200).optional(),
+        context_after: z.string().max(200).optional(),
+      }),
+    ])
+    .optional(),
 })
 
 export type AnswerKeyEntry = z.infer<typeof AnswerKeyEntrySchema>

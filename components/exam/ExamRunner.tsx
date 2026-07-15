@@ -683,7 +683,8 @@ export function ExamRunner({
     const activeQids = new Set((active?.questions ?? []).map((q) => q.id))
     const evs = review.items
       .filter((it) => it.evidence && activeQids.has(it.question_id))
-      .map((it) => ({ number: it.number, quote: it.evidence as string }))
+      // EXAM-006: truyền cả descriptor (quote + occurrence/context) để khử trùng khi highlight.
+      .map((it) => ({ number: it.number, ...it.evidence! }))
     const sync = () => {
       applyEvidenceHighlights(root, evs)
       setEvMarkers(evidenceMarkerPositions(root, evs))

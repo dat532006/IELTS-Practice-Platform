@@ -1,6 +1,7 @@
 // W8 — Highlight anchor (M05 §"Highlight & Note Anchor"). CLIENT DOM helpers.
 // Node-path thay vì plain offset (bền khi có <input> inline / reload). Restore verify `quote`; lệch → skip.
 // Field PHẢI khớp BE strict schema (lib/exam/highlights.ts): id/startPath/startOffset/endPath/endOffset/quote/color/note/createdAt.
+import { locateQuote, type EvidenceDescriptor } from '@/lib/exam/evidence-locate'
 
 export type HighlightAnchor = {
   id?: string
@@ -218,19 +219,16 @@ function posToNodeOffset(idx: TextIndex, pos: number): { node: Text; offset: num
   return null
 }
 
-// Tìm quote trong root (case-sensitive, khoảng trắng linh hoạt) → Range. Không thấy/lỗi → null.
-export function rangeFromQuote(root: Node, quote: string): Range | null {
-  const q = quote.trim().replace(/\s+/g, ' ')
-  if (q.length < 3) return null
+// EXAM-006: tìm evidence trong root (khoảng trắng linh hoạt) → Range. Quote trùng → chọn đúng lần theo
+//   occurrence/context; trùng mà không khử được → null (KHÔNG tô nhầm lần đầu). Không thấy/lỗi → null.
+export function rangeFromQuote(root: Node, ev: EvidenceDescriptor): Range | null {
   try {
     const idx = buildTextIndex(root)
     if (!idx.text) return null
-    // Regex từ quote đã escape, mỗi khoảng trắng → \s+ (khớp xuống dòng/nbsp trong DOM).
-    const pattern = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '[\\s\\u00a0]+')
-    const m = new RegExp(pattern).exec(idx.text)
-    if (!m) return null
-    const start = posToNodeOffset(idx, m.index)
-    const end = posToNodeOffset(idx, m.index + m[0].length)
+    const hit = locateQuote(idx.text, ev) // vị trí (thô) đã khử trùng theo occurrence/context
+    if (!hit) return null
+    const start = posToNodeOffset(idx, hit.start)
+    const end = posToNodeOffset(idx, hit.end)
     if (!start || !end) return null
     const range = (root.ownerDocument ?? document).createRange()
     range.setStart(start.node, start.offset)
@@ -252,7 +250,8 @@ function ensureEvidenceStyle(): void {
   document.head.appendChild(style)
 }
 
-export type EvidenceItem = { number?: number; quote: string }
+// EXAM-006: evidence item = descriptor (quote + occurrence/context khử trùng) + số câu [n] để đánh badge.
+export type EvidenceItem = EvidenceDescriptor & { number?: number }
 
 // Tô mọi evidence tìm thấy trong root (registry riêng 'exam-evidence' — không đụng highlight thí sinh).
 export function applyEvidenceHighlights(root: Node, items: EvidenceItem[]): void {
@@ -261,7 +260,7 @@ export function applyEvidenceHighlights(root: Node, items: EvidenceItem[]): void
   ensureEvidenceStyle()
   const ranges: Range[] = []
   for (const it of items) {
-    const r = rangeFromQuote(root, it.quote)
+    const r = rangeFromQuote(root, it)
     if (r) ranges.push(r)
   }
   if (ranges.length === 0) {
@@ -284,7 +283,7 @@ export function evidenceMarkerPositions(
   const out: { number: number; left: number; top: number }[] = []
   for (const it of items) {
     if (typeof it.number !== 'number') continue
-    const r = rangeFromQuote(root, it.quote)
+    const r = rangeFromQuote(root, it)
     if (!r) continue
     const first = r.getClientRects()[0]
     if (!first) continue
