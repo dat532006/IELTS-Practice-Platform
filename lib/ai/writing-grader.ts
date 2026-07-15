@@ -2,6 +2,8 @@ import 'server-only'
 import { z } from 'zod'
 import { isValidBand, roundHalf } from '@/lib/scoring/writing-band'
 import { WRITING_GRADER_SYSTEM_PROMPT } from '@/lib/ai/ielts-writing-rubric'
+import { selectProvider, gradeTimeoutMs } from '@/lib/ai/provider-select'
+import { fetchWithDeadline } from '@/lib/net/fetch-deadline'
 
 // ============================================================
 // W10/W11 — Writing AI grader (M07). SERVER-ONLY.
@@ -12,20 +14,16 @@ import { WRITING_GRADER_SYSTEM_PROMPT } from '@/lib/ai/ielts-writing-rubric'
 // A2 (2026-07-08, Owner quyết): thêm adapter OpenAI (fetch thuần, không thêm SDK). Chọn provider:
 //   WRITING_AI_PROVIDER=openai|anthropic; không set → tự chọn theo key có sẵn (anthropic ưu tiên).
 //   Cả 2 provider ĐI QUA CÙNG validateAiGradeOutput — schema/band rule không đổi.
+// AI-001 (batch 21): mọi lời gọi provider có DEADLINE (gradeTimeoutMs) — Anthropic SDK qua signal +
+//   maxRetries:0 (không auto-retry gây nhân đôi chi phí), OpenAI qua fetchWithDeadline. Hang → throw →
+//   AI_UNAVAILABLE → lib/exam/writing.ts refund quota + release claim (bounded, cho retry).
+// AI-002 (batch 21): chọn provider ở lib/ai/provider-select.ts — WRITING_AI_PROVIDER lạ → fail-loud
+//   (KHÔNG âm thầm đổi provider theo key). gradeWriting trả AI_UNAVAILABLE khi config lạ.
 // ============================================================
 
 const MODEL = process.env.WRITING_GRADER_MODEL || 'claude-opus-4-8'
 const OPENAI_MODEL = process.env.WRITING_GRADER_OPENAI_MODEL || 'gpt-4o-mini'
 const MAX_TOKENS = 4000
-
-type AiProvider = 'anthropic' | 'openai'
-function selectProvider(): AiProvider {
-  const p = process.env.WRITING_AI_PROVIDER
-  if (p === 'openai' || p === 'anthropic') return p
-  if (process.env.ANTHROPIC_API_KEY) return 'anthropic'
-  if (process.env.OPENAI_API_KEY) return 'openai'
-  return 'anthropic' // không key nào: non-prod đã mock ở trên; prod → nhánh live throw → AI_UNAVAILABLE (fail-loud F5)
-}
 
 const ErrorHighlight = z.object({
   quote: z.string().min(1).max(240),
@@ -175,21 +173,26 @@ function buildUserContent(input: GraderInput, toolNote: string): string {
 async function gradeWithAnthropic(input: GraderInput): Promise<GradeOutcome> {
   try {
     const { default: Anthropic } = await import('@anthropic-ai/sdk')
-    const client = new Anthropic() // đọc ANTHROPIC_API_KEY từ env (server-only)
+    // maxRetries:0 — KHÔNG để SDK tự retry (nhân đôi chi phí/claim); retry do người dùng qua release claim.
+    const client = new Anthropic({ maxRetries: 0 }) // đọc ANTHROPIC_API_KEY từ env (server-only)
     const userContent = buildUserContent(
       input,
       `Call the ${GRADE_TOOL} tool with the grade. All bands in 0..9, steps of 0.5. Include up to 12 short error_highlights per task when useful; omit the field if there are no specific highlights.`,
     )
 
-    const res = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      thinking: { type: 'adaptive' },
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: userContent }],
-      tools: [{ name: GRADE_TOOL, description: 'Return the IELTS writing grade for Task 1 and Task 2.', input_schema: GRADE_INPUT_SCHEMA }],
-      tool_choice: { type: 'auto' },
-    })
+    // AI-001: deadline ứng dụng — quá hạn → AbortSignal.timeout abort → SDK throw → catch → AI_UNAVAILABLE.
+    const res = await client.messages.create(
+      {
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        thinking: { type: 'adaptive' },
+        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: userContent }],
+        tools: [{ name: GRADE_TOOL, description: 'Return the IELTS writing grade for Task 1 and Task 2.', input_schema: GRADE_INPUT_SCHEMA }],
+        tool_choice: { type: 'auto' },
+      },
+      { signal: AbortSignal.timeout(gradeTimeoutMs()) },
+    )
 
     if (res.stop_reason === 'refusal') return { ok: false, code: 'AI_UNAVAILABLE' }
     const toolUse = res.content.find((b) => b.type === 'tool_use')
@@ -254,7 +257,8 @@ async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
       input,
       'Return the grade as JSON. All bands in 0..9, steps of 0.5. At most 8 suggestions and 12 error_highlights per task; use an empty array when there are no specific highlights.',
     )
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    // AI-001: deadline ứng dụng — provider treo → AbortSignal.timeout abort → throw → catch → AI_UNAVAILABLE.
+    const res = await fetchWithDeadline('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
@@ -269,7 +273,7 @@ async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
           json_schema: { name: 'ielts_writing_grade', strict: true, schema: OPENAI_GRADE_SCHEMA },
         },
       }),
-    })
+    }, gradeTimeoutMs())
     if (!res.ok) return { ok: false, code: 'AI_UNAVAILABLE' }
     const body = (await res.json().catch(() => null)) as {
       choices?: { message?: { content?: string | null; refusal?: string | null } }[]
@@ -302,5 +306,8 @@ export async function gradeWriting(input: GraderInput): Promise<GradeOutcome> {
     const grade = validateAiGradeOutput(mockGrade(input))
     return grade ? { ok: true, grade, mock: true } : { ok: false, code: 'AI_INVALID_OUTPUT' }
   }
-  return selectProvider() === 'openai' ? gradeWithOpenAi(input) : gradeWithAnthropic(input)
+  // AI-002: config provider lạ → fail-loud (AI_UNAVAILABLE), KHÔNG âm thầm đổi provider theo key.
+  const sel = selectProvider()
+  if (!sel.ok) return { ok: false, code: 'AI_UNAVAILABLE' }
+  return sel.provider === 'openai' ? gradeWithOpenAi(input) : gradeWithAnthropic(input)
 }
