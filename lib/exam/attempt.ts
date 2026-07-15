@@ -6,6 +6,7 @@ import { convertToBand } from '@/lib/scoring/band-convert'
 import { sanitizeHighlights } from '@/lib/exam/highlights'
 import { sanitizeAnswers } from '@/lib/exam/answers'
 import { checkAnswersRev } from '@/lib/exam/answers-rev'
+import { logEvent } from '@/lib/obs/log-event'
 import type { AttemptDTO, SubmitResult } from '@/types/exam'
 
 // ============================================================
@@ -66,6 +67,25 @@ const ATTEMPT_COLS =
 
 export type StartResult = { ok: true; attempt: AttemptDTO } | { ok: false; code: 'NOT_FOUND' | 'EXAM_LOCKED' }
 
+// EXAM-003/009 — chụp nội dung đề (passages+questions) lúc START, gắn attempt. Review đọc từ đây (độc lập
+//   published visibility + cố định khi đề bị sửa). Best-effort: chụp lỗi KHÔNG chặn vào thi (review fallback
+//   nội dung hiện tại + cờ stale). Chỉ gọi cho attempt VỪA TẠO (attempt cũ đã có bản chụp của nó).
+async function captureContentSnapshot(admin: SupabaseClient, attemptId: string, testId: string): Promise<void> {
+  try {
+    const { data: t } = await admin.from('tests').select('passages, questions').eq('id', testId).maybeSingle()
+    const row = t as { passages: unknown; questions: unknown } | null
+    const { error } = await admin.from('attempt_content_snapshots').insert({
+      attempt_id: attemptId,
+      test_id: testId,
+      passages: row?.passages ?? null,
+      questions: row?.questions ?? null,
+    })
+    if (error) logEvent('exam.snapshot_error', 'warn', { attempt: attemptId, code: error.code ?? null })
+  } catch {
+    logEvent('exam.snapshot_error', 'warn', { attempt: attemptId, kind: 'exception' })
+  }
+}
+
 // supabase = RLS client (user): access check + own-rows; admin = service_role: write attempt.
 export async function startAttempt(
   supabase: SupabaseClient,
@@ -119,6 +139,8 @@ export async function startAttempt(
       }
     } else {
       attempt = created as AttemptRow
+      // EXAM-003/009: attempt VỪA TẠO → chụp nội dung đề (best-effort). Attempt reuse/raced đã có bản chụp riêng.
+      await captureContentSnapshot(admin, attempt.id, testId)
     }
   }
 

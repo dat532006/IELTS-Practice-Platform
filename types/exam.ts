@@ -71,6 +71,10 @@ export type ResultDTO = {
   review: ReviewItem[]
   highlights: unknown // echo annotation của owner
   bookmarked_qs: string[] // echo câu đã bookmark trong attempt
+  // EXAM-003/009: nội dung để render review (passages+questions) — TỪ BẢN CHỤP lúc START (độc lập published
+  //   visibility + cố định khi đề bị sửa). Review-in-exam dùng cái này, KHÔNG gọi /api/exam published-only nữa.
+  content: { passages: unknown; questions: unknown; audio_url: string | null }
+  content_stale: boolean // true = attempt cũ không có bản chụp → fallback nội dung hiện tại ("bản gốc có thể đã đổi")
 }
 
 // W10 Writing AI grade — M07. KHÔNG bao giờ kèm system prompt / API key / raw provider response.

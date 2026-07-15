@@ -3,6 +3,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { scoreReading, type AnswerKeys } from '@/lib/scoring/score-reading'
 import { buildReviewItems } from '@/lib/exam/review'
 import { sanitizeHighlights } from '@/lib/exam/highlights'
+import { pickReviewContent } from '@/lib/exam/review-content'
+import { sanitizePassages } from '@/lib/sanitize/passage-html'
+import { getSignedAudioUrl } from '@/lib/exam/access'
 import type { ResultDTO, ExamSkill } from '@/types/exam'
 
 // ============================================================
@@ -46,24 +49,38 @@ export async function getResult(admin: SupabaseClient, attemptId: string, userId
   // Chưa terminal → KHÔNG trả review/đáp án.
   if (a.status !== 'submitted' && a.status !== 'expired') return { ok: false, code: 'RESULT_NOT_READY' }
 
-  // ---- CHỈ TỪ ĐÂY: owner + terminal đã xác nhận → đọc answer_keys + questions (service_role) ----
-  const [{ data: akData, error: akErr }, { data: tData, error: tErr }] = await Promise.all([
-    admin.from('answer_keys').select('keys').eq('test_id', a.test_id).maybeSingle(),
-    admin.from('tests').select('title, type, questions').eq('id', a.test_id).maybeSingle(),
-  ])
+  // ---- CHỈ TỪ ĐÂY: owner + terminal đã xác nhận → đọc answer_keys + nội dung (service_role) ----
+  //   EXAM-003/009: ưu tiên bản chụp lúc START (attempt_content_snapshots). Vẫn đọc tests hiện tại để lấy
+  //   title/type/audio_key + fallback nội dung cho attempt cũ (không bản chụp).
+  const [{ data: akData, error: akErr }, { data: tData, error: tErr }, { data: snapData, error: snapErr }] =
+    await Promise.all([
+      admin.from('answer_keys').select('keys').eq('test_id', a.test_id).maybeSingle(),
+      admin.from('tests').select('title, type, questions, passages, audio_key').eq('id', a.test_id).maybeSingle(),
+      admin.from('attempt_content_snapshots').select('passages, questions').eq('attempt_id', a.id).maybeSingle(),
+    ])
   if (akErr) throw new Error(akErr.message)
   if (tErr) throw new Error(tErr.message)
+  if (snapErr) throw new Error(snapErr.message)
 
   const keys = (akData?.keys ?? {}) as AnswerKeys
-  const testRow = (tData ?? {}) as { title?: string; type?: string; questions?: unknown }
+  const testRow = (tData ?? {}) as { title?: string; type?: string; questions?: unknown; passages?: unknown; audio_key?: string | null }
+  const snap = (snapData ?? null) as { passages: unknown; questions: unknown } | null
 
-  const review = buildReviewItems(a.answers, keys as Record<string, unknown>, testRow.questions)
+  // EXAM-003/009: nội dung review = bản chụp nếu có, else fallback hiện tại + cờ stale. Review items build từ
+  //   questions của NGUỒN NÀY (đề bị sửa sau khi thi không làm trôi đúng/sai/số câu).
+  const content = pickReviewContent(snap, { passages: testRow.passages, questions: testRow.questions })
+
+  const review = buildReviewItems(a.answers, keys as Record<string, unknown>, content.questions)
   // max_score nhất quán với scoring W6 (Σ points key hợp lệ). KHÔNG lộ map từng câu.
   const { max_score } = scoreReading(a.answers ?? {}, keys)
 
+  const skill = (testRow.type ?? 'reading') as ExamSkill
+  // Audio Listening ký lại từ audio_key hiện tại (audio_key server-only, KHÔNG ra client). Thiếu R2/key → null.
+  const { url: audio_url } = getSignedAudioUrl({ type: skill, audio_key: testRow.audio_key ?? null })
+
   const result: ResultDTO = {
     attempt_id: a.id,
-    test: { id: a.test_id, title: testRow.title ?? '', skill: (testRow.type ?? 'reading') as ExamSkill },
+    test: { id: a.test_id, title: testRow.title ?? '', skill },
     status: a.status as 'submitted' | 'expired',
     submitted_at: a.submitted_at,
     time_spent: a.time_spent,
@@ -75,6 +92,9 @@ export async function getResult(admin: SupabaseClient, attemptId: string, userId
     // (answer_keys/points/match...) kể cả nếu dữ liệu highlights cũ/bất thường.
     highlights: sanitizeHighlights(a.highlights),
     bookmarked_qs: toIdArray(a.bookmarked_qs),
+    // EXAM-003/009: nội dung render review từ bản chụp (sanitize passage lần nữa trên đường ra client như /api/exam).
+    content: { passages: sanitizePassages(content.passages), questions: content.questions, audio_url },
+    content_stale: content.stale,
   }
   return { ok: true, result }
 }
