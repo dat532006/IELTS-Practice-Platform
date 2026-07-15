@@ -43,6 +43,7 @@ export type AttemptDTO = {
   highlights: unknown // W8: annotation owner (restore qua reload); shape = HighlightAnchor[]
   bookmarked_qs: string[] // W8: câu đã bookmark trong attempt
   answers?: Record<string, string | string[]> // W9: draft answers (autosave) — restore qua reload; KHÔNG đáp án đúng
+  answers_rev: number // EXAM-004: rev optimistic-concurrency; client gửi lại làm expected_rev khi autosave/submit
 }
 
 // W8 result review — CHỈ owner + status submitted|expired (LUẬT THÉP #4).

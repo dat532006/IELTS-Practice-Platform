@@ -247,6 +247,8 @@ export function ExamRunner({
   const [remaining, setRemaining] = useState<number | null>(null)
   const [result, setResult] = useState<SubmitResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  // EXAM-004: bài bị cập nhật ở tab/thiết bị khác → hiện banner non-destructive "Tải lại" (không mất đáp án).
+  const [staleConflict, setStaleConflict] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [showPassage, setShowPassage] = useState(true)
   const [contrast, setContrast] = useState<Contrast>('bw')
@@ -272,6 +274,9 @@ export function ExamRunner({
   const autoSubmittedRef = useRef(false)
   const passageRootRef = useRef<HTMLDivElement | null>(null)
   const answerSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // EXAM-004: rev optimistic-concurrency — seed từ /start, cập nhật sau mỗi autosave thắng, gửi kèm mọi
+  //   autosave/submit làm expected_rev. Server lệch rev (tab khác đã lưu mới hơn) → 409 ANSWERS_STALE.
+  const answersRevRef = useRef(0)
   const scrollPendingRef = useRef<string | null>(null) // Tier0: cuộn tới câu sau khi ◀▶ đổi group
   const mainRef = useRef<HTMLElement | null>(null) // Tier0: đo bề rộng để kéo divider
 
@@ -369,12 +374,17 @@ export function ExamRunner({
       const r = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ attempt_id: attempt.attempt_id, answers }),
+        body: JSON.stringify({ attempt_id: attempt.attempt_id, answers, expected_rev: answersRevRef.current }),
       })
       const b = await r.json().catch(() => null)
       if (r.ok && b?.success) {
         setResult(b.data as SubmitResult)
         setPhase('done')
+      } else if (b?.meta?.error_code === 'ANSWERS_STALE') {
+        // EXAM-004: bài đã đổi ở tab/thiết bị khác → KHÔNG nộp đè; mời tải lại lấy bản mới rồi nộp lại.
+        submittingRef.current = false
+        setStaleConflict(true)
+        setPhase('active')
       } else {
         submittingRef.current = false
         setErrorMsg('Nộp bài thất bại, vui lòng thử lại.')
@@ -432,6 +442,7 @@ export function ExamRunner({
 
         const att = sb.data as AttemptDTO
         setAttempt(att)
+        answersRevRef.current = att.answers_rev ?? 0 // EXAM-004: neo rev đã thấy để optimistic-concurrency
         setHighlights(Array.isArray(att.highlights) ? (att.highlights as HighlightAnchor[]) : [])
         setBookmarkedQs(Array.isArray(att.bookmarked_qs) ? att.bookmarked_qs : [])
         if (att.status !== 'in_progress') {
@@ -525,11 +536,21 @@ export function ExamRunner({
       if (!attempt) return
       if (answerSaveTimer.current) clearTimeout(answerSaveTimer.current)
       answerSaveTimer.current = setTimeout(() => {
+        // EXAM-004: gửi expected_rev; thành công → cập nhật rev; ANSWERS_STALE (409) → bài đã đổi ở nơi khác.
         void fetch(`/api/attempts/${attempt.attempt_id}/answers`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ answers: next }),
-        }).catch(() => {})
+          body: JSON.stringify({ answers: next, expected_rev: answersRevRef.current }),
+        })
+          .then(async (r) => {
+            const b = await r.json().catch(() => null)
+            if (r.ok && b?.success) {
+              if (typeof b.data?.answers_rev === 'number') answersRevRef.current = b.data.answers_rev
+            } else if (b?.meta?.error_code === 'ANSWERS_STALE') {
+              setStaleConflict(true) // non-destructive: dừng đè, mời tải lại lấy bản mới
+            }
+          })
+          .catch(() => {})
       }, 800)
     },
     [attempt],
@@ -834,6 +855,14 @@ export function ExamRunner({
         </header>
 
         {errorMsg && <p className="dcx-error">{errorMsg}</p>}
+
+        {/* EXAM-004: bài được cập nhật ở tab/thiết bị khác → banner non-destructive, mời tải lại (không mất đáp án) */}
+        {staleConflict && (
+          <div role="alert" className="dcx-error" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            <span>Bài của bạn đã được cập nhật ở một tab hoặc thiết bị khác. Hãy tải lại để lấy bản mới nhất trước khi tiếp tục.</span>
+            <button onClick={() => location.reload()} className="dcx-btn-primary">Tải lại</button>
+          </div>
+        )}
 
         {/* Listening audio */}
         {isListening && <ListeningAudioPlayer audioUrl={payload?.audio_url ?? null} />}
