@@ -4,6 +4,7 @@ import { requireAdminApi } from '@/lib/admin/guard'
 import { setTestMeta, deleteTestTwoTier } from '@/lib/admin/tests'
 import { ok, fail } from '@/lib/api/response'
 import { isUuid } from '@/lib/utils'
+import { isAllowedPublicMediaUrl } from '@/lib/storage/media-url'
 
 // PATCH/DELETE /api/admin/tests/[id] — meta toggle + xóa đề 2 tầng (M11, 2026-07-12).
 // LUẬT THÉP: requireAdmin TRƯỚC service_role. PATCH ở đây là META-ONLY (is_free) — sửa nội dung
@@ -11,10 +12,18 @@ import { isUuid } from '@/lib/utils'
 //   xóa cứng; còn lại → status='hidden' (học viên cũ giữ nguyên kết quả — Owner quyết 2026-07-12).
 
 // Meta-only: is_free (toggle) và/hoặc cover_image (URL ảnh minh họa; null = gỡ ảnh). Cần ≥1 field.
+// STORE-003 — cover_image: null (gỡ ảnh) HOẶC URL ảnh công khai thuộc allowlist origin (Supabase Storage
+//   public / CDN Owner duyệt). Chặn javascript:/data:/host lạ/tracker — trước đây .url() nhận tất cả.
 const MetaBody = z
   .object({
     is_free: z.boolean().optional(),
-    cover_image: z.string().trim().max(1000).url().nullable().optional(),
+    cover_image: z
+      .string()
+      .trim()
+      .max(1000)
+      .refine(isAllowedPublicMediaUrl, { message: 'cover_image phải là URL ảnh công khai hợp lệ (origin được duyệt)' })
+      .nullable()
+      .optional(),
   })
   .strict()
   .refine((b) => b.is_free !== undefined || b.cover_image !== undefined, {
