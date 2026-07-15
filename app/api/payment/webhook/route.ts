@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getWebhookAdapter, getGatewayMode } from '@/lib/payments/gateway'
-import { ok, fail } from '@/lib/api/response'
+import { ok, fail, requestIdFrom } from '@/lib/api/response'
+import { logEvent } from '@/lib/obs/log-event'
 
 // POST /api/payment/webhook — provider gọi (KHÔNG user session). Theo payment_redeem_contract §3.
 // Verify chữ ký server → idempotent credit (RPC credit_topup, pending→success, amount SERVER-side).
@@ -15,26 +16,29 @@ const WebhookSchema = z.object({
 })
 
 export async function POST(request: Request) {
+  const rid = requestIdFrom(request.headers) // DEPLOY-005: id tương quan client ↔ mọi log tới hạn
   // A1 — chế độ live: route sandbox này BỊ TẮT (chống dùng sandbox HMAC để credit khi cổng thật đã bật;
   //   IPN thật đi qua /api/payment/webhook/{vnpay,momo} với scheme chữ ký riêng từng provider).
   if (getGatewayMode() === 'live') {
-    return fail('NOT_FOUND', 'Không tồn tại', { status: 404 })
+    return fail('NOT_FOUND', 'Không tồn tại', { status: 404, request_id: rid })
   }
   let raw: unknown
-  try { raw = await request.json() } catch { return fail('VALIDATION_ERROR', 'Body JSON không hợp lệ', { status: 400 }) }
+  try { raw = await request.json() } catch { return fail('VALIDATION_ERROR', 'Body JSON không hợp lệ', { status: 400, request_id: rid }) }
   const parsed = WebhookSchema.safeParse(raw)
-  if (!parsed.success) return fail('VALIDATION_ERROR', 'Payload không hợp lệ', { status: 400 })
+  if (!parsed.success) return fail('VALIDATION_ERROR', 'Payload không hợp lệ', { status: 400, request_id: rid })
 
   const { signature, ...payload } = parsed.data
   // Verify chữ ký theo provider (gateway seam). Sandbox HMAC hiện tại; cổng thật cắm ở lib/payments/gateway.ts.
   // Thiếu secret / sai chữ ký → reject (an toàn, KHÔNG cộng coin).
   const adapter = getWebhookAdapter(parsed.data.provider)
   if (!adapter.configured() || !adapter.verify(payload, signature)) {
-    return fail('PAYMENT_SIGNATURE_INVALID', 'Chữ ký không hợp lệ', { status: 400 })
+    // Sự kiện an ninh: webhook chữ ký sai (redact — KHÔNG log chữ ký/payload thô).
+    logEvent('security.webhook_signature_invalid', 'warn', { provider: parsed.data.provider, txn: parsed.data.provider_txn_id }, { request_id: rid })
+    return fail('PAYMENT_SIGNATURE_INVALID', 'Chữ ký không hợp lệ', { status: 400, request_id: rid })
   }
   // Chỉ status success mới credit (idempotent ở RPC).
   if (parsed.data.status && parsed.data.status !== 'success') {
-    return ok({ credited: false, status: parsed.data.status })
+    return ok({ credited: false, status: parsed.data.status }, { request_id: rid })
   }
 
   const admin = createAdminClient()
@@ -44,7 +48,7 @@ export async function POST(request: Request) {
   //   → mất mắt xích anti-fraud (paid == expected). Non-success notification đã return ở trên (không credit),
   //   nên yêu cầu amount ở đây KHÔNG ảnh hưởng thông báo thất bại. BẮT BUỘC trước khi cắm cổng thật (A1).
   if (parsed.data.amount === undefined) {
-    return fail('PAYMENT_AMOUNT_MISMATCH', 'Webhook thiếu số tiền để đối chiếu', { status: 400 })
+    return fail('PAYMENT_AMOUNT_MISMATCH', 'Webhook thiếu số tiền để đối chiếu', { status: 400, request_id: rid })
   }
 
   // W16 — verify SỐ TIỀN khớp chính xác transaction (paid_vnd == amount_vnd).
@@ -65,16 +69,12 @@ export async function POST(request: Request) {
       .maybeSingle()
     const row = txn as { amount_vnd: number | null } | null
     if (row && row.amount_vnd == null) {
-      console.error(
-        `[payment/webhook] missing amount_vnd on creditable txn=${parsed.data.provider_txn_id} — fail-closed, cần đối soát tay`,
-      )
-      return fail('PAYMENT_AMOUNT_MISMATCH', 'Giao dịch thiếu số tiền đối chiếu', { status: 400 })
+      logEvent('payment.amount_missing', 'critical', { provider: parsed.data.provider, txn: parsed.data.provider_txn_id }, { request_id: rid })
+      return fail('PAYMENT_AMOUNT_MISMATCH', 'Giao dịch thiếu số tiền đối chiếu', { status: 400, request_id: rid })
     }
     if (row && parsed.data.amount !== row.amount_vnd) {
-      console.error(
-        `[payment/webhook] amount mismatch txn=${parsed.data.provider_txn_id} paid=${parsed.data.amount} expected=${row.amount_vnd}`,
-      )
-      return fail('PAYMENT_AMOUNT_MISMATCH', 'Số tiền thanh toán không khớp', { status: 400 })
+      logEvent('payment.amount_mismatch', 'error', { provider: parsed.data.provider, txn: parsed.data.provider_txn_id, paid: parsed.data.amount, expected: row.amount_vnd }, { request_id: rid })
+      return fail('PAYMENT_AMOUNT_MISMATCH', 'Số tiền thanh toán không khớp', { status: 400, request_id: rid })
     }
   }
 
@@ -82,8 +82,12 @@ export async function POST(request: Request) {
     p_provider: parsed.data.provider,
     p_txn_id: parsed.data.provider_txn_id,
   })
-  if (error) return fail('INTERNAL', 'Không xử lý được webhook', { status: 500 })
+  if (error) {
+    // Credit RPC lỗi = sự cố tới hạn (đã verify chữ ký + số tiền nhưng không ghi được coin) → phải quan sát.
+    logEvent('payment.credit_error', 'critical', { provider: parsed.data.provider, txn: parsed.data.provider_txn_id, code: error.code ?? null }, { request_id: rid })
+    return fail('INTERNAL', 'Không xử lý được webhook', { status: 500, request_id: rid })
+  }
 
   const credited = (data as { credited?: boolean } | null)?.credited === true
-  return ok({ credited })
+  return ok({ credited }, { request_id: rid })
 }

@@ -4,6 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getSessionUser } from '@/lib/auth/guards'
 import { buildSepayQrUrl, sepayConfigured } from '@/lib/payments/sepay'
 import { fetchWithDeadline, readCappedArrayBuffer, QR_MAX_BYTES } from '@/lib/net/fetch-deadline'
+import { requestIdFrom } from '@/lib/api/response'
+import { logEvent } from '@/lib/obs/log-event'
 
 // A1-alt — proxy ảnh VietQR qua server (same-origin): adblock/DNS phía client chặn qr.sepay.vn
 //   sẽ không làm hỏng trang thanh toán; URL ảnh cũng không lộ số tài khoản/bank ra markup.
@@ -11,6 +13,7 @@ import { fetchWithDeadline, readCappedArrayBuffer, QR_MAX_BYTES } from '@/lib/ne
 const RefSchema = z.string().regex(/^TOPUP-[0-9a-f]{18}$/)
 
 export async function GET(request: Request) {
+  const rid = requestIdFrom(request.headers) // DEPLOY-005: tương quan lỗi upstream QR
   const user = await getSessionUser()
   if (!user) return NextResponse.json({ message: 'unauthorized' }, { status: 401 })
   if (!sepayConfigured()) return NextResponse.json({ message: 'not configured' }, { status: 503 })
@@ -38,13 +41,13 @@ export async function GET(request: Request) {
     //   → chỉ stream khi content-type là ảnh thật; còn lại 502 + log để thấy nguyên nhân ở server.
     const upstreamType = upstream.headers.get('content-type') ?? ''
     if (!upstream.ok || !upstreamType.startsWith('image/')) {
-      console.error(`[payment/qr-image] upstream không trả ảnh (status=${upstream.status}, type=${upstreamType})`)
+      logEvent('payment.qr_upstream_error', 'error', { status: upstream.status, type: upstreamType, kind: 'not_image' }, { request_id: rid })
       return NextResponse.json({ message: 'qr upstream error' }, { status: 502 })
     }
     // PAY-006 — đọc CÓ CAP: body vượt QR_MAX_BYTES → hủy stream → 502 (chống body khổng lồ).
     const png = await readCappedArrayBuffer(upstream, QR_MAX_BYTES)
     if (!png) {
-      console.error(`[payment/qr-image] upstream body vượt cap ${QR_MAX_BYTES}B (type=${upstreamType})`)
+      logEvent('payment.qr_upstream_error', 'error', { type: upstreamType, kind: 'over_cap', cap: QR_MAX_BYTES }, { request_id: rid })
       return NextResponse.json({ message: 'qr upstream error' }, { status: 502 })
     }
     return new NextResponse(png, {

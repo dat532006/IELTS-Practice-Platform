@@ -44,6 +44,14 @@ function newRequestId() {
   return 'req_' + Math.random().toString(36).slice(2, 10)
 }
 
+// DEPLOY-005 — correlation id: ưu tiên id tương quan do proxy/hạ tầng đính (x-request-id, rồi
+//   x-vercel-id) để 1 request có CÙNG id ở response client + mọi dòng log tới hạn; không có/không hợp
+//   lệ → sinh mới. Sanitize (chỉ [\w-], ≤80) chống log-injection qua header giả.
+export function requestIdFrom(headers: Headers): string {
+  const candidate = headers.get('x-request-id') ?? headers.get('x-vercel-id') ?? ''
+  return /^[\w-]{1,80}$/.test(candidate) ? candidate : newRequestId()
+}
+
 export function ok<T>(
   data: T,
   opts?: { message?: string; warnings?: string[]; request_id?: string; status?: number },
