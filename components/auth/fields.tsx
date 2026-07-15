@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react'
 import { EyeIcon, EyeOffIcon } from '@/components/brand/icons'
 
@@ -27,24 +27,40 @@ const ROW =
 const INPUT =
   'min-w-0 flex-1 border-none bg-transparent py-[13px] text-[14.5px] text-[#2A2740] outline-none placeholder:text-[#B9B0C8]'
 
-export function FieldLabel({ children }: { children: ReactNode }) {
-  return <span className="mb-[7px] block text-[13px] font-bold text-[#4A445E]">{children}</span>
+// UI-001: nhãn phải LIÊN KẾT chương trình với input. `htmlFor` set → render <label htmlFor> (screen reader
+//   đọc đúng tên field); không set → <span> (trang trí, vd nhãn phụ). Style giữ nguyên.
+export function FieldLabel({ children, htmlFor }: { children: ReactNode; htmlFor?: string }) {
+  const cls = 'mb-[7px] block text-[13px] font-bold text-[#4A445E]'
+  return htmlFor ? (
+    <label htmlFor={htmlFor} className={cls}>
+      {children}
+    </label>
+  ) : (
+    <span className={cls}>{children}</span>
+  )
 }
+
+// labelRow có thể là node tĩnh HOẶC hàm nhận id field (để caller gắn <FieldLabel htmlFor={id}> đúng input).
+type LabelRow = ReactNode | ((id: string) => ReactNode)
+const renderLabelRow = (labelRow: LabelRow, id: string): ReactNode =>
+  typeof labelRow === 'function' ? labelRow(id) : labelRow
 
 type FieldProps = {
   label?: ReactNode
   icon: ReactNode
-  labelRow?: ReactNode
+  labelRow?: LabelRow
 } & InputHTMLAttributes<HTMLInputElement>
 
-// Text/email field (icon dẫn bên trái).
+// Text/email field (icon dẫn bên trái). UI-001: input luôn có id + nhãn liên kết (htmlFor).
 export function AuthField({ label, icon, labelRow, className, ...input }: FieldProps) {
+  const autoId = useId()
+  const id = input.id ?? autoId
   return (
     <div className={className}>
-      {labelRow ?? (label && <FieldLabel>{label}</FieldLabel>)}
+      {labelRow != null ? renderLabelRow(labelRow, id) : label != null ? <FieldLabel htmlFor={id}>{label}</FieldLabel> : null}
       <div className={ROW}>
         <span className="flex flex-none text-[#B9B0C8]">{icon}</span>
-        <input className={INPUT} {...input} />
+        <input className={INPUT} {...input} id={id} />
       </div>
     </div>
   )
@@ -52,7 +68,7 @@ export function AuthField({ label, icon, labelRow, className, ...input }: FieldP
 
 type PasswordProps = {
   label?: ReactNode
-  labelRow?: ReactNode
+  labelRow?: LabelRow
   icon: ReactNode
   rightAdornment?: ReactNode
 } & Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>
@@ -67,9 +83,11 @@ export function PasswordField({
   ...input
 }: PasswordProps) {
   const [show, setShow] = useState(false)
+  const autoId = useId()
+  const id = input.id ?? autoId
   return (
     <div className={className}>
-      {labelRow ?? (label && <FieldLabel>{label}</FieldLabel>)}
+      {labelRow != null ? renderLabelRow(labelRow, id) : label != null ? <FieldLabel htmlFor={id}>{label}</FieldLabel> : null}
       <div className={ROW}>
         <span className="flex flex-none text-[#B9B0C8]">{icon}</span>
         <input
@@ -77,6 +95,7 @@ export function PasswordField({
           className={INPUT}
           style={show ? undefined : { letterSpacing: '2px' }}
           {...input}
+          id={id}
         />
         <button
           type="button"

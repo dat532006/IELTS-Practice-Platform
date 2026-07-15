@@ -23,6 +23,7 @@ import {
   ContrastIcon,
   FlagIcon,
 } from '@/components/exam/ExamIcons'
+import { A11yDialog } from '@/components/a11y/A11yDialog'
 import { isAnswered, renderKindOf, type AnswerValue, type ExamQuestion, type QOption } from '@/components/exam/questions/types'
 import {
   anchorFromRange,
@@ -1160,15 +1161,20 @@ export function ExamRunner({
 
       {/* Submit modal */}
       {modalOpen && (
-        <div className="dcx-overlay" role="dialog" aria-modal="true" onClick={() => setModalOpen(false)}>
-          <div className="dcx-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="dcx-overlay" onClick={() => setModalOpen(false)}>
+          <A11yDialog
+            className="dcx-modal"
+            onClose={() => setModalOpen(false)}
+            labelledBy="dcx-submit-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button onClick={() => setModalOpen(false)} aria-label="Đóng" className="dcx-modal-close">
               <CloseIcon className="h-4 w-4" />
             </button>
             <div className="dcx-modal-icon">
               <NoteIcon className="h-8 w-8" />
             </div>
-            <h2 className="dcx-modal-title">Bạn đã sẵn sàng nộp bài?</h2>
+            <h2 id="dcx-submit-title" className="dcx-modal-title">Bạn đã sẵn sàng nộp bài?</h2>
             <p className="dcx-modal-text">
               Sau khi nộp, bạn sẽ không thể chỉnh sửa câu trả lời.<br />
               Hãy kiểm tra kỹ đáp án trước khi tiếp tục.
@@ -1189,7 +1195,7 @@ export function ExamRunner({
                 Kiểm tra lại
               </button>
             </div>
-          </div>
+          </A11yDialog>
         </div>
       )}
     </div>
@@ -1215,16 +1221,16 @@ function PopupFrame({ x, y, width, onCancel, children, label }: { x: number; y: 
   return (
     <>
       <div className="dcx-ctx-backdrop" onClick={onCancel} aria-hidden />
-      <div
+      <A11yDialog
         className="dcx-ctx"
         style={{ left, top, width }}
-        role="dialog"
-        aria-label={label}
+        onClose={onCancel}
+        ariaLabel={label}
         onClick={(e) => e.stopPropagation()}
         onMouseUp={(e) => e.stopPropagation()}
       >
         {children}
-      </div>
+      </A11yDialog>
     </>
   )
 }
@@ -1346,7 +1352,7 @@ function OptionsMenu({
     { key: 'large', label: 'Lớn (Large)', fs: 20 },
   ]
   return (
-    <div className="dcx-opt-overlay" role="dialog" aria-modal="true" aria-label="Tùy chọn">
+    <A11yDialog className="dcx-opt-overlay" onClose={onClose} ariaLabel="Tùy chọn">
       {sub && (
         <button className="dcx-opt-back" onClick={() => setSub(null)}>‹ Options</button>
       )}
@@ -1411,6 +1417,6 @@ function OptionsMenu({
           </div>
         )}
       </div>
-    </div>
+    </A11yDialog>
   )
 }
