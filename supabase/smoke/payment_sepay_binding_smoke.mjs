@@ -50,10 +50,11 @@ const run = async () => {
   if (made.error || !made.data.user) throw made.error ?? new Error('create user failed')
   const userId = made.data.user.id
 
-  const mkPending = async (amountVnd, coins) => {
+  const mkPending = async (amountVnd, coins, beneficiaryAccount = null) => {
     const ref = 'TOPUP-' + randomBytes(9).toString('hex')
     const ins = await root.from('transactions').insert({
       user_id: userId, amount_vnd: amountVnd, amount_coins: coins, type: 'topup', provider: 'bank',
+      beneficiary_account: beneficiaryAccount,
       provider_txn_id: ref, status: 'pending', expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     })
     if (ins.error) throw ins.error
@@ -94,6 +95,16 @@ const run = async () => {
     const sub = await sepayHook(hook(refSub, { transferAmount: 50000, accountNumber: '1234567890', subAccount: acct }))
     check('subAccount khớp → credit', sub.status === 200 && (await txnStatus(refSub)) === 'success')
     check('sau subAccount → coins = 150', (await coins()) === 150, `coins=${await coins()}`)
+
+    // 5) Transaction mới bind beneficiary tại thời điểm tạo; rotate env không đổi hợp đồng cũ.
+    const snapAccount = '777700001'
+    const refSnapshot = await mkPending(100000, 100, snapAccount)
+    const currentAfterRotation = await sepayHook(hook(refSnapshot, { id: 900003, accountNumber: acct }))
+    check('snapshot khác env hiện tại → env hiện tại không được settle', currentAfterRotation.status === 200 && (await txnStatus(refSnapshot)) === 'pending')
+    check('snapshot mismatch → không credit', (await coins()) === 150)
+    const bound = await sepayHook(hook(refSnapshot, { id: 900004, accountNumber: snapAccount }))
+    check('beneficiary snapshot đúng → settle', bound.status === 200 && (await txnStatus(refSnapshot)) === 'success')
+    check('snapshot settle → coins = 250', (await coins()) === 250, `coins=${await coins()}`)
   } finally {
     await root.from('transactions').delete().eq('user_id', userId)
     await root.auth.admin.deleteUser(userId).catch(() => {})

@@ -186,6 +186,9 @@ const run = async () => {
     type,
     question_types: type === 'writing' ? ['essay'] : ['gap_filling'],
   })
+  const audioFixture = await ADMIN.admin.from('tests').update({ audio_key: `smoke/${draftTestId}.mp3` }).eq('id', draftTestId)
+  check('fixture listening có audio_key trước mutation', !audioFixture.error, audioFixture.error?.message)
+
   const toListening = await api('PATCH', '/api/admin/tests', ADMIN.cookie, updateBody('listening'))
   check('đổi published test Reading→Listening → 200', toListening.status === 200, `got ${toListening.status}`)
   check('Reading biến mất sau đổi type', !(await catalogItem(productId, 'skill=reading')))

@@ -129,7 +129,10 @@ const run = async () => {
 
   // 8) Media: thiếu R2/bucket → STORAGE_NOT_CONFIGURED (graceful, no secret leak)
   const audio = await api('POST', '/api/admin/media', ADMIN.cookie, { kind: 'audio', filename: 'a.mp3', test_id: testId })
-  check('admin media audio (no R2) → 503 STORAGE_NOT_CONFIGURED', audio.status === 503 && audio.body?.meta?.error_code === 'STORAGE_NOT_CONFIGURED', `got ${audio.status} ${JSON.stringify(audio.body?.meta)}`)
+  const mediaConfigContract =
+    (audio.status === 503 && audio.body?.meta?.error_code === 'STORAGE_NOT_CONFIGURED') ||
+    (audio.status === 200 && typeof audio.body?.data?.upload_url === 'string' && typeof audio.body?.data?.upload_ref === 'string')
+  check('admin media audio → 503 khi chưa cấu hình hoặc safe DTO khi đã cấu hình', mediaConfigContract, `got ${audio.status} ${JSON.stringify(audio.body?.meta)}`)
   const naMedia = await api('POST', '/api/admin/media', USER.cookie, { kind: 'audio', filename: 'a.mp3' })
   check('non-admin media → 403', naMedia.status === 403, `got ${naMedia.status}`)
   for (const s of SECRET) check(`media response KHÔNG lộ "${s}"`, !jsonHas(audio.body, s))

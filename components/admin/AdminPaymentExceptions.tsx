@@ -46,12 +46,22 @@ export function AdminPaymentExceptions() {
 
   async function resolve(id: string, status: 'resolved' | 'ignored') {
     const note = window.prompt(status === 'resolved' ? 'Ghi chú đối soát (đã xử lý):' : 'Lý do bỏ qua case:') ?? ''
+    let coinDelta = 0
+    if (status === 'resolved') {
+      const rawDelta = window.prompt('Coin delta to apply (non-zero integer; use negative to debit):')
+      if (rawDelta == null) return
+      coinDelta = Number(rawDelta)
+      if (!Number.isInteger(coinDelta) || coinDelta === 0) {
+        setErr('Coin delta must be a non-zero integer')
+        return
+      }
+    }
     setBusy(id)
     try {
       const res = await fetch(`/api/admin/payments/exceptions/${id}/resolve`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ status, note }),
+        body: JSON.stringify({ status, note, coin_delta: coinDelta }),
       })
       if (!res.ok) {
         const b = await res.json().catch(() => null)

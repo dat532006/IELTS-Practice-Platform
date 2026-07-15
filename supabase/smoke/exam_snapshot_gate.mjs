@@ -11,10 +11,12 @@ let pass = 0, fail = 0
 const check = (n, c, e = '') => { if (c) { pass++; console.log(`  ✅ ${n}`) } else { fail++; console.log(`  ❌ ${n} ${e}`) } }
 
 console.log('EXAM-003/009 — migration snapshot service_role-only + RLS check:')
-const mig = read('supabase/migrations/20260715000300_attempt_content_snapshots.sql')
+const mig = read('supabase/migrations/20260715000300_attempt_content_snapshots.sql') +
+  read('supabase/migrations/20260716000100_exam_integrity_guards.sql')
 check('bảng attempt_content_snapshots (attempt_id PK → attempts, on delete cascade)',
   /create table if not exists public\.attempt_content_snapshots/.test(mig) && /attempt_id\s+uuid primary key references public\.attempts\(id\) on delete cascade/.test(mig))
-check('lưu passages+questions jsonb + captured_at', /passages\s+jsonb/.test(mig) && /questions\s+jsonb/.test(mig) && /captured_at/.test(mig))
+check('lưu content + answer key + metadata scoring', /passages\s+jsonb/.test(mig) && /questions\s+jsonb/.test(mig) &&
+  /answer_keys jsonb/.test(mig) && /test_type public\.test_type_t/.test(mig) && /audio_key text/.test(mig))
 check('RLS on + chỉ grant service_role (deny client)',
   /enable row level security/.test(mig) && /grant select, insert on public\.attempt_content_snapshots to service_role/.test(mig) && !/to (anon|authenticated)/.test(mig))
 check('rls_smoke check40 client-denied', /check40: attempt_content_snapshots denied to client/.test(read('supabase/tests/rls_smoke.sql')))
@@ -22,16 +24,20 @@ check('rls_smoke check40 client-denied', /check40: attempt_content_snapshots den
 console.log('\nEXAM-003/009 — helper thuần + capture lúc START:')
 const rc = read('lib/exam/review-content.ts')
 check('review-content.ts export pickReviewContent, thuần', /export function pickReviewContent/.test(rc) && !/^import /m.test(rc))
-const att = read('lib/exam/attempt.ts')
-check('startAttempt chụp snapshot cho attempt VỪA TẠO (best-effort)',
-  /captureContentSnapshot\(admin, attempt\.id, testId\)/.test(att) && /insert\(\{[\s\S]*attempt_id: attemptId/.test(att))
-check('capture best-effort (lỗi → logEvent, không chặn vào thi)', /logEvent\('exam\.snapshot_error'/.test(att))
+check('trigger chụp snapshot trong cùng transaction INSERT attempt',
+  /create trigger attempts_capture_content_snapshot/.test(mig) &&
+  /after insert on public\.attempts/.test(mig) &&
+  /left join public\.answer_keys/.test(mig))
+const triggerFn = mig.slice(mig.indexOf('create or replace function public.capture_attempt_snapshot_trigger'), mig.indexOf('drop trigger'))
+check('snapshot failure aborts attempt insert (không best-effort)',
+  /returns trigger/.test(triggerFn) && !/exception/.test(triggerFn))
 
 console.log('\nEXAM-009 — getResult đọc snapshot + build review từ nội dung bản chụp:')
 const res = read('lib/exam/result.ts')
 check('đọc attempt_content_snapshots theo attempt_id', /from\('attempt_content_snapshots'\)[\s\S]*eq\('attempt_id', a\.id\)/.test(res))
 check('pickReviewContent(snap, current)', /pickReviewContent\(snap, \{ passages: testRow\.passages, questions: testRow\.questions \}\)/.test(res))
-check('buildReviewItems từ content.questions (KHÔNG tests.questions trực tiếp)',
+check('buildReviewItems dùng snapshot keys + content.questions',
+  /completeSnapshot \? snap\.answer_keys/.test(res) &&
   /buildReviewItems\(a\.answers, keys as Record<string, unknown>, content\.questions\)/.test(res))
 check('trả content{passages sanitize, questions, audio_url} + content_stale',
   /content: \{ passages: sanitizePassages\(content\.passages\), questions: content\.questions, audio_url \}/.test(res) && /content_stale: content\.stale/.test(res))

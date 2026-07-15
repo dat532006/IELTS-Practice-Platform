@@ -23,7 +23,7 @@ import { logEvent } from '@/lib/obs/log-event'
 // ============================================================
 
 const MODEL = process.env.WRITING_GRADER_MODEL || 'claude-opus-4-8'
-const OPENAI_MODEL = process.env.WRITING_GRADER_OPENAI_MODEL || 'gpt-4o-mini'
+const OPENAI_MODEL = process.env.WRITING_GRADER_OPENAI_MODEL || 'gpt-5.6-terra'
 const MAX_TOKENS = 4000
 
 const ErrorHighlight = z.object({
@@ -209,7 +209,7 @@ async function gradeWithAnthropic(input: GraderInput): Promise<GradeOutcome> {
   }
 }
 
-// ---- LIVE: OpenAI (A2) — fetch thuần tới /v1/chat/completions + Structured Outputs (json_schema strict).
+// ---- LIVE: OpenAI (A2) — fetch thuần tới /v1/responses + Structured Outputs (json_schema strict).
 // KHÔNG thêm SDK dependency. Strict mode yêu cầu mọi field required → error_highlights bắt buộc là
 // mảng (rỗng được); maxItems không dùng trong schema (một số phiên bản API từ chối keyword) —
 // giới hạn 8 suggestions/12 highlights vẫn được ENFORCE bởi Zod sau parse (AiGradeSchema).
@@ -261,32 +261,43 @@ async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
       'Return the grade as JSON. All bands in 0..9, steps of 0.5. At most 8 suggestions and 12 error_highlights per task; use an empty array when there are no specific highlights.',
     )
     // AI-001: deadline ứng dụng — provider treo → AbortSignal.timeout abort → throw → catch → AI_UNAVAILABLE.
-    const res = await fetchWithDeadline('https://api.openai.com/v1/chat/completions', {
+    const res = await fetchWithDeadline('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: OPENAI_MODEL,
-        max_tokens: MAX_TOKENS,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userContent },
-        ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: { name: 'ielts_writing_grade', strict: true, schema: OPENAI_GRADE_SCHEMA },
+        max_output_tokens: MAX_TOKENS,
+        instructions: SYSTEM_PROMPT,
+        input: userContent,
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'ielts_writing_grade',
+            strict: true,
+            schema: OPENAI_GRADE_SCHEMA,
+          },
         },
       }),
     }, gradeTimeoutMs())
     if (!res.ok) return { ok: false, code: 'AI_UNAVAILABLE' }
     const body = (await res.json().catch(() => null)) as {
-      choices?: { message?: { content?: string | null; refusal?: string | null } }[]
-      usage?: { prompt_tokens?: number; completion_tokens?: number }
+      output?: {
+        type?: string
+        content?: { type?: string; text?: string; refusal?: string }[]
+      }[]
+      usage?: { input_tokens?: number; output_tokens?: number }
     } | null
-    const msg = body?.choices?.[0]?.message
-    if (!msg || msg.refusal) return { ok: false, code: 'AI_UNAVAILABLE' }
+    const content = body?.output
+      ?.filter((item) => item.type === 'message')
+      .flatMap((item) => item.content ?? []) ?? []
+    if (content.some((item) => item.type === 'refusal' || item.refusal)) {
+      return { ok: false, code: 'AI_UNAVAILABLE' }
+    }
+    const outputText = content.find((item) => item.type === 'output_text')?.text
+    if (!outputText) return { ok: false, code: 'AI_INVALID_OUTPUT' }
     let parsed: unknown
     try {
-      parsed = JSON.parse(msg.content ?? '')
+      parsed = JSON.parse(outputText)
     } catch {
       return { ok: false, code: 'AI_INVALID_OUTPUT' }
     }
@@ -296,7 +307,7 @@ async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
       ok: true,
       grade,
       mock: false,
-      usage: { input_tokens: body?.usage?.prompt_tokens, output_tokens: body?.usage?.completion_tokens },
+      usage: { input_tokens: body?.usage?.input_tokens, output_tokens: body?.usage?.output_tokens },
     }
   } catch (err) {
     // DEPLOY-005: xem gradeWithAnthropic — chỉ tên lỗi, KHÔNG message/secret/essay.

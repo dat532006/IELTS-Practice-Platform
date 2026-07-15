@@ -16,7 +16,7 @@ export async function getAuthedUser(supabase: SupabaseClient): Promise<User | nu
   } = await supabase.auth.getUser()
   if (!user) return null
   const { data: banned, error } = await supabase.rpc('is_user_banned', { uid: user.id })
-  if (error) return user
+  if (error) return null
   if (banned === true) return null
   return user
 }

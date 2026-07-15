@@ -17,6 +17,7 @@ export type RevCheck =
   | { ok: false; reason: 'stale' }
 
 export function checkAnswersRev(currentRev: number, expectedRev: number | undefined): RevCheck {
+  if (expectedRev === undefined && currentRev !== 0) return { ok: false, reason: 'stale' }
   if (expectedRev !== undefined && expectedRev !== currentRev) return { ok: false, reason: 'stale' }
   return { ok: true, nextRev: currentRev + 1 }
 }

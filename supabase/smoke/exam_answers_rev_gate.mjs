@@ -21,7 +21,7 @@ check('ERROR_CODES có ANSWERS_STALE', /ANSWERS_STALE: 'ANSWERS_STALE'/.test(rea
 
 console.log('\nEXAM-004 — autosave route (answers) guard rev:')
 const auto = read('app/api/attempts/[id]/answers/route.ts')
-check('BodySchema nhận expected_rev', /expected_rev: z\.number\(\)\.int\(\)\.nonnegative\(\)\.optional\(\)/.test(auto))
+check('BodySchema nhận expected_rev cho client mới', /expected_rev: z\.number\(\)\.int\(\)\.nonnegative\(\)\.optional\(\)/.test(auto))
 check('gọi checkAnswersRev + trả ANSWERS_STALE khi lệch', /checkAnswersRev\(row\.answers_rev, expected_rev\)/.test(auto) && /fail\('ANSWERS_STALE'/.test(auto))
 check('conditional update guard .eq answers_rev + bump nextRev', /\.eq\('answers_rev', row\.answers_rev\)/.test(auto) && /answers_rev: chk\.nextRev/.test(auto))
 check('phân biệt 0-row: còn in_progress → STALE, ngược lại TERMINAL', /st === 'in_progress'\) return fail\('ANSWERS_STALE'/.test(auto))
@@ -29,7 +29,7 @@ check('trả answers_rev mới trong ok', /saved: true, answers_rev: chk\.nextRe
 
 console.log('\nEXAM-004 — submit route + submitAttempt guard rev:')
 const submit = read('app/api/submit/route.ts')
-check('SubmitBody nhận expected_rev', /expected_rev: z\.number\(\)\.int\(\)\.nonnegative\(\)\.optional\(\)/.test(submit))
+check('SubmitBody nhận expected_rev cho client mới', /expected_rev: z\.number\(\)\.int\(\)\.nonnegative\(\)\.optional\(\)/.test(submit))
 check('truyền expected_rev vào submitAttempt', /submitAttempt\(admin, parsed\.data\.attempt_id, user\.id, parsed\.data\.answers, parsed\.data\.expected_rev\)/.test(submit))
 check('map ANSWERS_STALE → 409', /res\.error === 'ANSWERS_STALE'.*\n?.*fail\('ANSWERS_STALE'.*status: 409/.test(submit) || /res\.error === 'ANSWERS_STALE'/.test(submit) && /fail\('ANSWERS_STALE'[\s\S]*status: 409/.test(submit))
 const att = read('lib/exam/attempt.ts')

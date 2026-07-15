@@ -129,7 +129,7 @@ const run = async () => {
 
   // === 6) Terminal guard: submit → autosave sau đó → 409 ATTEMPT_TERMINAL (không ghi đè/không hồi sinh) ===
   {
-    const sub = await api('POST', '/api/submit', A.cookie, { attempt_id: attemptId, answers: { q1: 'forests', q2: '2 degrees' } })
+    const sub = await api('POST', '/api/submit', A.cookie, { attempt_id: attemptId, answers: { q1: 'forests', q2: '2 degrees' }, expected_rev: 1 })
     check('submit → 200 (terminal)', sub.status === 200, `got ${sub.status}`)
     const r = await api('POST', `/api/attempts/${attemptId}/answers`, A.cookie, { answers: { q1: 'AFTER-SUBMIT' } })
     check('autosave sau submit → 409 ATTEMPT_TERMINAL', r.status === 409, `got ${r.status}`)

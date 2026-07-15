@@ -56,15 +56,23 @@ export async function getResult(admin: SupabaseClient, attemptId: string, userId
     await Promise.all([
       admin.from('answer_keys').select('keys').eq('test_id', a.test_id).maybeSingle(),
       admin.from('tests').select('title, type, questions, passages, audio_key').eq('id', a.test_id).maybeSingle(),
-      admin.from('attempt_content_snapshots').select('passages, questions').eq('attempt_id', a.id).maybeSingle(),
+      admin.from('attempt_content_snapshots').select('passages, questions, answer_keys, test_title, test_type, audio_key').eq('attempt_id', a.id).maybeSingle(),
     ])
   if (akErr) throw new Error(akErr.message)
   if (tErr) throw new Error(tErr.message)
   if (snapErr) throw new Error(snapErr.message)
 
-  const keys = (akData?.keys ?? {}) as AnswerKeys
   const testRow = (tData ?? {}) as { title?: string; type?: string; questions?: unknown; passages?: unknown; audio_key?: string | null }
-  const snap = (snapData ?? null) as { passages: unknown; questions: unknown } | null
+  const snap = (snapData ?? null) as {
+    passages: unknown; questions: unknown; answer_keys?: AnswerKeys | null
+    test_title?: string | null; test_type?: string | null; audio_key?: string | null
+  } | null
+  // Older snapshots predate scoring metadata. They remain readable but are explicitly stale.
+  const completeSnapshot = snap?.answer_keys != null
+  const keys = (completeSnapshot ? snap.answer_keys : akData?.keys ?? {}) as AnswerKeys
+  const title = completeSnapshot ? snap.test_title ?? '' : testRow.title ?? ''
+  const skill = (completeSnapshot ? snap.test_type ?? 'reading' : testRow.type ?? 'reading') as ExamSkill
+  const audioKey = completeSnapshot ? snap.audio_key ?? null : testRow.audio_key ?? null
 
   // EXAM-003/009: nội dung review = bản chụp nếu có, else fallback hiện tại + cờ stale. Review items build từ
   //   questions của NGUỒN NÀY (đề bị sửa sau khi thi không làm trôi đúng/sai/số câu).
@@ -74,13 +82,12 @@ export async function getResult(admin: SupabaseClient, attemptId: string, userId
   // max_score nhất quán với scoring W6 (Σ points key hợp lệ). KHÔNG lộ map từng câu.
   const { max_score } = scoreReading(a.answers ?? {}, keys)
 
-  const skill = (testRow.type ?? 'reading') as ExamSkill
   // Audio Listening ký lại từ audio_key hiện tại (audio_key server-only, KHÔNG ra client). Thiếu R2/key → null.
-  const { url: audio_url } = getSignedAudioUrl({ type: skill, audio_key: testRow.audio_key ?? null })
+  const { url: audio_url } = getSignedAudioUrl({ type: skill, audio_key: audioKey })
 
   const result: ResultDTO = {
     attempt_id: a.id,
-    test: { id: a.test_id, title: testRow.title ?? '', skill },
+    test: { id: a.test_id, title, skill },
     status: a.status as 'submitted' | 'expired',
     submitted_at: a.submitted_at,
     time_spent: a.time_spent,
@@ -94,7 +101,7 @@ export async function getResult(admin: SupabaseClient, attemptId: string, userId
     bookmarked_qs: toIdArray(a.bookmarked_qs),
     // EXAM-003/009: nội dung render review từ bản chụp (sanitize passage lần nữa trên đường ra client như /api/exam).
     content: { passages: sanitizePassages(content.passages), questions: content.questions, audio_url },
-    content_stale: content.stale,
+    content_stale: content.stale || !completeSnapshot,
   }
   return { ok: true, result }
 }

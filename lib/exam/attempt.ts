@@ -6,7 +6,6 @@ import { convertToBand } from '@/lib/scoring/band-convert'
 import { sanitizeHighlights } from '@/lib/exam/highlights'
 import { sanitizeAnswers } from '@/lib/exam/answers'
 import { checkAnswersRev } from '@/lib/exam/answers-rev'
-import { logEvent } from '@/lib/obs/log-event'
 import type { AttemptDTO, SubmitResult } from '@/types/exam'
 
 // ============================================================
@@ -70,21 +69,6 @@ export type StartResult = { ok: true; attempt: AttemptDTO } | { ok: false; code:
 // EXAM-003/009 — chụp nội dung đề (passages+questions) lúc START, gắn attempt. Review đọc từ đây (độc lập
 //   published visibility + cố định khi đề bị sửa). Best-effort: chụp lỗi KHÔNG chặn vào thi (review fallback
 //   nội dung hiện tại + cờ stale). Chỉ gọi cho attempt VỪA TẠO (attempt cũ đã có bản chụp của nó).
-async function captureContentSnapshot(admin: SupabaseClient, attemptId: string, testId: string): Promise<void> {
-  try {
-    const { data: t } = await admin.from('tests').select('passages, questions').eq('id', testId).maybeSingle()
-    const row = t as { passages: unknown; questions: unknown } | null
-    const { error } = await admin.from('attempt_content_snapshots').insert({
-      attempt_id: attemptId,
-      test_id: testId,
-      passages: row?.passages ?? null,
-      questions: row?.questions ?? null,
-    })
-    if (error) logEvent('exam.snapshot_error', 'warn', { attempt: attemptId, code: error.code ?? null })
-  } catch {
-    logEvent('exam.snapshot_error', 'warn', { attempt: attemptId, kind: 'exception' })
-  }
-}
 
 // supabase = RLS client (user): access check + own-rows; admin = service_role: write attempt.
 export async function startAttempt(
@@ -140,7 +124,6 @@ export async function startAttempt(
     } else {
       attempt = created as AttemptRow
       // EXAM-003/009: attempt VỪA TẠO → chụp nội dung đề (best-effort). Attempt reuse/raced đã có bản chụp riêng.
-      await captureContentSnapshot(admin, attempt.id, testId)
     }
   }
 
@@ -176,13 +159,19 @@ type ScoreOutcome = {
 }
 
 // 🔐 W6: đọc answer_keys (service_role) → validate → chấm Reading → band. CHỈ gọi cho request THẮNG claim.
-async function scoreSubmission(admin: SupabaseClient, testId: string, answers: Record<string, unknown>): Promise<ScoreOutcome> {
+async function scoreSubmission(admin: SupabaseClient, testId: string, attemptId: string, answers: Record<string, unknown>): Promise<ScoreOutcome> {
   const warnings: string[] = []
 
-  const { data: akData, error: akErr } = await admin.from('answer_keys').select('keys').eq('test_id', testId).maybeSingle()
+  const [{ data: snapData, error: snapErr }, { data: akData, error: akErr }, { data: tRow, error: tErr }] = await Promise.all([
+    admin.from('attempt_content_snapshots').select('answer_keys, test_type').eq('attempt_id', attemptId).maybeSingle(),
+    admin.from('answer_keys').select('keys').eq('test_id', testId).maybeSingle(),
+    admin.from('tests').select('type').eq('id', testId).maybeSingle(),
+  ])
+  if (snapErr) throw new Error(snapErr.message)
   if (akErr) throw new Error(akErr.message)
-
-  const keys = (akData?.keys ?? null) as AnswerKeys | null
+  if (tErr) throw new Error(tErr.message)
+  const snapshot = snapData as { answer_keys?: AnswerKeys | null; test_type?: string | null } | null
+  const keys = (snapshot?.answer_keys ?? akData?.keys ?? null) as AnswerKeys | null
   if (!keys || Object.keys(keys).length === 0) {
     warnings.push('ANSWER_KEYS_MISSING')
     return { scored: false, raw_score: null, band: null, max_score: null, warnings }
@@ -196,9 +185,7 @@ async function scoreSubmission(admin: SupabaseClient, testId: string, answers: R
   }
 
   // test type để chọn bảng score_bands đúng (reading ở W6; listening W7).
-  const { data: tRow, error: tErr } = await admin.from('tests').select('type').eq('id', testId).maybeSingle()
-  if (tErr) throw new Error(tErr.message)
-  const testType = ((tRow as { type?: string } | null)?.type ?? 'reading') as string
+  const testType = (snapshot?.test_type ?? (tRow as { type?: string } | null)?.type ?? 'reading') as string
 
   const { band, warning } = await convertToBand(admin, sc.raw_score, testType)
   if (warning) warnings.push(warning)
@@ -241,7 +228,7 @@ export async function submitAttempt(
   const submitted_at = new Date().toISOString()
 
   // 🔐 Đọc answer_keys + chấm TRƯỚC (cả submitted lẫn expired). Lỗi ở đây → throw → attempt còn in_progress → retry.
-  const scored = await scoreSubmission(admin, a.test_id, answers)
+  const scored = await scoreSubmission(admin, a.test_id, a.id, answers)
 
   // GHI ATOMIC: 1 conditional update (status + score + bump rev cùng lúc). `status='in_progress'` → chỉ 1 winner
   //   (chống double-submit/race). `answers_rev`=rev đã đọc → EXAM-004: autosave chen giữa read↔submit làm rev

@@ -96,15 +96,17 @@ const run = async () => {
     check('admin list → thấy case open đúng số tiền', list.status === 200 && caseRow && caseRow.kind === 'amount_mismatch' && caseRow.paid_vnd === 90000 && caseRow.expected_vnd === 100000, JSON.stringify(caseRow))
     check('case KHÔNG lộ secret (chỉ số tiền)', !JSON.stringify(list.body).includes(process.env.SEPAY_WEBHOOK_SECRET))
 
-    // Resolve exactly-once: lần 1 OK, lần 2 → 409. KHÔNG credit.
-    const r1 = await adminApi(adminCookie, 'POST', `/api/admin/payments/exceptions/${caseRow.id}/resolve`, { status: 'resolved', note: 'đối soát tay: user chuyển thiếu 10k' })
+    // Resolve exactly-once: lần 1 credit atomically, lần 2 → 409.
+    const r1 = await adminApi(adminCookie, 'POST', `/api/admin/payments/exceptions/${caseRow.id}/resolve`, { status: 'resolved', note: 'đối soát tay: credit theo số tiền đã nhận', coin_delta: 90 })
     check('resolve lần 1 → 200', r1.status === 200 && r1.body?.data?.status === 'resolved', `status=${r1.status}`)
-    const r2 = await adminApi(adminCookie, 'POST', `/api/admin/payments/exceptions/${caseRow.id}/resolve`, { status: 'ignored', note: 'x' })
+    const r2 = await adminApi(adminCookie, 'POST', `/api/admin/payments/exceptions/${caseRow.id}/resolve`, { status: 'ignored', note: 'x', coin_delta: 0 })
     check('resolve lần 2 → 409 (exactly-once)', r2.status === 409, `status=${r2.status}`)
 
-    const resolved = await root.from('payment_exceptions').select('status, resolved_by, resolution_note').eq('id', caseRow.id).single()
+    const resolved = await root.from('payment_exceptions').select('status, resolved_by, resolution_note, ledger_txn_id').eq('id', caseRow.id).single()
     check('case → resolved + actor + note đúng', resolved.data?.status === 'resolved' && resolved.data?.resolved_by === adminId && String(resolved.data?.resolution_note).includes('đối soát'), JSON.stringify(resolved.data))
-    check('sau resolve → coins vẫn 0 (KHÔNG auto-credit)', (await coins()) === 0)
+    const ledger = await root.from('transactions').select('amount_coins, type, status, payment_exception_id').eq('id', resolved.data?.ledger_txn_id).single()
+    check('resolve → balance credit đúng một lần', (await coins()) === 90)
+    check('resolve → ledger atomic liên kết case', ledger.data?.amount_coins === 90 && ledger.data?.type === 'bonus' && ledger.data?.status === 'success' && ledger.data?.payment_exception_id === caseRow.id, JSON.stringify(ledger.data))
 
     // Non-admin không resolve được.
     check('txn vẫn pending (mismatch không settle)', (await root.from('transactions').select('status').eq('provider_txn_id', ref).single()).data?.status === 'pending')

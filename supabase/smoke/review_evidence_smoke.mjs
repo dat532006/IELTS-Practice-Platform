@@ -98,7 +98,17 @@ async function main() {
   check('start attempt → 200/201', start.status === 200 || start.status === 201, `status=${start.status}`)
   const attemptId = start.body?.data?.attempt_id
   if (!attemptId) { console.log('Không start được attempt — dừng.'); process.exit(1) }
-  const submit = await api('POST', '/api/submit', user.cookie, { attempt_id: attemptId, answers: { q1: 'dog', q2: 'false' } })
+  // Mutate the live answer key after start. Scoring/review must use the start snapshot.
+  const mutated = await api('PATCH', '/api/admin/tests', admin.cookie, {
+    ...TEST_BODY,
+    id: testId,
+    answer_keys: {
+      ...TEST_BODY.answer_keys,
+      q1: { ...TEST_BODY.answer_keys.q1, answers: ['wolf'] },
+    },
+  })
+  check('admin edits current key after start', mutated.status === 200, `status=${mutated.status}`)
+  const submit = await api('POST', '/api/submit', user.cookie, { attempt_id: attemptId, answers: { q1: 'dog', q2: 'false' }, expected_rev: 0 })
   check('submit → 200, raw_score=1', submit.status === 200 && submit.body?.data?.raw_score === 1, `status=${submit.status} raw=${submit.body?.data?.raw_score}`)
 
   // Result review: evidence + explanation về đúng câu; is_correct đúng.
@@ -107,7 +117,7 @@ async function main() {
   const review = result.body?.data?.review ?? []
   const r1 = review.find((r) => r.question_id === 'q1')
   const r2 = review.find((r) => r.question_id === 'q2')
-  check('q1: is_correct=true + evidence đúng nguyên văn', r1?.is_correct === true && r1?.evidence === EVIDENCE, JSON.stringify(r1 ?? null))
+  check('q1: is_correct=true + evidence đúng nguyên văn', r1?.is_correct === true && r1?.evidence?.quote === EVIDENCE, JSON.stringify(r1 ?? null))
   check('q1: explanation đi kèm', r1?.explanation === 'Nêu rõ trong câu evidence.', `exp=${r1?.explanation}`)
   check('q2: is_correct=false + KHÔNG có evidence (không nhập)', r2?.is_correct === false && r2?.evidence === undefined, JSON.stringify(r2 ?? null))
 

@@ -16,25 +16,30 @@ export type SettleResult =
 
 // PAY-004 — ghi payment exception bền + dedup qua RPC (best-effort: lỗi ghi case KHÔNG được nuốt
 //   quyết định fail-closed của settle, chỉ log). detail redacted (chỉ số tiền, KHÔNG secret/PII thô).
-async function recordException(
+export async function recordPaymentException(
   admin: SupabaseClient,
   provider: 'vnpay' | 'momo' | 'bank',
   txnId: string,
+  kind: 'amount_mismatch' | 'beneficiary_mismatch',
   paidVnd: number | null,
   expectedVnd: number | null,
   userId: string | null,
-): Promise<void> {
+): Promise<boolean> {
   const { error } = await admin.rpc('record_payment_exception', {
     p_provider: provider,
     p_txn_id: txnId,
-    p_kind: 'amount_mismatch',
+    p_kind: kind,
     p_paid_vnd: paidVnd,
     p_expected_vnd: expectedVnd,
     p_user: userId,
     p_detail: { paid_vnd: paidVnd, expected_vnd: expectedVnd },
   })
   // KHÔNG log error.message thô (có thể chứa chi tiết nội bộ) — chỉ code có cấu trúc, đã redact.
-  if (error) logEvent('payment.exception_record_error', 'error', { provider, txn: txnId, code: error.code ?? null })
+  if (error) {
+    logEvent('payment.exception_record_error', 'error', { provider, txn: txnId, code: error.code ?? null })
+    return false
+  }
+  return true
 }
 
 export async function settleVerifiedTopup(
@@ -72,13 +77,13 @@ export async function settleVerifiedTopup(
   if (row && row.amount_vnd == null) {
     logEvent('payment.amount_missing', 'critical', { provider, txn: txnId })
     // PAY-004 — ghi case bền để đối soát (dedup); KHÔNG credit.
-    await recordException(admin, provider, txnId, amountVnd, null, row.user_id ?? null)
-    return { ok: false, code: 'PAYMENT_AMOUNT_MISMATCH' }
+    const recorded = await recordPaymentException(admin, provider, txnId, 'amount_mismatch', amountVnd, null, row.user_id ?? null)
+    return { ok: false, code: recorded ? 'PAYMENT_AMOUNT_MISMATCH' : 'INTERNAL' }
   }
   if (row && amountVnd !== row.amount_vnd) {
     logEvent('payment.amount_mismatch', 'error', { provider, txn: txnId, paid: amountVnd, expected: row.amount_vnd })
-    await recordException(admin, provider, txnId, amountVnd, row.amount_vnd, row.user_id ?? null)
-    return { ok: false, code: 'PAYMENT_AMOUNT_MISMATCH' }
+    const recorded = await recordPaymentException(admin, provider, txnId, 'amount_mismatch', amountVnd, row.amount_vnd, row.user_id ?? null)
+    return { ok: false, code: recorded ? 'PAYMENT_AMOUNT_MISMATCH' : 'INTERNAL' }
   }
 
   const { data, error } = await admin.rpc('credit_topup', { p_provider: provider, p_txn_id: txnId })

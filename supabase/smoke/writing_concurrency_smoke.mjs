@@ -88,6 +88,27 @@ const run = async () => {
     const res = await api('GET', `/api/writing-result/${attemptId}`, cookie)
     check('GET writing-result → 200 (không 500)', res.status === 200 && res.body?.data?.overall_band != null, `status=${res.status}`)
   } finally {
+    // Race the AI finalizer against the generic submit path on a fresh attempt.
+    const startRace = await api('POST', `/api/exam/${testId}/start`, cookie, {})
+    const raceAttemptId = startRace.body?.data?.attempt_id
+    const racePayload = { attempt_id: raceAttemptId, task1_text: words(160), task2_text: words(260) }
+    const [gradeRace, submitRace] = await Promise.all([
+      api('POST', '/api/grade-writing', cookie, racePayload),
+      api('POST', '/api/submit', cookie, { attempt_id: raceAttemptId, answers: {}, expected_rev: 0 }),
+    ])
+    check('grade-vs-submit race returns only terminal/conflict outcomes',
+      [200, 409].includes(gradeRace.status) && submitRace.status === 200,
+      `grade=${gradeRace.status} submit=${submitRace.status}`)
+    const raceRows = await root.from('writing_submissions').select('ai_score').eq('attempt_id', raceAttemptId)
+    const raceAtt = await root.from('attempts').select('status, band').eq('id', raceAttemptId).single()
+    const noPlaceholder = (raceRows.data ?? []).every((row) => row.ai_score != null)
+    const consistentWinner = gradeRace.status === 200
+      ? (raceRows.data ?? []).length === 1 && raceAtt.data?.band != null
+      : (raceRows.data ?? []).length === 0 && raceAtt.data?.band == null
+    check('race leaves no null placeholder and DB state matches winner',
+      noPlaceholder && consistentWinner && raceAtt.data?.status === 'submitted',
+      JSON.stringify({ grade: gradeRace.status, rows: raceRows.data, attempt: raceAtt.data }))
+
     await root.from('writing_submissions').delete().eq('user_id', userId)
     await root.from('attempts').delete().eq('user_id', userId)
     if (testId) await root.from('tests').delete().eq('id', testId)

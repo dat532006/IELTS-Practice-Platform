@@ -110,8 +110,8 @@ function normalizeAccount(v: string | null | undefined): string {
 // PAY-002 — event SePay (đã verify HMAC) có VÀO ĐÚNG tài khoản người bán (SEPAY_BANK_ACCOUNT) không.
 //   Event ký hợp lệ nhưng accountNumber khác (định tuyến sai / cấu hình người khác) KHÔNG được credit.
 //   Fail-closed: thiếu accountNumber hoặc chưa cấu hình tài khoản → false. So cả subAccount (VA ảo).
-export function sepayBeneficiaryMatches(body: SepayWebhookBody): boolean {
-  const expected = normalizeAccount(env('SEPAY_BANK_ACCOUNT'))
+export function sepayBeneficiaryMatches(body: SepayWebhookBody, expectedAccount?: string): boolean {
+  const expected = normalizeAccount(expectedAccount ?? env('SEPAY_BANK_ACCOUNT'))
   if (!expected) return false
   const acct = normalizeAccount(body.accountNumber)
   const sub = normalizeAccount(body.subAccount)

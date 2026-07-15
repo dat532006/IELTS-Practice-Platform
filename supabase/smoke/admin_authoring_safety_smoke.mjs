@@ -109,6 +109,14 @@ const run = async () => {
     check('PATCH clear-all → 200', patch.status === 200, `status=${patch.status}`)
     const prevAfter = await api('GET', `/api/admin/tests/${stId}/preview`, cookie)
     const keysAfter = prevAfter.body?.data?.answer_keys
+    // Published rows stay publishable: mutation + keys are validated in the same DB transaction.
+    const invalidMutation = await api('PATCH', '/api/admin/tests', cookie, body('valid', { id: okId, answer_keys: {} }))
+    check('published test rejects mutation that removes all keys', invalidMutation.status === 400, `status=${invalidMutation.status}`)
+    const afterRejectedMutation = await api('GET', `/api/admin/tests/${okId}/preview`, cookie)
+    check('rejected mutation rolls back keys and published status',
+      afterRejectedMutation.body?.data?.test?.status === 'published' &&
+      afterRejectedMutation.body?.data?.answer_keys?.q1?.answers?.[0] === 'cat',
+      JSON.stringify(afterRejectedMutation.body?.data ?? null))
     check('sau clear: answer_keys ĐÃ XOÁ (không stale)', keysAfter == null || Object.keys(keysAfter).length === 0, JSON.stringify(keysAfter))
 
     // ===== ADMIN-003 atomic: absent answer_keys → GIỮ NGUYÊN key cũ =====
