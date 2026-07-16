@@ -385,10 +385,12 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       is_free: isFree,
       duration_sec: Math.max(1, Number(durationMin) || 60) * 60,
       passages: type === 'writing' ? normalizeWritingPassageIds(pOut) : pOut,
-      questions: qOut,
+      // AI-011: writing KHÔNG có câu hỏi — gửi [] để không lưu rác từ state (vd đổi type giữa chừng).
+      questions: type === 'writing' ? [] : qOut,
       // ADMIN-003: LUÔN gửi answer_keys (kể cả {}) → save là AUTHORITATIVE. Xoá hết đáp án → {} → server
       //   xoá key cũ (không còn stale). Bỏ trống = giữ nguyên chỉ dành cho caller không quản key.
-      answer_keys,
+      // AI-011: writing → {} (không có đáp án; xoá luôn key rác nếu đề từng là reading).
+      answer_keys: type === 'writing' ? {} : answer_keys,
     }
   }
 
@@ -508,6 +510,8 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
         if (!p.content.trim()) out.push({ level: 'warn', text: `Passage ${i + 1} ("${p.title || '—'}") đang trống.` })
       })
     }
+    // AI-011: writing không có câu hỏi/đáp án — bỏ toàn bộ lint câu hỏi (payload cũng gửi rỗng).
+    if (type === 'writing') return out
     if (questions.length === 0) out.push({ level: 'warn', text: 'Chưa có câu hỏi nào.' })
     const seen = new Map<number, number>()
     questions.forEach((q, i) => {
@@ -880,7 +884,10 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
         </div>
       </div>
 
-      {/* questions builder */}
+      {/* questions builder — AI-011: ẨN với Writing (AI chấm, không có câu hỏi/đáp án; hiện khối này
+          chỉ gây rối + lint than "chưa có câu hỏi"). State questions GIỮ NGUYÊN — đổi type qua lại
+          không mất dữ liệu đang soạn; buildPayload tự gửi questions rỗng khi type=writing. */}
+      {type !== 'writing' && (
       <div className="mt-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-[14px] font-extrabold text-[#2A2740]">Câu hỏi &amp; đáp án</div>
@@ -1171,6 +1178,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           })}
         </div>
       </div>
+      )}
 
       {/* Preview + kiểm lỗi (dựng từ state, không cần lưu) */}
       <div className="mt-5 flex flex-wrap items-center gap-3">
