@@ -63,7 +63,10 @@ console.log('\nAI-012 — Xem giao diện thi cho Writing (preview không-API):'
 const wrunner = stripComments(read('components/writing/WritingRunner.tsx'))
 check('WritingRunner nhận prop preview', /preview\?: \{ payload: ExamPayload \}/.test(wrunner))
 check('preview → bơm payload + active, KHÔNG fetch', /if \(preview\) \{\s*setPayload\(preview\.payload\)\s*setPhase\('active'\)\s*return\s*\}/.test(wrunner))
-check('preview khoá nút chấm/nộp', (wrunner.match(/disabled=\{!!preview \|\| !canSubmit \|\| submitting\}/g) ?? []).length === 2)
+// AI-013: chỉ CÒN 1 CTA (nộp = chấm, 1 hành động) — nút "Chấm bằng AI" riêng đã bỏ.
+check('preview khoá nút nộp (CTA duy nhất)', (wrunner.match(/disabled=\{!!preview \|\| !canSubmit \|\| submitting\}/g) ?? []).length === 1)
+check('KHÔNG còn nút "Chấm bằng AI" riêng (gợi ý sai chấm-không-nộp)', !/Chấm bằng AI'/.test(wrunner))
+check('CTA nói thật cả hai việc', /Nộp bài & chấm AI/.test(wrunner))
 check('form: overlay chọn WritingRunner cho writing', /type === 'writing' \? \(\s*<WritingRunner testId="__admin_preview__" preview=\{\{ payload: examPreview\.payload \}\}/.test(form))
 check('form: nút preview KHÔNG còn disabled với writing', !/disabled=\{type === 'writing'\}/.test(form))
 check('form: payload preview mang image + id chuẩn hoá', /type === 'writing' \? normalizeWritingPassageIds\(passages\) : passages/.test(form))
