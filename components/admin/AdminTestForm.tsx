@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RichTextEditor, plainToHtml, looksRich } from './RichTextEditor'
 import { sanitizePassageHtmlClient } from '@/lib/sanitize/passage-html-client'
+import { normalizeWritingPassageIds, lintWritingPrompts } from '@/lib/exam/writing-prompts'
 import { ExamRunner } from '@/components/exam/ExamRunner'
 import { examFontVars } from '@/app/exam-fonts'
 import type { ExamPayload } from '@/types/exam'
@@ -373,13 +374,17 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       }
       answer_keys[q.id] = entry
     }
+    // AI-006: writing → ép id passage về task1/task2 NGAY LÚC LƯU. Form sinh uid('p') không bao giờ
+    //   trùng 'task1' → runtime rơi về khớp VỊ TRÍ, đảo/thêm/xoá passage là tráo đề Task 1 ↔ Task 2
+    //   âm thầm. Passage ĐÃ mang id task giữ nguyên (id thắng vị trí) — xem lib/exam/writing-prompts.ts.
+    const pOut = passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), content: p.content }))
     return {
       title,
       type,
       slug: slug.trim() || undefined,
       is_free: isFree,
       duration_sec: Math.max(1, Number(durationMin) || 60) * 60,
-      passages: passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), content: p.content })),
+      passages: type === 'writing' ? normalizeWritingPassageIds(pOut) : pOut,
       questions: qOut,
       // ADMIN-003: LUÔN gửi answer_keys (kể cả {}) → save là AUTHORITATIVE. Xoá hết đáp án → {} → server
       //   xoá key cũ (không còn stale). Bỏ trống = giữ nguyên chỉ dành cho caller không quản key.
@@ -491,7 +496,12 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
   function lintIssues(): { level: 'error' | 'warn'; text: string }[] {
     const out: { level: 'error' | 'warn'; text: string }[] = []
     if (!title.trim()) out.push({ level: 'error', text: 'Chưa có tiêu đề đề.' })
-    if (type !== 'writing') {
+    if (type === 'writing') {
+      // AI-006: writing thì passage CHÍNH LÀ đề bài — trước đây nhánh này bị BỎ QUA hoàn toàn
+      //   (if type !== 'writing') → publish được đề với prompt rỗng, AI chấm với task1_prompt=''.
+      //   Rỗng ở writing là ERROR, không phải warn.
+      for (const text of lintWritingPrompts(passages)) out.push({ level: 'error', text })
+    } else {
       if (passages.length === 0) out.push({ level: 'warn', text: 'Chưa có passage nào.' })
       passages.forEach((p, i) => {
         if (!p.content.trim()) out.push({ level: 'warn', text: `Passage ${i + 1} ("${p.title || '—'}") đang trống.` })
