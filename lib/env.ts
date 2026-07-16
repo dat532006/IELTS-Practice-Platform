@@ -31,11 +31,13 @@ export const ENV_REGISTRY: EnvVar[] = [
   { name: 'NEXT_PUBLIC_SITE_URL', scope: 'public', describe: 'Origin công khai (redirect/sitemap)' },
   // Cron — prod bắt buộc (route đã fail-closed 503 nếu thiếu)
   { name: 'CRON_SECRET', scope: 'server', secret: true, required: isProd, describe: 'Bearer cho Vercel Cron reconcile-topups' },
-  // AI grading — cần key trừ khi mock; provider tường minh (AI-002)
-  { name: 'WRITING_AI_PROVIDER', scope: 'server', describe: "anthropic|openai; sai → fail-loud (AI-002)" },
-  { name: 'ANTHROPIC_API_KEY', scope: 'server', secret: true, required: (e) => !aiMock(e) && e.WRITING_AI_PROVIDER !== 'openai' && !e.OPENAI_API_KEY, describe: 'Key Claude (chấm Writing)' },
-  { name: 'OPENAI_API_KEY', scope: 'server', secret: true, describe: 'Key OpenAI (nếu WRITING_AI_PROVIDER=openai)' },
-  { name: 'WRITING_GRADER_MODEL', scope: 'server', describe: 'Override model Anthropic' },
+  // AI grading — cần key trừ khi mock; provider tường minh (AI-002).
+  // AI-004: OpenAI là provider mặc định (Owner chốt 2026-07-16) → OPENAI_API_KEY là key BẮT BUỘC mặc
+  //   định; ANTHROPIC_API_KEY chỉ bắt buộc khi Owner chủ động chọn lại đường lui anthropic.
+  { name: 'WRITING_AI_PROVIDER', scope: 'server', describe: "anthropic|openai; sai → fail-loud (AI-002); không set → openai (AI-004)" },
+  { name: 'OPENAI_API_KEY', scope: 'server', secret: true, required: (e) => !aiMock(e) && e.WRITING_AI_PROVIDER !== 'anthropic' && !e.ANTHROPIC_API_KEY, describe: 'Key OpenAI (provider mặc định — AI-004)' },
+  { name: 'ANTHROPIC_API_KEY', scope: 'server', secret: true, required: (e) => !aiMock(e) && e.WRITING_AI_PROVIDER === 'anthropic', describe: 'Key Claude (chỉ khi chọn đường lui WRITING_AI_PROVIDER=anthropic)' },
+  { name: 'WRITING_GRADER_MODEL', scope: 'server', describe: 'Override model Anthropic (đường lui)' },
   { name: 'WRITING_GRADER_OPENAI_MODEL', scope: 'server', describe: 'Override model OpenAI' },
   { name: 'WRITING_GRADER_OPENAI_MAX_OUTPUT_TOKENS', scope: 'server', describe: 'Budget output OpenAI (AI-003; reasoning tính vào đây, sàn 25000, mặc định 32000)' },
   { name: 'WRITING_GRADER_OPENAI_REASONING_EFFORT', scope: 'server', describe: 'none|low|medium|high|xhigh|max (AI-003; mặc định medium, sai → fail-loud)' },

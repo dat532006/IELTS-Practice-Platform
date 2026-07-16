@@ -58,8 +58,17 @@ console.log('\nDEPLOY-004 — checkEnv theo mode (chỉ tên, không giá trị)
   check('core đủ + mock → ok (không cần AI key)', checkEnv(base).ok === true)
   check('prod thiếu CRON_SECRET → missing', checkEnv({ ...base, NODE_ENV: 'production' }).missing.includes('CRON_SECRET'))
   check('payment live thiếu webhook secret → missing', checkEnv({ ...base, PAYMENT_GATEWAY_MODE: 'live' }).missing.includes('PAYMENT_WEBHOOK_SECRET'))
-  check('AI không mock + không key → thiếu ANTHROPIC_API_KEY', checkEnv({ NEXT_PUBLIC_SUPABASE_URL: 'x', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'x', SUPABASE_SERVICE_ROLE_KEY: 'x' }).missing.includes('ANTHROPIC_API_KEY'))
-  check('AI provider=openai + có OPENAI key → không đòi ANTHROPIC', !checkEnv({ NEXT_PUBLIC_SUPABASE_URL: 'x', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'x', SUPABASE_SERVICE_ROLE_KEY: 'x', WRITING_AI_PROVIDER: 'openai', OPENAI_API_KEY: 'y' }).missing.includes('ANTHROPIC_API_KEY'))
+  // AI-004: OpenAI là provider mặc định (Owner chốt 2026-07-16) → key BẮT BUỘC mặc định là OPENAI.
+  const core = { NEXT_PUBLIC_SUPABASE_URL: 'x', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'x', SUPABASE_SERVICE_ROLE_KEY: 'x' }
+  check('AI không mock + không key → thiếu OPENAI_API_KEY (không phải ANTHROPIC)',
+    checkEnv(core).missing.includes('OPENAI_API_KEY') && !checkEnv(core).missing.includes('ANTHROPIC_API_KEY'),
+    JSON.stringify(checkEnv(core).missing))
+  check('AI-004: có OPENAI key → không đòi ANTHROPIC',
+    !checkEnv({ ...core, OPENAI_API_KEY: 'y' }).missing.includes('ANTHROPIC_API_KEY'))
+  check('AI-004: đường lui provider=anthropic + không key → đòi ANTHROPIC_API_KEY',
+    checkEnv({ ...core, WRITING_AI_PROVIDER: 'anthropic' }).missing.includes('ANTHROPIC_API_KEY'))
+  check('AI-004: đường lui provider=anthropic + có ANTHROPIC key → không đòi OPENAI',
+    !checkEnv({ ...core, WRITING_AI_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: 'x' }).missing.includes('OPENAI_API_KEY'))
 }
 
 console.log(`\nRESULT: ${pass} passed, ${fail} failed`)

@@ -100,7 +100,7 @@ export type WritingGradeResult = {
   task1_wc: number
   task2_wc: number
   graded_at: string
-  mock: boolean // true nếu chấm bằng mock grader (thiếu ANTHROPIC_API_KEY) — KHÔNG claim live
+  mock: boolean // true nếu chấm bằng mock grader (thiếu key AI ở non-prod) — KHÔNG claim live
 }
 
 // W6 submit — scoring server-side. KHÔNG bao giờ kèm answer_keys/correct answers (LUẬT THÉP #2).

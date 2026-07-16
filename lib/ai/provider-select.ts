@@ -3,6 +3,10 @@
 //   provider không hỗ trợ) bị BỎ QUA ÂM THẦM rồi tự chọn provider theo key có sẵn → chấm bằng provider
 //   NGOÀI dự kiến (chi phí/hành vi lạ). Fix: config lạ → { ok:false } → gradeWriting fail-loud
 //   (AI_UNAVAILABLE), KHÔNG âm thầm đổi provider. Chỉ tự chọn theo key khi WRITING_AI_PROVIDER KHÔNG set.
+// AI-004 (Owner chốt 2026-07-16) — provider của dự án = OPENAI. Mặc định ĐỔI từ anthropic sang openai:
+//   quên WRITING_AI_PROVIDER ở môi trường mới (preview/staging/local) KHÔNG được âm thầm chạy Anthropic
+//   — đó là tiền ở provider Owner không định dùng. Adapter Anthropic GIỮ LẠI làm đường lui:
+//   set WRITING_AI_PROVIDER=anthropic (+ key) là quay lại ngay, không cần sửa code.
 // AI-001 — Deadline ứng dụng cho lời gọi provider (Anthropic SDK signal / OpenAI fetch). GRADE_TIMEOUT_MS
 //   phải NHỎ HƠN platform function timeout để hang → AI_UNAVAILABLE + refund/release claim (bounded), thay
 //   vì treo tới khi platform giết hàm (giữ quota/claim). Owner chỉnh qua WRITING_GRADER_TIMEOUT_MS.
@@ -38,8 +42,8 @@ export function selectProvider(env: EnvLike = process.env): ProviderSelection {
     if (p === 'openai' || p === 'anthropic') return { ok: true, provider: p, reason: 'explicit' }
     return { ok: false, reason: 'invalid_config' } // typo/không hỗ trợ → fail-loud
   }
-  // Không cấu hình tường minh → tự chọn theo key có sẵn (anthropic ưu tiên).
-  if (env.ANTHROPIC_API_KEY) return { ok: true, provider: 'anthropic', reason: 'key' }
+  // AI-004: không cấu hình tường minh → theo key có sẵn, OPENAI ưu tiên (provider Owner đã chốt).
   if (env.OPENAI_API_KEY) return { ok: true, provider: 'openai', reason: 'key' }
-  return { ok: true, provider: 'anthropic', reason: 'default' } // không key: nhánh live throw → AI_UNAVAILABLE
+  if (env.ANTHROPIC_API_KEY) return { ok: true, provider: 'anthropic', reason: 'key' } // đường lui
+  return { ok: true, provider: 'openai', reason: 'default' } // không key: nhánh live throw → AI_UNAVAILABLE
 }

@@ -35,15 +35,24 @@ check('provider lạ (claude) → ok:false (không map mờ)', r2.ok === false, 
 const r3 = selectProvider({ WRITING_AI_PROVIDER: 'openai; drop', OPENAI_API_KEY: 'y' })
 check('provider rác → ok:false', r3.ok === false, JSON.stringify(r3))
 
-console.log('\nAI-002 — auto theo key khi KHÔNG set:')
-check('unset + chỉ ANTHROPIC key → key anthropic',
+// AI-004 (Owner chốt 2026-07-16): provider = OpenAI. Mặc định code ĐỔI sang openai để quên
+//   WRITING_AI_PROVIDER ở môi trường mới (preview/staging) KHÔNG âm thầm chạy Anthropic — đó là tiền
+//   của Owner ở provider không định dùng. Adapter Anthropic giữ lại làm đường lui (set explicit).
+console.log('\nAI-002/AI-004 — auto theo key khi KHÔNG set (OpenAI ưu tiên):')
+check('unset + chỉ ANTHROPIC key → key anthropic (đường lui vẫn dùng được)',
   selectProvider({ ANTHROPIC_API_KEY: 'x' }).reason === 'key' && selectProvider({ ANTHROPIC_API_KEY: 'x' }).provider === 'anthropic')
 check('unset + chỉ OPENAI key → key openai',
   selectProvider({ OPENAI_API_KEY: 'y' }).provider === 'openai')
-check('unset + cả 2 key → anthropic ưu tiên',
-  selectProvider({ ANTHROPIC_API_KEY: 'x', OPENAI_API_KEY: 'y' }).provider === 'anthropic')
-check('unset + không key → default anthropic (nhánh live throw → AI_UNAVAILABLE)',
-  selectProvider({}).reason === 'default')
+// BẤT BIẾN AI-004: cả 2 key → OpenAI thắng (trước đây anthropic thắng).
+check('unset + cả 2 key → OPENAI ưu tiên (không phải anthropic)',
+  selectProvider({ ANTHROPIC_API_KEY: 'x', OPENAI_API_KEY: 'y' }).provider === 'openai',
+  JSON.stringify(selectProvider({ ANTHROPIC_API_KEY: 'x', OPENAI_API_KEY: 'y' })))
+// BẤT BIẾN AI-004: không key → default PHẢI là openai (khoá cả provider, không chỉ reason).
+const dflt = selectProvider({})
+check('unset + không key → default OPENAI (nhánh live thiếu key → AI_UNAVAILABLE)',
+  dflt.ok === true && dflt.provider === 'openai' && dflt.reason === 'default', JSON.stringify(dflt))
+check('AI-004: KHÔNG môi trường nào rơi về anthropic khi chưa cấu hình gì',
+  selectProvider({}).provider !== 'anthropic')
 console.log('\nAI-001 — OpenAI Responses API contract:')
 const graderSource = readFileSync(resolve(root, 'lib', 'ai', 'writing-grader.ts'), 'utf8')
 check('uses Responses API (not legacy Chat Completions)',
