@@ -76,6 +76,7 @@ export const ENV_REGISTRY: EnvVar[] = [
   { name: 'R2_URL_TTL_SEC', scope: 'server', describe: 'TTL presigned URL R2 (giây)' },
   // Hạ tầng
   { name: 'TRUST_FORWARDED_IP', scope: 'server', describe: '1 = tin X-Forwarded-For (sau proxy tin cậy)' },
+  { name: 'VERCEL_ENV', scope: 'server', describe: 'Vercel system env (production|preview|development) — AUTH-007 canonical-host 308 chỉ chạy ở production' },
 ]
 
 // LUẬT THÉP: secret server không được mang tên NEXT_PUBLIC_ (bundle ra client). Trả danh sách vi phạm.
