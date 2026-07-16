@@ -7,6 +7,7 @@ import { RichTextEditor, plainToHtml, looksRich } from './RichTextEditor'
 import { sanitizePassageHtmlClient } from '@/lib/sanitize/passage-html-client'
 import { normalizeWritingPassageIds, lintWritingPrompts } from '@/lib/exam/writing-prompts'
 import { ExamRunner } from '@/components/exam/ExamRunner'
+import { WritingRunner } from '@/components/writing/WritingRunner'
 import { examFontVars } from '@/app/exam-fonts'
 import type { ExamPayload } from '@/types/exam'
 
@@ -272,8 +273,9 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
   function openExamPreview() {
     const payload: ExamPayload = {
       test: { id: '__admin_preview__', title: title || '(Chưa có tiêu đề)', skill: type, is_free: isFree },
-      passages: passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), content: p.content })),
-      questions: questions.map(emitQuestion), // rich fields (options/instruction/image/x/y) để preview đúng format thi
+      // AI-012: preview writing cần cả image (biểu đồ Task 1) + id chuẩn task1/task2 như lúc lưu thật.
+      passages: (type === 'writing' ? normalizeWritingPassageIds(passages) : passages).map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), ...(p.image ? { image: p.image } : {}), content: p.content })),
+      questions: type === 'writing' ? [] : questions.map(emitQuestion), // rich fields (options/instruction/image/x/y) để preview đúng format thi
       audio_url: null, // audio ký URL chỉ sau access guard — preview không phát audio
     }
     setExamPreview({ payload, durationSec: Math.max(1, Number(durationMin) || 60) * 60 })
@@ -1192,8 +1194,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
         <button
           type="button"
           onClick={openExamPreview}
-          disabled={type === 'writing'}
-          title={type === 'writing' ? 'Preview giao diện thi hiện hỗ trợ Reading/Listening' : 'Mở đề trong giao diện làm bài thật để soát định dạng'}
+          title="Mở đề trong giao diện làm bài thật để soát định dạng"
           className="rounded-[11px] border border-[#D9CFF2] bg-[#F6F2FF] px-4 py-2.5 text-sm font-bold text-[#5B43C7] transition hover:border-[#B9A7E6] disabled:cursor-not-allowed disabled:opacity-50"
         >
           🖥 Xem giao diện thi
@@ -1404,7 +1405,12 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
             ✕ Đóng preview
           </button>
           <div className={`${examFontVars} h-full`}>
-            <ExamRunner testId="__admin_preview__" preview={examPreview} />
+            {/* AI-012: Writing dùng runner riêng (2 tab Task + đếm từ + biểu đồ) — cùng chế độ preview không-API. */}
+            {type === 'writing' ? (
+              <WritingRunner testId="__admin_preview__" preview={{ payload: examPreview.payload }} />
+            ) : (
+              <ExamRunner testId="__admin_preview__" preview={examPreview} />
+            )}
           </div>
         </div>
       )}
