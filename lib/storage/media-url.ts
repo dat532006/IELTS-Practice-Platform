@@ -29,6 +29,13 @@ export function isAllowedPublicMediaUrl(raw: unknown): boolean {
   return true
 }
 
+// AI-010 — ảnh đề Writing (passage.image): giữ URL hợp lệ, URL lạ → null (strip). Dùng ở
+//   sanitizePassages (chokepoint cả LƯU lẫn TRẢ) — ảnh đề đi qua field riêng, KHÔNG mở <img>
+//   trong HTML content (chính sách sanitize giữ nguyên).
+export function sanitizePassageImageUrl(raw: unknown): string | null {
+  return isAllowedPublicMediaUrl(raw) ? (raw as string) : null
+}
+
 // STORE-001 — tách {bucket, path} từ URL công khai để xoá object CŨ khi thay/gỡ cover/avatar
 //   (compensated-delete). Chỉ nhận URL hợp lệ (origin allowlist + object public) → KHÔNG suy ra bucket/path
 //   từ URL lạ (chống xoá nhầm). Format: {origin}/storage/v1/object/public/{bucket}/{path}. PURE.

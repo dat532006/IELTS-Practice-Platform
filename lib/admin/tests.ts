@@ -5,6 +5,7 @@ import { AnswerKeyEntrySchema } from '@/lib/scoring/score-reading'
 import { sanitizePassages } from '@/lib/sanitize/passage-html'
 import { refreshProductSearch } from '@/lib/admin/product-search'
 import { deleteStorageObjectByUrl } from '@/lib/storage/delete-object'
+import { isAllowedPublicMediaUrl } from '@/lib/storage/media-url'
 
 // ============================================================
 // W12 — Admin test content orchestration (M11/M05). SERVER-ONLY.
@@ -37,13 +38,15 @@ const QuestionSchema = z.object({
   y: z.number().optional(),
 })
 
-// Passage: chỉ giữ field hiển thị (id/number/title/subtitle/content) — chặn alias lồng trong passage.
+// Passage: chỉ giữ field hiển thị (id/number/title/subtitle/content/image) — chặn alias lồng trong passage.
+// AI-010: image = URL ảnh biểu đồ đề (Writing Task 1) — PHẢI thuộc storage allowlist (validate ở saveTest).
 const PassageSchema = z.object({
   id: z.string().max(80).optional(),
   number: z.number().int().optional(),
   title: z.string().max(1000).optional(),
   subtitle: z.string().max(2000).optional(),
   content: z.string().max(200000).optional(),
+  image: z.string().max(2000).optional(),
 })
 
 export const TestInputSchema = z.object({
@@ -123,6 +126,14 @@ function buildRow(input: TestInput) {
 // ADMIN-003 — ghi test + answer_keys ATOMIC qua RPC admin_save_test (1 transaction).
 //   p_replace_keys = (answer_keys có mặt): present (kể cả {}) → THAY/XOÁ; absent → giữ nguyên.
 async function saveTest(admin: SupabaseClient, parsed: TestInput): Promise<AdminTestOutcome> {
+  // AI-010: passage.image PHẢI là URL storage allowlist — fail-loud (không strip âm thầm khi admin
+  //   gõ/paste URL lạ qua Import JSON; upload qua form luôn hợp lệ). sanitizePassages vẫn strip lần
+  //   nữa ở buildRow + đường trả (defense-in-depth).
+  for (const p of parsed.passages ?? []) {
+    if (p.image !== undefined && !isAllowedPublicMediaUrl(p.image)) {
+      return { ok: false, code: 'VALIDATION_ERROR', detail: `passage "${p.id ?? '?'}": image phải là URL Supabase Storage public (upload qua form admin)` }
+    }
+  }
   const replaceKeys = parsed.answer_keys !== undefined
   const { data, error } = await admin.rpc('admin_save_test', {
     p_id: parsed.id ?? null,

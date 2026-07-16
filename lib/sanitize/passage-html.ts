@@ -1,5 +1,6 @@
 import 'server-only'
 import sanitizeHtml from 'sanitize-html'
+import { sanitizePassageImageUrl } from '@/lib/storage/media-url'
 
 // M11 — Passage rich-text: HTML do ADMIN soạn (WYSIWYG) rồi RENDER cho thí sinh qua dangerouslySetInnerHTML.
 // LUẬT THÉP mindset: dù chỉ admin (requireAdmin) mới soạn, VẪN sanitize allowlist trước khi HTML tới client —
@@ -34,13 +35,25 @@ export function sanitizePassageHtml(html: unknown): string {
 }
 
 // Sanitize content từng passage NẾU là HTML rich; plain text để nguyên (nhánh render text — React tự escape).
-//   Bất biến payload khác (id/title/subtitle/questions…) — chỉ đụng field content.
+// AI-010: field image (biểu đồ đề Writing) validate qua sanitizePassageImageUrl — URL ngoài storage
+//   allowlist bị STRIP ở CẢ lưu (buildRow) lẫn trả (/api/exam, result) → DB cũ/ghi thẳng cũng không
+//   đưa được ảnh host lạ ra client. Bất biến field khác (id/title/subtitle…) giữ nguyên.
 export function sanitizePassages<T>(passages: T): T {
   if (!Array.isArray(passages)) return passages
   return passages.map((p) => {
     if (!p || typeof p !== 'object') return p
     const rec = p as Record<string, unknown>
-    if (isRichHtml(rec.content)) return { ...rec, content: sanitizePassageHtml(rec.content) }
-    return p
+    let out = rec
+    if (isRichHtml(rec.content)) out = { ...out, content: sanitizePassageHtml(rec.content) }
+    if ('image' in rec) {
+      const img = sanitizePassageImageUrl(rec.image)
+      if (img) out = out === rec ? { ...rec, image: img } : { ...out, image: img }
+      else {
+        const { image: _drop, ...rest } = out === rec ? rec : out
+        void _drop
+        out = rest
+      }
+    }
+    return out
   }) as unknown as T
 }

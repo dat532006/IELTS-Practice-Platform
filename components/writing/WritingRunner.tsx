@@ -11,7 +11,12 @@ import { MenuIcon, CloseIcon, CheckIcon, SparkleIcon, ArrowLeft } from '@/compon
 // W10 — Writing UI (M07). dc-exam restyle: tab Task1/Task2 + 1 editor, word count realtime,
 //   chấm qua /api/grade-writing → modal AI (band + 4 tiêu chí). LUẬT THÉP #2/#12: KHÔNG tự tính band.
 type Phase = 'loading' | 'locked' | 'notfound' | 'error' | 'active' | 'submitting' | 'result'
-type Passage = { id?: string; number?: number; title?: string; content?: string }
+type Passage = { id?: string; number?: number; title?: string; content?: string; image?: string }
+
+// AI-010: đề soạn WYSIWYG là HTML rich → render qua dangerouslySetInnerHTML (đã sanitize server 2 lần:
+//   lúc lưu + /api/exam trả). Bug cũ: render {content} như TEXT → học viên thấy nguyên thẻ <p>.
+//   Regex nhận diện rich giống ExamRunner/passage-html (chỉ thẻ allowlist → không false-positive "a < b").
+const RICH_RE = /<(\/?)(p|br|strong|b|em|i|u|s|h2|h3|ul|ol|li|span|div)(\s|>|\/)/i
 
 const T1_MIN = 150
 const T2_MIN = 250
@@ -208,16 +213,28 @@ export function WritingRunner({ testId }: { testId: string }) {
         {/* Split: prompt | editor */}
         <div className="dcx-w-split">
           <div className="dcx-w-prompt">
-            <div className="dcx-w-prompt-text">
-              {(tab === 1 ? prompts.task1 : prompts.task2)?.content ?? 'Đề bài đang được cập nhật.'}
-            </div>
-            {tab === 1 ? (
+            {(() => {
+              const cur = tab === 1 ? prompts.task1 : prompts.task2
+              const raw = cur?.content ?? ''
+              return RICH_RE.test(raw) ? (
+                <div className="dcx-w-prompt-text dcx-rich" dangerouslySetInnerHTML={{ __html: raw }} />
+              ) : (
+                <div className="dcx-w-prompt-text">{raw || 'Đề bài đang được cập nhật.'}</div>
+              )
+            })()}
+            {/* AI-010: biểu đồ/hình kèm đề (passage.image — URL đã qua allowlist server). Không có ảnh
+                thì KHÔNG render khung giả "[ hình minh hoạ ]" nữa (gây hiểu lầm đề thiếu hình). */}
+            {(tab === 1 ? prompts.task1 : prompts.task2)?.image && (
               <div className="dcx-w-chart">
-                <SparkleIcon className="h-7 w-7" />
-                <span className="dcx-w-chart-mono">[ hình minh hoạ đề bài Task 1 ]</span>
-                <span className="dcx-w-chart-cap">Biểu đồ/bảng số liệu kèm đề (nếu có)</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={(tab === 1 ? prompts.task1 : prompts.task2)!.image}
+                  alt={`Biểu đồ/hình kèm đề bài Task ${tab}`}
+                  style={{ maxWidth: '100%', borderRadius: 8 }}
+                />
               </div>
-            ) : (
+            )}
+            {tab === 1 ? null : (
               <div className="dcx-w-hint">
                 <div className="dcx-w-hint-title">Gợi ý dàn bài</div>
                 <div className="dcx-w-hint-body">
