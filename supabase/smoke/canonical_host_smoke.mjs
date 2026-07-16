@@ -22,6 +22,18 @@ console.log('AUTH-007 — canonicalRedirectTarget (production ép về 1 origin)
     canonicalRedirectTarget({ ...base, host: 'ieltspracticeplatform.online', pathname: '/', search: '' }) === null)
   check('host đúng nhưng KHÁC HOA/thường → null (so case-insensitive)',
     canonicalRedirectTarget({ ...base, host: 'IELTSPracticePlatform.online', pathname: '/', search: '' }) === null)
+
+  // FOOTGUN THẬT (phát hiện 2026-07-17 trên prod): Vercel primary domain là WWW, apex 308 → www ở edge.
+  // Nếu NEXT_PUBLIC_SITE_URL đặt apex mà middleware kéo www → apex thì 2 tầng đá nhau vô hạn
+  // (ERR_TOO_MANY_REDIRECTS, sập toàn site). apex↔www là việc của Vercel edge — middleware KHÔNG đụng.
+  check('siteUrl=apex nhưng host=www.<apex> → null (KHÔNG tạo loop với Vercel edge)',
+    canonicalRedirectTarget({ ...base, siteUrl: 'https://ieltspracticeplatform.online', host: 'www.ieltspracticeplatform.online', pathname: '/', search: '' }) === null)
+  check('siteUrl=www nhưng host=apex → null (chiều ngược lại cũng không đụng)',
+    canonicalRedirectTarget({ ...base, siteUrl: 'https://www.ieltspracticeplatform.online', host: 'ieltspracticeplatform.online', pathname: '/', search: '' }) === null)
+  check('www.vercel.app → VẪN bị kéo về (guard chỉ áp cho www-variant của CHÍNH canonical host)',
+    canonicalRedirectTarget({ ...base, host: 'www.x.vercel.app', pathname: '/', search: '' }) === `${SITE}/`)
+  check('host www.KHÁC-domain → vẫn kéo về (không phải variant của canonical)',
+    canonicalRedirectTarget({ ...base, siteUrl: 'https://www.ieltspracticeplatform.online', host: 'www.other.com', pathname: '/x', search: '' }) === 'https://www.ieltspracticeplatform.online/x')
 }
 
 console.log('\nAUTH-007 — các trường hợp KHÔNG được đụng:')
