@@ -61,8 +61,12 @@ check('settle.ts KHÔNG log error.message thô', !/error\.message/.test(read('li
 check('product-search.ts logEvent chỉ code (không message trong logEvent)',
   !/logEvent\([^)]*error\.message/.test(read('lib/admin/product-search.ts')))
 const grader = read('lib/ai/writing-grader.ts')
-check('writing-grader: 2 catch log scoring.provider_error (chỉ .name, không .message)',
-  (grader.match(/scoring\.provider_error/g) ?? []).length === 2 && !/logEvent\([^)]*\)\?\.message/.test(grader) && /\(err as Error\)\?\.name/.test(grader))
+// AI-003: bỏ đếm cứng ===2 (đã thêm logEvent quan sát cho config/http/response/schema ở nhánh OpenAI).
+//   Bất biến THẬT của DEPLOY-005 giữ nguyên: đủ cả 2 catch, chỉ .name, KHÔNG .message thô.
+check('writing-grader: cả 2 catch provider vẫn log scoring.provider_error',
+  (grader.match(/scoring\.provider_error/g) ?? []).length >= 2 && (grader.match(/\(err as Error\)\?\.name/g) ?? []).length === 2)
+check('writing-grader: KHÔNG logEvent nào rò .message thô',
+  !/logEvent\((?:[^()]|\([^()]*\))*\.message/.test(grader))
 
 console.log(`\nRESULT: ${pass} passed, ${fail} failed`)
 process.exitCode = fail ? 1 : 0

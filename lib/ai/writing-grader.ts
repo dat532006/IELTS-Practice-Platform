@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { isValidBand, roundHalf } from '@/lib/scoring/writing-band'
 import { WRITING_GRADER_SYSTEM_PROMPT } from '@/lib/ai/ielts-writing-rubric'
 import { selectProvider, gradeTimeoutMs } from '@/lib/ai/provider-select'
+import { openaiMaxOutputTokens, openaiReasoningEffort, parseOpenAiResponse } from '@/lib/ai/openai-responses'
 import { fetchWithDeadline } from '@/lib/net/fetch-deadline'
 import { logEvent } from '@/lib/obs/log-event'
 
@@ -255,6 +256,12 @@ const OPENAI_GRADE_SCHEMA = {
 async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return { ok: false, code: 'AI_UNAVAILABLE' } // fail-loud, không mock âm thầm (F5)
+  // AI-003: effort lạ → chặn TRƯỚC khi gọi provider (AI-002 precedent) — không tiêu tiền với config sai.
+  const effortSel = openaiReasoningEffort()
+  if (!effortSel.ok) {
+    logEvent('scoring.provider_error', 'error', { provider: 'openai', kind: 'config', reason: 'invalid_reasoning_effort' })
+    return { ok: false, code: 'AI_UNAVAILABLE' }
+  }
   try {
     const userContent = buildUserContent(
       input,
@@ -266,7 +273,10 @@ async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
       headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: OPENAI_MODEL,
-        max_output_tokens: MAX_TOKENS,
+        // AI-003: budget RIÊNG cho OpenAI — reasoning token tính vào đây; dùng chung MAX_TOKENS (4000)
+        //   của Anthropic → reasoning nuốt hết → incomplete → chấm luôn hỏng.
+        max_output_tokens: openaiMaxOutputTokens(),
+        reasoning: { effort: effortSel.effort },
         instructions: SYSTEM_PROMPT,
         input: userContent,
         text: {
@@ -279,36 +289,23 @@ async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
         },
       }),
     }, gradeTimeoutMs())
-    if (!res.ok) return { ok: false, code: 'AI_UNAVAILABLE' }
-    const body = (await res.json().catch(() => null)) as {
-      output?: {
-        type?: string
-        content?: { type?: string; text?: string; refusal?: string }[]
-      }[]
-      usage?: { input_tokens?: number; output_tokens?: number }
-    } | null
-    const content = body?.output
-      ?.filter((item) => item.type === 'message')
-      .flatMap((item) => item.content ?? []) ?? []
-    if (content.some((item) => item.type === 'refusal' || item.refusal)) {
+    if (!res.ok) {
+      logEvent('scoring.provider_error', 'error', { provider: 'openai', kind: 'http', reason: 'http_error', status: res.status })
       return { ok: false, code: 'AI_UNAVAILABLE' }
     }
-    const outputText = content.find((item) => item.type === 'output_text')?.text
-    if (!outputText) return { ok: false, code: 'AI_INVALID_OUTPUT' }
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(outputText)
-    } catch {
+    // AI-003: parse ở module thuần → phân biệt incomplete (budget/filter) vs refusal vs JSON hỏng, và
+    //   GHI LẠI lý do. Trước đây truncation lẫn vào AI_INVALID_OUTPUT câm → không debug được.
+    const parsed = parseOpenAiResponse(await res.json().catch(() => null))
+    if (!parsed.ok) {
+      logEvent('scoring.provider_error', 'error', { provider: 'openai', kind: 'response', reason: parsed.reason })
+      return { ok: false, code: parsed.code }
+    }
+    const grade = validateAiGradeOutput(parsed.json)
+    if (!grade) {
+      logEvent('scoring.provider_error', 'error', { provider: 'openai', kind: 'response', reason: 'schema_reject' })
       return { ok: false, code: 'AI_INVALID_OUTPUT' }
     }
-    const grade = validateAiGradeOutput(parsed)
-    if (!grade) return { ok: false, code: 'AI_INVALID_OUTPUT' }
-    return {
-      ok: true,
-      grade,
-      mock: false,
-      usage: { input_tokens: body?.usage?.input_tokens, output_tokens: body?.usage?.output_tokens },
-    }
+    return { ok: true, grade, mock: false, usage: parsed.usage }
   } catch (err) {
     // DEPLOY-005: xem gradeWithAnthropic — chỉ tên lỗi, KHÔNG message/secret/essay.
     logEvent('scoring.provider_error', 'error', { provider: 'openai', kind: (err as Error)?.name ?? 'unknown' })

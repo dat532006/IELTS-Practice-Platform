@@ -37,6 +37,8 @@ export const ENV_REGISTRY: EnvVar[] = [
   { name: 'OPENAI_API_KEY', scope: 'server', secret: true, describe: 'Key OpenAI (nếu WRITING_AI_PROVIDER=openai)' },
   { name: 'WRITING_GRADER_MODEL', scope: 'server', describe: 'Override model Anthropic' },
   { name: 'WRITING_GRADER_OPENAI_MODEL', scope: 'server', describe: 'Override model OpenAI' },
+  { name: 'WRITING_GRADER_OPENAI_MAX_OUTPUT_TOKENS', scope: 'server', describe: 'Budget output OpenAI (AI-003; reasoning tính vào đây, sàn 25000, mặc định 32000)' },
+  { name: 'WRITING_GRADER_OPENAI_REASONING_EFFORT', scope: 'server', describe: 'none|low|medium|high|xhigh|max (AI-003; mặc định medium, sai → fail-loud)' },
   { name: 'WRITING_GRADER_MOCK', scope: 'server', describe: '1 = mock grader (dev/test)' },
   { name: 'WRITING_GRADER_TIMEOUT_MS', scope: 'server', describe: 'Deadline gọi provider (AI-001), mặc định 60000' },
   { name: 'AI_GRADE_IP_DAILY_LIMIT', scope: 'server', describe: 'Giới hạn chấm/ngày theo IP (free)' },
