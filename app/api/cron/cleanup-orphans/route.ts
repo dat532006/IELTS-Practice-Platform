@@ -46,6 +46,23 @@ async function collectReferenced(admin: StorageAdmin, table: string, column: str
   return set
 }
 
+// AI-010 — ảnh đề Writing (passage.image) nằm TRONG tests.passages jsonb, KHÔNG có cột riêng →
+//   phải gom vào referenced-set của bucket media, nếu không sweep sẽ XOÁ ảnh đề ĐANG DÙNG sau grace.
+//   Lỗi query → throw (STORE-004: query fail không bao giờ được hiểu là "không có tham chiếu").
+async function collectPassageImageRefs(admin: StorageAdmin, bucket: string): Promise<Set<string>> {
+  const set = new Set<string>()
+  const { data, error } = await admin.from('tests').select('passages').not('passages', 'is', null)
+  if (error) throw new Error('passages_reference_query_failed')
+  for (const row of (data ?? []) as { passages: unknown }[]) {
+    if (!Array.isArray(row.passages)) continue
+    for (const p of row.passages as { image?: unknown }[]) {
+      const obj = parsePublicObjectPath(p?.image as string)
+      if (obj && obj.bucket === bucket) set.add(obj.path)
+    }
+  }
+  return set
+}
+
 // Liệt kê object trong bucket (đệ quy folder, có cap). Trả {path, created_at}.
 async function listAllObjects(admin: StorageAdmin, bucket: string): Promise<{ path: string; created_at: string | null }[]> {
   const out: { path: string; created_at: string | null }[] = []
@@ -77,8 +94,10 @@ async function sweepBucket(
   graceDays: number,
   enabled: boolean,
   now: number,
+  extraRefs?: Set<string>, // AI-010: tham chiếu bổ sung (vd ảnh đề trong tests.passages)
 ): Promise<{ scanned: number; orphans: number; deleted: number }> {
   const referenced = await collectReferenced(admin, table, column, bucket)
+  if (extraRefs) for (const p of extraRefs) referenced.add(p)
   const objects = await listAllObjects(admin, bucket)
   const orphanPaths = objects
     .filter((o) => o.created_at && isOrphanObject(o.created_at, o.path, referenced, graceDays, now))
@@ -108,7 +127,10 @@ export async function GET(request: Request) {
   const enabled = orphanCleanupEnabled() // false = DRY-RUN (chỉ quan sát, KHÔNG xoá)
   const now = Date.now()
   try {
-    const media = await sweepBucket(admin, process.env.SUPABASE_STORAGE_BUCKET || 'media', 'tests', 'cover_image', graceDays, enabled, now)
+    const mediaBucket = process.env.SUPABASE_STORAGE_BUCKET || 'media'
+    // AI-010: ảnh đề Writing (passage.image) cũng là "đang dùng" — thiếu dòng này là cron xoá ảnh thật.
+    const passageImageRefs = await collectPassageImageRefs(admin, mediaBucket)
+    const media = await sweepBucket(admin, mediaBucket, 'tests', 'cover_image', graceDays, enabled, now, passageImageRefs)
     const avatars = await sweepBucket(admin, 'avatars', 'profiles', 'avatar', graceDays, enabled, now)
     const detail = { dry_run: !enabled, grace_days: graceDays, media, avatars }
     await recordRun(admin, true, detail)

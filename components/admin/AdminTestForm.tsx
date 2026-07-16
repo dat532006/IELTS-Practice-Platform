@@ -14,7 +14,7 @@ import type { ExamPayload } from '@/types/exam'
 //   Guard thật ở server (admin layout + /api/admin/* requireAdmin); form chỉ gọi API. KHÔNG import scoring/secret.
 //   Layout theo design frame 6; logic/data flow GIỮ NGUYÊN (chỉ thay markup).
 type TestType = 'reading' | 'listening' | 'writing'
-type Passage = { id: string; title: string; subtitle?: string; content: string }
+type Passage = { id: string; title: string; subtitle?: string; content: string; image?: string }
 type QOpt = { key: string; text: string }
 // QField mang đủ field renderer (M06) hỗ trợ: đáp án tách sang `answers`/`points`/`explanation` (→ answer_keys),
 //   còn lại đi vào tests.questions. instruction/passage_id điều khiển gom nhóm + header "Questions a–b".
@@ -377,7 +377,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
     // AI-006: writing → ép id passage về task1/task2 NGAY LÚC LƯU. Form sinh uid('p') không bao giờ
     //   trùng 'task1' → runtime rơi về khớp VỊ TRÍ, đảo/thêm/xoá passage là tráo đề Task 1 ↔ Task 2
     //   âm thầm. Passage ĐÃ mang id task giữ nguyên (id thắng vị trí) — xem lib/exam/writing-prompts.ts.
-    const pOut = passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), content: p.content }))
+    const pOut = passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), ...(p.image ? { image: p.image } : {}), content: p.content }))
     return {
       title,
       type,
@@ -440,6 +440,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       const content = rawContent && !looksRich(rawContent) ? plainToHtml(rawContent) : sanitizePassageHtmlClient(rawContent)
       const out: Passage = { id: String(p.id ?? uid('p')), title: str(p.title), content }
       if (str(p.subtitle)) out.subtitle = str(p.subtitle)
+      if (str(p.image)) out.image = str(p.image) // AI-010: biểu đồ đề (server validate allowlist khi lưu)
       return out
     })
 
@@ -599,6 +600,38 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       })
       const fj = await fr.json().catch(() => null)
       setMediaMsg(fr.ok && fj?.success ? '✓ Đã upload + gán audio cho đề.' : (fj?.message || 'Finalize audio thất bại.'))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  // AI-010 — Upload biểu đồ/hình kèm đề cho 1 passage (Writing Task 1): presign kind image → PUT →
+  //   lưu URL vào passage state (đi cùng payload khi Lưu; server validate allowlist + strip URL lạ).
+  //   Khác cover: KHÔNG PATCH riêng — ảnh là một phần nội dung đề. Ảnh cũ bị thay → orphan sweep dọn.
+  async function uploadPassageImage(i: number, file: File) {
+    setBusy(`pimg-${i}`)
+    setMediaMsg('')
+    try {
+      const r = await fetch('/api/admin/media', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'image', filename: file.name, content_type: file.type, ...(created ? { test_id: created.test_id } : {}) }),
+      })
+      const j = await r.json().catch(() => null)
+      if (!r.ok || !j?.data?.upload_url) {
+        setMediaMsg(j?.meta?.error_code === 'STORAGE_NOT_CONFIGURED' ? '⚠️ Supabase Storage chưa cấu hình (bucket media).' : 'Không tạo được upload URL cho ảnh đề.')
+        return
+      }
+      const { path, token, bucket, public_url } = j.data as { path: string; token: string; bucket: string; public_url: string }
+      const { error: upErr } = await createClient().storage.from(bucket).uploadToSignedUrl(path, token, file)
+      if (upErr) {
+        setMediaMsg(`Upload ảnh đề thất bại: ${upErr.message}`)
+        return
+      }
+      setP(i, { image: public_url })
+      setMediaMsg('✓ Đã gắn biểu đồ vào đề — nhớ bấm Lưu.')
+    } catch {
+      setMediaMsg('Lỗi khi upload ảnh đề.')
     } finally {
       setBusy('')
     }
@@ -804,6 +837,35 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                   </button>
                 )}
               </div>
+              {/* AI-010: biểu đồ/hình kèm đề — chỉ Writing (Passage i = đề Task i+1). data-passage-image cho gate. */}
+              {type === 'writing' && (
+                <div className="mt-2 flex items-center gap-3" data-passage-image>
+                  {p.image ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.image} alt={`Biểu đồ đề Task ${i + 1}`} className="h-16 rounded-[8px] border border-[#E4DEEE]" />
+                      <button type="button" onClick={() => setP(i, { image: undefined })} className="text-[12.5px] font-bold text-[#D08585]">
+                        Gỡ biểu đồ
+                      </button>
+                    </>
+                  ) : (
+                    <label className="cursor-pointer text-[12.5px] font-bold text-[#6A48D6]">
+                      {busy === `pimg-${i}` ? 'Đang upload…' : `🖼 Thêm biểu đồ/hình cho đề Task ${i + 1}`}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={busy !== ''}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0]
+                          if (f) uploadPassageImage(i, f)
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
               {/* Soạn nội dung passage kiểu Word (WYSIWYG): tiêu đề/phụ đề/đoạn/đậm-nghiêng/căn lề/danh sách bằng
                   nút bấm. Xuất HTML → server sanitize allowlist trước khi tới thí sinh. Dán từ Word được dọn sạch. */}
               <div className="mt-2">
