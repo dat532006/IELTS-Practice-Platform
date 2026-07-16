@@ -13,7 +13,9 @@ const read = (p) => readFileSync(resolve(root, p), 'utf8')
 // Bóc comment TRƯỚC khi kiểm bất biến: comment mô tả field ("+ vocabulary_upgrades — cả hai optional")
 //   làm regex xanh giả kể cả khi code render đã bị xoá sạch. Đã dính đúng bẫy này 2 lần (obs_event_gate
 //   với 'server-only', và MUT4 của chính gate này) → kiểm trên source ĐÃ BÓC comment.
-const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+// THỨ TỰ: line-comment TRƯỚC block — line comment chứa '/*' (vd "/api/admin/*") sẽ mở block giả
+// nuốt cả đoạn code tới '*/' gần nhất (bug thật đã gặp ở writing_authoring_gate trên AdminTestForm).
+const stripComments = (s) => s.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
 const schema = read('lib/ai/grade-schema.ts')
 const grader = read('lib/ai/writing-grader.ts')
 const rubric = read('lib/ai/ielts-writing-rubric.ts')

@@ -828,5 +828,55 @@ begin
   reset role;
 end $$;
 
+-- ---------- Check 41 (AI-006): publish guard writing — prompt rỗng/thiếu task id KHÔNG publish được ----------
+do $$
+declare
+  v_id uuid;
+  v_res jsonb;
+  v_leaked boolean;
+begin
+  -- 41a: id sai (p1/p2) + prompt rỗng → publish phải BỊ CHẶN (INVALID_GRAPH, P0001)
+  insert into public.tests (title, type, passages, questions, status)
+  values ('check41 writing guard', 'writing',
+          '[{"id":"p1","content":"<p> </p>"},{"id":"p2","content":""}]'::jsonb, '[]'::jsonb, 'draft')
+  returning id into v_id;
+  v_leaked := false;
+  begin
+    perform public.admin_publish_test(v_id);
+    v_leaked := true;
+  exception when sqlstate 'P0001' then
+    raise notice 'PASS check41a: writing id sai/prompt rỗng bị chặn publish';
+  end;
+  if v_leaked then
+    raise exception 'FAIL check41a: publish được đề writing id sai + prompt rỗng';
+  end if;
+
+  -- 41b: id chuẩn nhưng task2 rỗng HTML vỏ (<p><br></p>) → vẫn phải BỊ CHẶN
+  update public.tests
+     set passages = '[{"id":"task1","content":"<p>Describe the chart.</p>"},{"id":"task2","content":"<p><br></p>"}]'::jsonb
+   where id = v_id;
+  v_leaked := false;
+  begin
+    perform public.admin_publish_test(v_id);
+    v_leaked := true;
+  exception when sqlstate 'P0001' then
+    raise notice 'PASS check41b: writing task2 rỗng HTML vỏ bị chặn publish';
+  end;
+  if v_leaked then
+    raise exception 'FAIL check41b: publish được đề writing với task2 rỗng';
+  end if;
+
+  -- 41c: đề chuẩn (task1/task2 đủ nội dung) → publish PHẢI OK (guard không siết quá tay)
+  update public.tests
+     set passages = '[{"id":"task1","content":"<p>Describe the chart.</p>"},{"id":"task2","content":"<p>Discuss both views.</p>"}]'::jsonb
+   where id = v_id;
+  v_res := public.admin_publish_test(v_id);
+  if coalesce(v_res->>'ok', 'false') <> 'true' then
+    raise exception 'FAIL check41c: đề writing chuẩn không publish được: %', v_res;
+  end if;
+  raise notice 'PASS check41c: writing task1/task2 chuẩn publish OK';
+  delete from public.tests where id = v_id;
+end $$;
+
 select 'ALL RLS SMOKE CHECKS PASSED' as result;
 

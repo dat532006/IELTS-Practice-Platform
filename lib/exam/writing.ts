@@ -2,6 +2,7 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { gradeWriting } from '@/lib/ai/writing-grader'
+import { pickTaskPassage } from '@/lib/exam/writing-prompts'
 import { computeOverallBand } from '@/lib/scoring/writing-band'
 import type { WritingGradeResult } from '@/types/exam'
 
@@ -33,11 +34,15 @@ type SubmitWritingBody = {
   ip_daily_limit: number
 }
 
+// AI-006: hợp đồng task1/task2 dùng CHUNG với WritingRunner (trước đây copy tay 2 nơi → drift).
+//   Lưu ý đổi ngữ nghĩa CÓ CHỦ ĐÍCH: passage id 'task1' tồn tại nhưng content rỗng → trả '' (trước đây
+//   rơi sang content của passage Ở VỊ TRÍ 0 — tức đề của TASK KHÁC). Prompt rỗng giờ bị publish guard chặn.
 function extractPrompts(passages: unknown): { task1: string; task2: string } {
   const arr = Array.isArray(passages) ? (passages as Passage[]) : []
-  const pick = (i: number, id: string) =>
-    arr.find((p) => p?.id === id)?.content ?? arr[i]?.content ?? ''
-  return { task1: pick(0, 'task1'), task2: pick(1, 'task2') }
+  return {
+    task1: pickTaskPassage(arr, 0, 'task1')?.content ?? '',
+    task2: pickTaskPassage(arr, 1, 'task2')?.content ?? '',
+  }
 }
 
 async function refundReservations(admin: SupabaseClient, userId: string, ipHash: string, userReserved: boolean, ipReserved: boolean) {

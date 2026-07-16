@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { AttemptDTO, ExamPayload, WritingGradeResult } from '@/types/exam'
+import { pickTaskPassage } from '@/lib/exam/writing-prompts'
 import { WritingResultView } from '@/components/writing/WritingResultView'
 import { A11yDialog } from '@/components/a11y/A11yDialog'
 import { MenuIcon, CloseIcon, CheckIcon, SparkleIcon, ArrowLeft } from '@/components/exam/ExamIcons'
@@ -23,10 +24,10 @@ const CRITERIA: { key: 'task_response' | 'coherence_cohesion' | 'lexical_resourc
   { key: 'grammar', label: 'Grammatical Range' },
 ]
 
+// AI-006: hợp đồng task1/task2 dùng CHUNG với lib/exam/writing.ts extractPrompts (hết copy tay 2 nơi).
 function getPrompts(payload: ExamPayload | null): { task1: Passage | null; task2: Passage | null } {
   const arr = Array.isArray(payload?.passages) ? (payload!.passages as Passage[]) : []
-  const pick = (i: number, id: string) => arr.find((p) => p?.id === id) ?? arr[i] ?? null
-  return { task1: pick(0, 'task1'), task2: pick(1, 'task2') }
+  return { task1: pickTaskPassage(arr, 0, 'task1'), task2: pickTaskPassage(arr, 1, 'task2') }
 }
 
 export function WritingRunner({ testId }: { testId: string }) {
