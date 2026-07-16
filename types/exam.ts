@@ -85,12 +85,24 @@ export type WritingErrorHighlight = {
   type: 'task_response' | 'coherence_cohesion' | 'lexical_resource' | 'grammar'
   suggestion: string
 }
+// AI-005: bảng "vocabulary upgrade" — từ/cụm đáng học lấy TỪ corrected_version của chính task đó.
+export type WritingVocabUpgrade = {
+  word: string
+  level: 'B2' | 'C1' | 'C2'
+  meaning_vi: string
+  why: string
+  example: string
+}
 export type WritingTaskGrade = {
   band: number // 0..9, bước 0.5
   criteria: { task_response: number; coherence_cohesion: number; lexical_resource: number; grammar: number }
   feedback: string
   suggestions: string[]
   error_highlights?: WritingErrorHighlight[] // W11: optional, đã Zod-validate và giới hạn trước khi lưu/trả
+  // AI-005: optional — Anthropic (đường lui) được phép bỏ qua, và bài chấm TRƯỚC 2026-07-16 trong DB
+  //   không có 2 field này (ai_score là jsonb, không migration) → UI phải render có điều kiện.
+  corrected_version?: string // Version A — bài viết lại (tiếng Anh), giữ ý/trình độ gốc
+  vocabulary_upgrades?: WritingVocabUpgrade[]
 }
 export type WritingGradeResult = {
   attempt_id: string
