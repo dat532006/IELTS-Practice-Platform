@@ -1,6 +1,6 @@
 import 'server-only'
-import { z } from 'zod'
 import { isValidBand, roundHalf } from '@/lib/scoring/writing-band'
+import { AiGradeSchema, GRADE_INPUT_SCHEMA, OPENAI_GRADE_SCHEMA, type RawAiGrade } from '@/lib/ai/grade-schema'
 import { WRITING_GRADER_SYSTEM_PROMPT } from '@/lib/ai/ielts-writing-rubric'
 import { selectProvider, gradeTimeoutMs } from '@/lib/ai/provider-select'
 import { openaiMaxOutputTokens, openaiReasoningEffort, parseOpenAiResponse } from '@/lib/ai/openai-responses'
@@ -17,6 +17,11 @@ import { logEvent } from '@/lib/obs/log-event'
 //   WRITING_AI_PROVIDER=openai|anthropic; không set → openai (AI-004: Owner chốt OpenAI 2026-07-16;
 //   anthropic là ĐƯỜNG LUI, chọn lại bằng env, không sửa code).
 //   Cả 2 provider ĐI QUA CÙNG validateAiGradeOutput — schema/band rule không đổi.
+// AI-005 (Owner chốt 2026-07-16): thêm corrected_version (Version A) + vocabulary_upgrades. Hợp đồng dữ
+//   liệu (Zod + schema 2 provider) TÁCH sang lib/ai/grade-schema.ts (thuần, test Node trực tiếp được).
+//   Output dài hơn hẳn → MAX_TOKENS nâng khỏi 4000 (bài viết lại + bảng vocab không lọt budget cũ).
+//   Owner XIN "estimated overall band" từ AI nhưng ĐÃ TỪ CHỐI: server tính (trọng số IELTS 1/3–2/3) là
+//   nguồn duy nhất — AI đoán lại phép tính của chính nó chỉ tạo 2 số mâu thuẫn trên màn hình.
 // AI-001 (batch 21): mọi lời gọi provider có DEADLINE (gradeTimeoutMs) — Anthropic SDK qua signal +
 //   maxRetries:0 (không auto-retry gây nhân đôi chi phí), OpenAI qua fetchWithDeadline. Hang → throw →
 //   AI_UNAVAILABLE → lib/exam/writing.ts refund quota + release claim (bounded, cho retry).
@@ -26,30 +31,10 @@ import { logEvent } from '@/lib/obs/log-event'
 
 const MODEL = process.env.WRITING_GRADER_MODEL || 'claude-opus-4-8'
 const OPENAI_MODEL = process.env.WRITING_GRADER_OPENAI_MODEL || 'gpt-5.6-terra'
-const MAX_TOKENS = 4000
-
-const ErrorHighlight = z.object({
-  quote: z.string().min(1).max(240),
-  type: z.enum(['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar']),
-  suggestion: z.string().min(1).max(500),
-}).strict()
-
-// Criteria band cho 1 task (IELTS 4 tiêu chí). band number thô — validate sau parse.
-const TaskCriteria = z.object({
-  task_response: z.number(),
-  coherence_cohesion: z.number(),
-  lexical_resource: z.number(),
-  grammar: z.number(),
-}).strict()
-const TaskGrade = z.object({
-  band: z.number(),
-  criteria: TaskCriteria,
-  feedback: z.string().max(4000),
-  suggestions: z.array(z.string().max(600)).max(8),
-  error_highlights: z.array(ErrorHighlight).max(12).optional(),
-}).strict()
-export const AiGradeSchema = z.object({ task1: TaskGrade, task2: TaskGrade }).strict()
-export type RawAiGrade = z.infer<typeof AiGradeSchema>
+// AI-005: Anthropic (đường lui). 4000 cũ KHÔNG đủ từ khi có corrected_version + vocabulary_upgrades
+//   (2 bài viết lại + 2 bảng vocab) — thinking cũng tính vào max_tokens → JSON bị cắt giữa chừng.
+//   OpenAI có budget RIÊNG (openaiMaxOutputTokens, AI-003) vì reasoning token tính vào max_output_tokens.
+const MAX_TOKENS = 16_000
 
 export type GradeUsage = {
   input_tokens?: number
@@ -58,46 +43,7 @@ export type GradeUsage = {
   cache_read_input_tokens?: number
 }
 
-// JSON schema cho Claude tool use (structured input). Zod (project = v3) vẫn validate lại output.
 const GRADE_TOOL = 'submit_grade'
-const ERROR_HIGHLIGHT_JSON = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    quote: { type: 'string', description: 'Exact short quote from the candidate response containing the issue.' },
-    type: { type: 'string', enum: ['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar'] },
-    suggestion: { type: 'string', description: 'Concrete correction or improvement suggestion.' },
-  },
-  required: ['quote', 'type', 'suggestion'],
-}
-const TASK_JSON = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    band: { type: 'number' },
-    criteria: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        task_response: { type: 'number' },
-        coherence_cohesion: { type: 'number' },
-        lexical_resource: { type: 'number' },
-        grammar: { type: 'number' },
-      },
-      required: ['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar'],
-    },
-    feedback: { type: 'string' },
-    suggestions: { type: 'array', items: { type: 'string' }, maxItems: 8 },
-    error_highlights: { type: 'array', items: ERROR_HIGHLIGHT_JSON, maxItems: 12 },
-  },
-  required: ['band', 'criteria', 'feedback', 'suggestions'],
-}
-const GRADE_INPUT_SCHEMA = {
-  type: 'object' as const,
-  additionalProperties: false,
-  properties: { task1: TASK_JSON, task2: TASK_JSON },
-  required: ['task1', 'task2'],
-}
 
 export type GraderInput = {
   task1_prompt: string
@@ -146,6 +92,18 @@ function mockGrade(input: GraderInput): RawAiGrade {
           suggestion: '[MOCK] Replace vague wording with more precise vocabulary.',
         },
       ],
+      // AI-005: mock PHẢI sinh cả field mới — nếu không, dev/test không bao giờ thấy UI Version A/vocab
+      //   và lỗi render chỉ lộ ra ở prod (nơi có key thật).
+      corrected_version: `[MOCK] ${text.trim().slice(0, 200) || 'Corrected version placeholder.'}`,
+      vocabulary_upgrades: [
+        {
+          word: 'a marked increase',
+          level: 'C1' as const,
+          meaning_vi: '[MOCK] sự gia tăng rõ rệt',
+          why: '[MOCK] thay cho "big increase" bị lặp trong bài.',
+          example: 'The chart shows a marked increase in sales.',
+        },
+      ],
     }
   }
   return { task1: task(input.task1_text, 4.5), task2: task(input.task2_text, 4.5) }
@@ -180,7 +138,7 @@ async function gradeWithAnthropic(input: GraderInput): Promise<GradeOutcome> {
     const client = new Anthropic({ maxRetries: 0 }) // đọc ANTHROPIC_API_KEY từ env (server-only)
     const userContent = buildUserContent(
       input,
-      `Call the ${GRADE_TOOL} tool with the grade. All bands in 0..9, steps of 0.5. Include up to 12 short error_highlights per task when useful; omit the field if there are no specific highlights.`,
+      `Call the ${GRADE_TOOL} tool with the grade. All bands in 0..9, steps of 0.5. Include up to 12 short error_highlights per task when useful; omit the field if there are no specific highlights. Also include corrected_version (Version A rewrite) and up to 10 vocabulary_upgrades per task, as specified in the system instructions.`,
     )
 
     // AI-001: deadline ứng dụng — quá hạn → AbortSignal.timeout abort → SDK throw → catch → AI_UNAVAILABLE.
@@ -212,48 +170,8 @@ async function gradeWithAnthropic(input: GraderInput): Promise<GradeOutcome> {
 }
 
 // ---- LIVE: OpenAI (A2) — fetch thuần tới /v1/responses + Structured Outputs (json_schema strict).
-// KHÔNG thêm SDK dependency. Strict mode yêu cầu mọi field required → error_highlights bắt buộc là
-// mảng (rỗng được); maxItems không dùng trong schema (một số phiên bản API từ chối keyword) —
-// giới hạn 8 suggestions/12 highlights vẫn được ENFORCE bởi Zod sau parse (AiGradeSchema).
-const OPENAI_ERROR_HIGHLIGHT = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    quote: { type: 'string', description: 'Exact short quote (≤240 chars) from the candidate response containing the issue.' },
-    type: { type: 'string', enum: ['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar'] },
-    suggestion: { type: 'string', description: 'Concrete correction or improvement suggestion.' },
-  },
-  required: ['quote', 'type', 'suggestion'],
-}
-const OPENAI_TASK_JSON = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    band: { type: 'number' },
-    criteria: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        task_response: { type: 'number' },
-        coherence_cohesion: { type: 'number' },
-        lexical_resource: { type: 'number' },
-        grammar: { type: 'number' },
-      },
-      required: ['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar'],
-    },
-    feedback: { type: 'string' },
-    suggestions: { type: 'array', items: { type: 'string' } },
-    error_highlights: { type: 'array', items: OPENAI_ERROR_HIGHLIGHT },
-  },
-  required: ['band', 'criteria', 'feedback', 'suggestions', 'error_highlights'],
-}
-const OPENAI_GRADE_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: { task1: OPENAI_TASK_JSON, task2: OPENAI_TASK_JSON },
-  required: ['task1', 'task2'],
-}
-
+// KHÔNG thêm SDK dependency. Schema (strict, mọi field required) ở lib/ai/grade-schema.ts cùng chỗ với
+// Zod → không drift. Giới hạn 8 suggestions/12 highlights/10 vocab ENFORCE bởi Zod sau parse.
 async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return { ok: false, code: 'AI_UNAVAILABLE' } // fail-loud, không mock âm thầm (F5)
@@ -266,7 +184,7 @@ async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
   try {
     const userContent = buildUserContent(
       input,
-      'Return the grade as JSON. All bands in 0..9, steps of 0.5. At most 8 suggestions and 12 error_highlights per task; use an empty array when there are no specific highlights.',
+      'Return the grade as JSON. All bands in 0..9, steps of 0.5. At most 8 suggestions, 12 error_highlights and 10 vocabulary_upgrades per task; use an empty array when there is nothing to list. corrected_version and vocabulary_upgrades are required fields — follow the system instructions for how to produce them.',
     )
     // AI-001: deadline ứng dụng — provider treo → AbortSignal.timeout abort → throw → catch → AI_UNAVAILABLE.
     const res = await fetchWithDeadline('https://api.openai.com/v1/responses', {
