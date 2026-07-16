@@ -35,7 +35,8 @@ function getPrompts(payload: ExamPayload | null): { task1: Passage | null; task2
   return { task1: pickTaskPassage(arr, 0, 'task1'), task2: pickTaskPassage(arr, 1, 'task2') }
 }
 
-export function WritingRunner({ testId }: { testId: string }) {
+// AI-012: preview mode cho admin (như ExamRunner) — payload bơm từ form, KHÔNG API/attempt/chấm.
+export function WritingRunner({ testId, preview }: { testId: string; preview?: { payload: ExamPayload } }) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [attempt, setAttempt] = useState<AttemptDTO | null>(null)
   const [payload, setPayload] = useState<ExamPayload | null>(null)
@@ -48,6 +49,12 @@ export function WritingRunner({ testId }: { testId: string }) {
   const [restarting, setRestarting] = useState(false)
 
   useEffect(() => {
+    // AI-012: preview — payload có sẵn từ form admin, không tạo attempt, không gọi API nào.
+    if (preview) {
+      setPayload(preview.payload)
+      setPhase('active')
+      return
+    }
     let active = true
     ;(async () => {
       try {
@@ -84,7 +91,7 @@ export function WritingRunner({ testId }: { testId: string }) {
     return () => {
       active = false
     }
-  }, [testId])
+  }, [testId, preview])
 
   const prompts = useMemo(() => getPrompts(payload), [payload])
   const wc1 = countWords(task1)
@@ -271,12 +278,14 @@ export function WritingRunner({ testId }: { testId: string }) {
               />
               {errorMsg && <p className="dcx-w-alert" style={{ marginTop: 12 }}>{errorMsg}</p>}
               <div className="dcx-w-editor-actions">
-                <button className="dcx-w-grade" onClick={submit} disabled={!canSubmit || submitting}>
+                <button className="dcx-w-grade" onClick={submit} disabled={!!preview || !canSubmit || submitting}>
                   <SparkleIcon className="h-[18px] w-[18px]" />
                   {submitting ? 'Đang chấm…' : 'Chấm bằng AI'}
                 </button>
                 <span className="dcx-w-grade-note">
-                  {canSubmit ? 'AI chấm theo 4 tiêu chí band descriptor' : `Cần đủ ${T1_MIN} từ (Task 1) và ${T2_MIN} từ (Task 2).`}
+                  {preview
+                    ? 'Chế độ xem trước (admin) — không tạo bài làm, không chấm.'
+                    : canSubmit ? 'AI chấm theo 4 tiêu chí band descriptor' : `Cần đủ ${T1_MIN} từ (Task 1) và ${T2_MIN} từ (Task 2).`}
                 </span>
               </div>
             </div>
@@ -285,8 +294,8 @@ export function WritingRunner({ testId }: { testId: string }) {
 
         {/* Footer */}
         <div className="dcx-w-footer">
-          <span className="dcx-w-footer-note">Task 1 &amp; Task 2 sẽ được nộp cùng lúc.</span>
-          <button className="dcx-submit" onClick={submit} disabled={!canSubmit || submitting}>
+          <span className="dcx-w-footer-note">{preview ? 'Xem trước — nút nộp bị khoá.' : 'Task 1 & Task 2 sẽ được nộp cùng lúc.'}</span>
+          <button className="dcx-submit" onClick={submit} disabled={!!preview || !canSubmit || submitting}>
             {submitting ? 'Đang chấm…' : 'Nộp bài viết'} <CheckIcon className="h-4 w-4" />
           </button>
         </div>

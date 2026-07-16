@@ -59,6 +59,15 @@ check("buildPayload: writing → answer_keys {} (xoá key rác nếu đề từn
   /answer_keys:\s*type === 'writing' \? \{\} : answer_keys/.test(form))
 check('lint bỏ toàn bộ check câu hỏi khi writing', /if \(type === 'writing'\) return out/.test(form))
 
+console.log('\nAI-012 — Xem giao diện thi cho Writing (preview không-API):')
+const wrunner = stripComments(read('components/writing/WritingRunner.tsx'))
+check('WritingRunner nhận prop preview', /preview\?: \{ payload: ExamPayload \}/.test(wrunner))
+check('preview → bơm payload + active, KHÔNG fetch', /if \(preview\) \{\s*setPayload\(preview\.payload\)\s*setPhase\('active'\)\s*return\s*\}/.test(wrunner))
+check('preview khoá nút chấm/nộp', (wrunner.match(/disabled=\{!!preview \|\| !canSubmit \|\| submitting\}/g) ?? []).length === 2)
+check('form: overlay chọn WritingRunner cho writing', /type === 'writing' \? \(\s*<WritingRunner testId="__admin_preview__" preview=\{\{ payload: examPreview\.payload \}\}/.test(form))
+check('form: nút preview KHÔNG còn disabled với writing', !/disabled=\{type === 'writing'\}/.test(form))
+check('form: payload preview mang image + id chuẩn hoá', /type === 'writing' \? normalizeWritingPassageIds\(passages\) : passages/.test(form))
+
 console.log('\nAI-006 — BUG 2: SQL publish guard chặn writing rác:')
 const migs = readdirSync(resolve(root, 'supabase/migrations')).filter((f) => f >= '20260717')
 const guardMig = migs.find((f) => /writing_publish_guard/.test(f))
