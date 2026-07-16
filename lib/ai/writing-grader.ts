@@ -14,7 +14,8 @@ import { logEvent } from '@/lib/obs/log-event'
 //   KHÔNG tin overall do AI trả (server compute ở lib/exam/writing.ts).
 // W11: prompt caching cho stable rubric/system block + optional bounded error_highlights.
 // A2 (2026-07-08, Owner quyết): thêm adapter OpenAI (fetch thuần, không thêm SDK). Chọn provider:
-//   WRITING_AI_PROVIDER=openai|anthropic; không set → tự chọn theo key có sẵn (anthropic ưu tiên).
+//   WRITING_AI_PROVIDER=openai|anthropic; không set → openai (AI-004: Owner chốt OpenAI 2026-07-16;
+//   anthropic là ĐƯỜNG LUI, chọn lại bằng env, không sửa code).
 //   Cả 2 provider ĐI QUA CÙNG validateAiGradeOutput — schema/band rule không đổi.
 // AI-001 (batch 21): mọi lời gọi provider có DEADLINE (gradeTimeoutMs) — Anthropic SDK qua signal +
 //   maxRetries:0 (không auto-retry gây nhân đôi chi phí), OpenAI qua fetchWithDeadline. Hang → throw →
@@ -150,8 +151,8 @@ function mockGrade(input: GraderInput): RawAiGrade {
   return { task1: task(input.task1_text, 4.5), task2: task(input.task2_text, 4.5) }
 }
 
-// F5 — mock CHỈ khi: (a) bật tường minh WRITING_GRADER_MOCK=1 (test/dev), hoặc (b) thiếu ANTHROPIC_API_KEY
-//   Ở MÔI TRƯỜNG NON-PROD. Prod thiếu key → KHÔNG mock âm thầm: rơi xuống nhánh LIVE, SDK thiếu key sẽ throw
+// F5 — mock CHỈ khi: (a) bật tường minh WRITING_GRADER_MOCK=1 (test/dev), hoặc (b) thiếu CẢ HAI key AI
+//   Ở MÔI TRƯỜNG NON-PROD. Prod thiếu key → KHÔNG mock âm thầm: rơi xuống nhánh LIVE, thiếu key sẽ throw
 //   → AI_UNAVAILABLE (fail loud), KHÔNG trả band giả cho người dùng trả tiền.
 //   (Tên KHÔNG bắt đầu bằng "use" để tránh eslint react-hooks/rules-of-hooks hiểu nhầm là React hook.)
 function mockEnabled(): boolean {
