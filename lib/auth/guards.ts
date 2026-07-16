@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { banVerdict } from '@/lib/auth/ban-check'
 
 // SEC-001 — Ban-aware resolver (nguồn duy nhất): getUser() xác thực JWT, rồi is_user_banned() (RPC
 // đọc auth.users.banned_until) chặn token cũ của user đã bị ban. Ban qua Supabase Auth chỉ chặn
@@ -10,14 +11,17 @@ import { createClient } from '@/lib/supabase/server'
 //   - banned=true → null (route trả 401/403 TRƯỚC business logic).
 //   - RPC lỗi (vd DB chưa migrate) → fail-open, coi như không ban: tránh global outage; direct
 //     PostgREST write vẫn bị RLS chặn cứng ở DB. Deploy DB TRƯỚC server để đóng cửa sổ này.
+// AUTH-009 (2026-07-17): code cũ `if (error) return null` = fail-CLOSED, NGƯỢC với thiết kế trên —
+//   prod thiếu migration → PGRST202 → mọi user đăng nhập bị coi là chưa đăng nhập → loop
+//   /login?next=/admin ↔ /admin + mọi API authed 401. Phán quyết chuyển về lib/auth/ban-check.ts
+//   (thuần, test được): CHỈ deny khi banned === true tường minh.
 export async function getAuthedUser(supabase: SupabaseClient): Promise<User | null> {
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
   const { data: banned, error } = await supabase.rpc('is_user_banned', { uid: user.id })
-  if (error) return null
-  if (banned === true) return null
+  if (banVerdict(banned, error) === 'deny') return null
   return user
 }
 
