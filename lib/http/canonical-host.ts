@@ -39,7 +39,13 @@ export function canonicalRedirectTarget(input: CanonicalInput): string | null {
     return null
   }
   const reqHost = input.host.trim().toLowerCase()
-  if (reqHost === canonical.host.toLowerCase()) return null // đã đúng nhà
+  const canonicalHost = canonical.host.toLowerCase()
+  if (reqHost === canonicalHost) return null // đã đúng nhà
+  // FOOTGUN THẬT (prod 2026-07-17): Vercel primary domain = WWW, apex 308 → www ở EDGE (trước cả
+  //   middleware). Nếu NEXT_PUBLIC_SITE_URL lỡ đặt biến thể kia (apex thay vì www hoặc ngược lại),
+  //   middleware kéo về một hướng, Vercel edge kéo về hướng kia → ERR_TOO_MANY_REDIRECTS, SẬP TOÀN
+  //   SITE. apex↔www của CÙNG domain là chủ quyền của Vercel domain config — middleware không đụng.
+  if (reqHost === `www.${canonicalHost}` || canonicalHost === `www.${reqHost}`) return null
   return `${canonical.origin}${input.pathname}${input.search}`
 }
 
