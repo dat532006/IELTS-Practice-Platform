@@ -45,6 +45,8 @@ export function sanitizePassages<T>(passages: T): T {
     const rec = p as Record<string, unknown>
     let out = rec
     if (isRichHtml(rec.content)) out = { ...out, content: sanitizePassageHtml(rec.content) }
+    // AI-015: hint (gợi ý dàn bài Writing) cũng soạn rich như passage → cùng allowlist sanitize.
+    if (isRichHtml(rec.hint)) out = { ...out, hint: sanitizePassageHtml(rec.hint) }
     if ('image' in rec) {
       const img = sanitizePassageImageUrl(rec.image)
       if (img) out = out === rec ? { ...rec, image: img } : { ...out, image: img }

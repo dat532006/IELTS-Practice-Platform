@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RichTextEditor, plainToHtml, looksRich } from './RichTextEditor'
 import { sanitizePassageHtmlClient } from '@/lib/sanitize/passage-html-client'
-import { normalizeWritingPassageIds, lintWritingPrompts } from '@/lib/exam/writing-prompts'
+import { normalizeWritingPassageIds, lintWritingPrompts, isBlankHtml } from '@/lib/exam/writing-prompts'
 import { ExamRunner } from '@/components/exam/ExamRunner'
 import { WritingRunner } from '@/components/writing/WritingRunner'
 import { examFontVars } from '@/app/exam-fonts'
@@ -274,7 +274,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
     const payload: ExamPayload = {
       test: { id: '__admin_preview__', title: title || '(Chưa có tiêu đề)', skill: type, is_free: isFree },
       // AI-012: preview writing cần cả image (biểu đồ Task 1) + id chuẩn task1/task2 như lúc lưu thật.
-      passages: (type === 'writing' ? normalizeWritingPassageIds(passages) : passages).map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), ...(p.image ? { image: p.image } : {}), ...(p.hint?.trim() ? { hint: p.hint.trim() } : {}), content: p.content })),
+      passages: (type === 'writing' ? normalizeWritingPassageIds(passages) : passages).map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), ...(p.image ? { image: p.image } : {}), ...(p.hint && !isBlankHtml(p.hint) ? { hint: p.hint } : {}), content: p.content })),
       questions: type === 'writing' ? [] : questions.map(emitQuestion), // rich fields (options/instruction/image/x/y) để preview đúng format thi
       audio_url: null, // audio ký URL chỉ sau access guard — preview không phát audio
     }
@@ -379,7 +379,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
     // AI-006: writing → ép id passage về task1/task2 NGAY LÚC LƯU. Form sinh uid('p') không bao giờ
     //   trùng 'task1' → runtime rơi về khớp VỊ TRÍ, đảo/thêm/xoá passage là tráo đề Task 1 ↔ Task 2
     //   âm thầm. Passage ĐÃ mang id task giữ nguyên (id thắng vị trí) — xem lib/exam/writing-prompts.ts.
-    const pOut = passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), ...(p.image ? { image: p.image } : {}), ...(p.hint?.trim() ? { hint: p.hint.trim() } : {}), content: p.content }))
+    const pOut = passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), ...(p.image ? { image: p.image } : {}), ...(p.hint && !isBlankHtml(p.hint) ? { hint: p.hint } : {}), content: p.content }))
     return {
       title,
       type,
@@ -445,7 +445,9 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       const out: Passage = { id: String(p.id ?? uid('p')), title: str(p.title), content }
       if (str(p.subtitle)) out.subtitle = str(p.subtitle)
       if (str(p.image)) out.image = str(p.image) // AI-010: biểu đồ đề (server validate allowlist khi lưu)
-      if (str(p.hint)) out.hint = str(p.hint) // AI-014: gợi ý dàn bài tự viết
+      // AI-015: hint có thể là HTML rich từ draft/edit — sanitize client như content (SEC-006).
+      const rawHint = str(p.hint)
+      if (rawHint) out.hint = looksRich(rawHint) ? sanitizePassageHtmlClient(rawHint) : rawHint
       return out
     })
 
@@ -873,15 +875,19 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                   )}
                 </div>
               )}
-              {/* AI-014: gợi ý dàn bài tự viết — học viên bấm 💡 mới thấy; bỏ trống = không có nút. */}
+              {/* AI-015: gợi ý dàn bài soạn RICH như passage (đậm/nghiêng/danh sách) — học viên bấm
+                  nút 💡 (toggle) mới thấy; bỏ trống = không có nút. Editor tự giãn theo nội dung. */}
               {type === 'writing' && (
-                <textarea
-                  className={`${inputCls} mt-2 min-h-[70px]`}
-                  value={p.hint ?? ''}
-                  onChange={(e) => setP(i, { hint: e.target.value })}
-                  placeholder={`💡 Gợi ý dàn bài cho Task ${i + 1} (tuỳ chọn) — mỗi ý 1 dòng. Học viên bấm nút gợi ý mới thấy; bỏ trống = không hiện nút.`}
-                  data-passage-hint
-                />
+                <div className="mt-2" data-passage-hint>
+                  <div className="mb-1 text-[12.5px] font-bold text-[#6A48D6]">
+                    💡 Gợi ý dàn bài cho Task {i + 1} (tuỳ chọn — bỏ trống = không hiện nút)
+                  </div>
+                  <RichTextEditor
+                    value={p.hint && looksRich(p.hint) ? p.hint : plainToHtml(p.hint ?? '')}
+                    onChange={(html) => setP(i, { hint: html })}
+                    placeholder="Mở bài: paraphrase đề… · Overview: … · Body 1: … — đậm/nghiêng/danh sách như soạn passage."
+                  />
+                </div>
               )}
               {/* Soạn nội dung passage kiểu Word (WYSIWYG): tiêu đề/phụ đề/đoạn/đậm-nghiêng/căn lề/danh sách bằng
                   nút bấm. Xuất HTML → server sanitize allowlist trước khi tới thí sinh. Dán từ Word được dọn sạch. */}
