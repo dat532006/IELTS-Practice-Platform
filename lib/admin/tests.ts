@@ -47,6 +47,8 @@ const PassageSchema = z.object({
   subtitle: z.string().max(2000).optional(),
   content: z.string().max(200000).optional(),
   image: z.string().max(2000).optional(),
+  // AI-014: gợi ý dàn bài do admin viết (Writing) — TEXT thuần, render escaped, bấm 💡 mới hiện.
+  hint: z.string().max(4000).optional(),
 })
 
 export const TestInputSchema = z.object({

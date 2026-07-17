@@ -11,7 +11,7 @@ import { MenuIcon, CloseIcon, CheckIcon, SparkleIcon, ArrowLeft } from '@/compon
 // W10 — Writing UI (M07). dc-exam restyle: tab Task1/Task2 + 1 editor, word count realtime,
 //   chấm qua /api/grade-writing → modal AI (band + 4 tiêu chí). LUẬT THÉP #2/#12: KHÔNG tự tính band.
 type Phase = 'loading' | 'locked' | 'notfound' | 'error' | 'active' | 'submitting' | 'result'
-type Passage = { id?: string; number?: number; title?: string; content?: string; image?: string }
+type Passage = { id?: string; number?: number; title?: string; content?: string; image?: string; hint?: string }
 
 // AI-010: đề soạn WYSIWYG là HTML rich → render qua dangerouslySetInnerHTML (đã sanitize server 2 lần:
 //   lúc lưu + /api/exam trả). Bug cũ: render {content} như TEXT → học viên thấy nguyên thẻ <p>.
@@ -47,6 +47,8 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
   const [aiOpen, setAiOpen] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [restarting, setRestarting] = useState(false)
+  // AI-014: gợi ý mở theo TỪNG task (mở task 1 không tự đóng khi mở task 2).
+  const [hintOpen, setHintOpen] = useState<Record<number, boolean>>({})
 
   useEffect(() => {
     // AI-012: preview — payload có sẵn từ form admin, không tạo attempt, không gọi API nào.
@@ -241,17 +243,31 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
                 />
               </div>
             )}
-            {tab === 1 ? null : (
-              <div className="dcx-w-hint">
-                <div className="dcx-w-hint-title">Gợi ý dàn bài</div>
-                <div className="dcx-w-hint-body">
-                  • Mở bài: giới thiệu chủ đề &amp; nêu quan điểm<br />
-                  • Thân bài 1: luận điểm thứ nhất + ví dụ<br />
-                  • Thân bài 2: luận điểm thứ hai + ví dụ<br />
-                  • Kết bài: khẳng định lại quan điểm
+            {/* AI-014 (Owner 2026-07-17): gợi ý do ADMIN tự viết theo đề (passage.hint) — bấm 💡 mới
+                hiện (mặc định ẩn để học viên tự nghĩ trước). Khối "Gợi ý dàn bài" CỨNG chung chung
+                trước đây đã bỏ. Không có hint → không có nút. Render TEXT thuần (React escape). */}
+            {typeof (tab === 1 ? prompts.task1 : prompts.task2)?.hint === 'string' &&
+              ((tab === 1 ? prompts.task1 : prompts.task2)!.hint as string).trim() !== '' && (
+                <div className="dcx-w-hint">
+                  {hintOpen[tab] ? (
+                    <>
+                      <div className="dcx-w-hint-title">💡 Gợi ý dàn bài</div>
+                      <div className="dcx-w-hint-body" style={{ whiteSpace: 'pre-line' }}>
+                        {(tab === 1 ? prompts.task1 : prompts.task2)!.hint}
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="dcx-w-hint-title"
+                      style={{ cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
+                      onClick={() => setHintOpen((h) => ({ ...h, [tab]: true }))}
+                    >
+                      💡 Xem gợi ý dàn bài
+                    </button>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
           </div>
 
           <div className="dcx-w-vsep" />
