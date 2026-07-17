@@ -11,6 +11,7 @@ import { FishBone } from '@/components/brand/FishBone'
 import { Header } from '@/components/layout/Header'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import './home.css'
+import './home-cards.css'
 
 // Fonts from the design (Plus Jakarta Sans + Newsreader italic), exposed as CSS
 // variables and consumed by app/home.css under the `.dc-home` scope.
@@ -57,7 +58,7 @@ async function getLandingData(): Promise<{ hot: LandingProduct[]; free: LandingP
       getProductCatalog(supabase, { sort: 'hot', page_size: '3' }),
       supabase
         .from('tests')
-        .select('id, title, type, is_free, attempts_count')
+        .select('id, title, type, is_free, attempts_count, cover_image')
         .eq('is_free', true)
         .order('attempts_count', { ascending: false })
         .limit(3),
@@ -69,8 +70,9 @@ async function getLandingData(): Promise<{ hot: LandingProduct[]; free: LandingP
       state: p.is_free ? ('free' as const) : ('locked' as const),
       price: p.price_coins,
       href: `/products/${p.slug}`,
+      coverUrl: p.thumbnail_url,
     }))
-    type FreeRow = { id: string; title: string; type: string; attempts_count: number | null }
+    type FreeRow = { id: string; title: string; type: string; attempts_count: number | null; cover_image: string | null }
     const free: LandingProduct[] = ((freeRes.data ?? []) as unknown as FreeRow[]).map((t) => ({
       title: t.title,
       skills: [t.type],
@@ -78,6 +80,7 @@ async function getLandingData(): Promise<{ hot: LandingProduct[]; free: LandingP
       state: 'free' as const,
       price: 0,
       href: `/tests/${t.id}`,
+      coverUrl: t.cover_image,
     }))
     return { hot, free }
   } catch {
