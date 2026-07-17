@@ -15,7 +15,7 @@ import type { ExamPayload } from '@/types/exam'
 //   Guard thật ở server (admin layout + /api/admin/* requireAdmin); form chỉ gọi API. KHÔNG import scoring/secret.
 //   Layout theo design frame 6; logic/data flow GIỮ NGUYÊN (chỉ thay markup).
 type TestType = 'reading' | 'listening' | 'writing'
-type Passage = { id: string; title: string; subtitle?: string; content: string; image?: string }
+type Passage = { id: string; title: string; subtitle?: string; content: string; image?: string; hint?: string }
 type QOpt = { key: string; text: string }
 // QField mang đủ field renderer (M06) hỗ trợ: đáp án tách sang `answers`/`points`/`explanation` (→ answer_keys),
 //   còn lại đi vào tests.questions. instruction/passage_id điều khiển gom nhóm + header "Questions a–b".
@@ -274,7 +274,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
     const payload: ExamPayload = {
       test: { id: '__admin_preview__', title: title || '(Chưa có tiêu đề)', skill: type, is_free: isFree },
       // AI-012: preview writing cần cả image (biểu đồ Task 1) + id chuẩn task1/task2 như lúc lưu thật.
-      passages: (type === 'writing' ? normalizeWritingPassageIds(passages) : passages).map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), ...(p.image ? { image: p.image } : {}), content: p.content })),
+      passages: (type === 'writing' ? normalizeWritingPassageIds(passages) : passages).map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), ...(p.image ? { image: p.image } : {}), ...(p.hint?.trim() ? { hint: p.hint.trim() } : {}), content: p.content })),
       questions: type === 'writing' ? [] : questions.map(emitQuestion), // rich fields (options/instruction/image/x/y) để preview đúng format thi
       audio_url: null, // audio ký URL chỉ sau access guard — preview không phát audio
     }
@@ -379,7 +379,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
     // AI-006: writing → ép id passage về task1/task2 NGAY LÚC LƯU. Form sinh uid('p') không bao giờ
     //   trùng 'task1' → runtime rơi về khớp VỊ TRÍ, đảo/thêm/xoá passage là tráo đề Task 1 ↔ Task 2
     //   âm thầm. Passage ĐÃ mang id task giữ nguyên (id thắng vị trí) — xem lib/exam/writing-prompts.ts.
-    const pOut = passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), ...(p.image ? { image: p.image } : {}), content: p.content }))
+    const pOut = passages.map((p) => ({ id: p.id, title: p.title, ...(p.subtitle?.trim() ? { subtitle: p.subtitle.trim() } : {}), ...(p.image ? { image: p.image } : {}), ...(p.hint?.trim() ? { hint: p.hint.trim() } : {}), content: p.content }))
     return {
       title,
       type,
@@ -445,6 +445,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       const out: Passage = { id: String(p.id ?? uid('p')), title: str(p.title), content }
       if (str(p.subtitle)) out.subtitle = str(p.subtitle)
       if (str(p.image)) out.image = str(p.image) // AI-010: biểu đồ đề (server validate allowlist khi lưu)
+      if (str(p.hint)) out.hint = str(p.hint) // AI-014: gợi ý dàn bài tự viết
       return out
     })
 
@@ -871,6 +872,16 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                     </label>
                   )}
                 </div>
+              )}
+              {/* AI-014: gợi ý dàn bài tự viết — học viên bấm 💡 mới thấy; bỏ trống = không có nút. */}
+              {type === 'writing' && (
+                <textarea
+                  className={`${inputCls} mt-2 min-h-[70px]`}
+                  value={p.hint ?? ''}
+                  onChange={(e) => setP(i, { hint: e.target.value })}
+                  placeholder={`💡 Gợi ý dàn bài cho Task ${i + 1} (tuỳ chọn) — mỗi ý 1 dòng. Học viên bấm nút gợi ý mới thấy; bỏ trống = không hiện nút.`}
+                  data-passage-hint
+                />
               )}
               {/* Soạn nội dung passage kiểu Word (WYSIWYG): tiêu đề/phụ đề/đoạn/đậm-nghiêng/căn lề/danh sách bằng
                   nút bấm. Xuất HTML → server sanitize allowlist trước khi tới thí sinh. Dán từ Word được dọn sạch. */}

@@ -67,6 +67,16 @@ check('preview → bơm payload + active, KHÔNG fetch', /if \(preview\) \{\s*se
 check('preview khoá nút nộp (CTA duy nhất)', (wrunner.match(/disabled=\{!!preview \|\| !canSubmit \|\| submitting\}/g) ?? []).length === 1)
 check('KHÔNG còn nút "Chấm bằng AI" riêng (gợi ý sai chấm-không-nộp)', !/Chấm bằng AI'/.test(wrunner))
 check('CTA nói thật cả hai việc', /Nộp bài & chấm AI/.test(wrunner))
+
+console.log('\nAI-014 — gợi ý dàn bài do admin viết, bấm mới hiện:')
+const adminSrc = stripComments(read('lib/admin/tests.ts'))
+check('PassageSchema có hint (text, cap 4000)', /hint:\s*z\.string\(\)\.max\(4000\)\.optional\(\)/.test(adminSrc))
+check('KHÔNG còn khối "Gợi ý dàn bài" CỨNG trong runner', !/Mở bài: giới thiệu chủ đề/.test(wrunner))
+check('có nút bấm mới hiện (hintOpen theo từng task)', /setHintOpen\(\(h\) => \(\{ \.\.\.h, \[tab\]: true \}\)\)/.test(wrunner))
+check('hint render TEXT thuần pre-line (không dangerouslySetInnerHTML)', /whiteSpace: 'pre-line'/.test(wrunner))
+check('form có ô nhập hint (writing)', /data-passage-hint/.test(form))
+check('buildPayload + preview + applyDraft mang hint',
+  (form.match(/hint: p\.hint\.trim\(\)/g) ?? []).length === 2 && /out\.hint = str\(p\.hint\)/.test(form))
 check('form: overlay chọn WritingRunner cho writing', /type === 'writing' \? \(\s*<WritingRunner testId="__admin_preview__" preview=\{\{ payload: examPreview\.payload \}\}/.test(form))
 check('form: nút preview KHÔNG còn disabled với writing', !/disabled=\{type === 'writing'\}/.test(form))
 check('form: payload preview mang image + id chuẩn hoá', /type === 'writing' \? normalizeWritingPassageIds\(passages\) : passages/.test(form))
