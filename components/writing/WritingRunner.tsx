@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { AttemptDTO, ExamPayload, WritingGradeResult } from '@/types/exam'
 import { pickTaskPassage, isBlankHtml } from '@/lib/exam/writing-prompts'
 import { WritingResultView } from '@/components/writing/WritingResultView'
+import { WritingFeedback } from '@/components/writing/WritingFeedback'
 import { A11yDialog } from '@/components/a11y/A11yDialog'
 import { MenuIcon, CloseIcon, CheckIcon, SparkleIcon, ArrowLeft } from '@/components/exam/ExamIcons'
 
@@ -367,7 +368,11 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
                   )
                 })}
               </div>
-              {modalGrade.feedback && <p className="dcx-ai-fb">{modalGrade.feedback}</p>}
+              {modalGrade.feedback && (
+                <div className="mt-5">
+                  <WritingFeedback feedback={modalGrade.feedback} compact />
+                </div>
+              )}
               {modalGrade.suggestions?.length > 0 && (
                 <div className="dcx-ai-tip">
                   <b>Gợi ý · </b>
