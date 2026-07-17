@@ -249,8 +249,10 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
             {(() => {
               const hint = (tab === 1 ? prompts.task1 : prompts.task2)?.hint
               if (typeof hint !== 'string' || isBlankHtml(hint)) return null
+              // Nút đứng NGOÀI khung: đóng = chỉ còn đúng nút vuông (khung .dcx-w-hint có nền/padding,
+              // để nút bên trong là lúc đóng vẽ ra hộp rỗng to đùng — Owner báo 2026-07-17).
               return (
-                <div className="dcx-w-hint">
+                <div style={{ marginTop: 10 }}>
                   <button
                     type="button"
                     aria-expanded={!!hintOpen[tab]}
@@ -264,12 +266,16 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
                   >
                     💡
                   </button>
-                  {hintOpen[tab] &&
-                    (RICH_RE.test(hint) ? (
-                      <div className="dcx-w-hint-body dcx-rich" style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: hint }} />
-                    ) : (
-                      <div className="dcx-w-hint-body" style={{ marginTop: 8, whiteSpace: 'pre-line' }}>{hint}</div>
-                    ))}
+                  {hintOpen[tab] && (
+                    <div className="dcx-w-hint" style={{ marginTop: 8 }}>
+                      <div className="dcx-w-hint-title">💡 Gợi ý dàn bài</div>
+                      {RICH_RE.test(hint) ? (
+                        <div className="dcx-w-hint-body dcx-rich" dangerouslySetInnerHTML={{ __html: hint }} />
+                      ) : (
+                        <div className="dcx-w-hint-body" style={{ whiteSpace: 'pre-line' }}>{hint}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })()}
