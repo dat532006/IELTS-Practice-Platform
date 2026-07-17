@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { FishBone } from '@/components/brand/FishBone'
 
-// W17 — Dashboard tổng quan (M09). Fetch /api/dashboard (server tính, RLS own-only). KHÔNG tự suy dữ liệu client.
 type TestRef = { title: string | null; type: string | null; slug: string | null } | null
 type RecentAttempt = {
   id: string
@@ -13,6 +12,7 @@ type RecentAttempt = {
   raw_score: number | null
   submitted_at: string | null
   started_at: string | null
+  result_href: string | null
   tests: TestRef
 }
 type DashboardData = {
@@ -29,7 +29,8 @@ type DashboardData = {
 }
 
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('vi-VN') : '—')
-const skillLabel = (t: string | null) => (t === 'reading' ? 'Reading' : t === 'listening' ? 'Listening' : t === 'writing' ? 'Writing' : '—')
+const skillLabel = (type: string | null) =>
+  type === 'reading' ? 'Reading' : type === 'listening' ? 'Listening' : type === 'writing' ? 'Writing' : '—'
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -39,6 +40,39 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint?:
       {hint && <div className="mt-0.5 text-[12px] font-semibold text-[#A8A2BA]">{hint}</div>}
     </div>
   )
+}
+
+function RecentAttemptItem({ attempt }: { attempt: RecentAttempt }) {
+  const content = (
+    <>
+      <div className="min-w-0">
+        <div className="truncate text-[14px] font-bold text-[#2A2740]">{attempt.tests?.title || 'Bài luyện tập'}</div>
+        <div className="mt-0.5 text-[12.5px] font-semibold text-[#A8A2BA]">
+          {skillLabel(attempt.tests?.type ?? null)} · {fmtDate(attempt.submitted_at || attempt.started_at)}
+        </div>
+      </div>
+      <div className="flex-none text-right">
+        <div className="text-[16px] font-extrabold text-[#6A48D6]">
+          {attempt.band != null ? `Band ${attempt.band.toFixed(1)}` : attempt.status === 'submitted' ? '—' : 'Đang làm'}
+        </div>
+        {attempt.result_href && <div className="mt-0.5 text-[11.5px] font-extrabold text-[#7C5CE6]">Xem chi tiết →</div>}
+      </div>
+    </>
+  )
+
+  if (attempt.result_href) {
+    return (
+      <Link
+        href={attempt.result_href}
+        className="flex items-center justify-between gap-4 px-5 py-3.5 transition hover:bg-[#F8F5FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7C5CE6]"
+        aria-label={`Xem chi tiết kết quả ${attempt.tests?.title || 'bài luyện tập'}`}
+      >
+        {content}
+      </Link>
+    )
+  }
+
+  return <div className="flex items-center justify-between gap-4 px-5 py-3.5">{content}</div>
 }
 
 export default function DashboardPage() {
@@ -53,19 +87,28 @@ export default function DashboardPage() {
         if (res.status === 401) return alive && setState('unauth')
         const body = await res.json().catch(() => null)
         if (!res.ok || !body?.data) return alive && setState('error')
-        if (alive) { setData(body.data as DashboardData); setState('ok') }
+        if (alive) {
+          setData(body.data as DashboardData)
+          setState('ok')
+        }
       } catch {
         if (alive) setState('error')
       }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [])
 
   if (state === 'loading') return <p className="text-[14px] text-[#857F96]">Đang tải…</p>
   if (state === 'unauth')
     return (
       <p className="text-[14px] text-[#857F96]">
-        Bạn cần <Link href="/login" className="font-bold text-[#6A48D6] underline">đăng nhập</Link> để xem bảng điều khiển.
+        Bạn cần{' '}
+        <Link href="/login" className="font-bold text-[#6A48D6] underline">
+          đăng nhập
+        </Link>{' '}
+        để xem bảng điều khiển.
       </p>
     )
   if (state === 'error' || !data) return <p className="text-[14px] text-rose-600">Không tải được dữ liệu. Vui lòng thử lại.</p>
@@ -73,12 +116,15 @@ export default function DashboardPage() {
   const { profile, stats, recent_attempts } = data
   return (
     <div>
-      {/* Header card */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-[#EEEAF3] bg-[#FBFAFF] px-6 py-5">
         <div>
           <div className="text-[18px] font-extrabold text-[#2A2740]">Chào {profile.name || profile.email || 'bạn'} 👋</div>
           <div className="mt-1 flex items-center gap-2 text-[13px] font-semibold text-[#857F96]">
-            <span className={`rounded-full px-2.5 py-0.5 text-[12px] font-bold ${profile.plan === 'pro' ? 'bg-[#F0ECFF] text-[#6A48D6]' : 'bg-[#EEF0F4] text-[#6B7280]'}`}>
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-[12px] font-bold ${
+                profile.plan === 'pro' ? 'bg-[#F0ECFF] text-[#6A48D6]' : 'bg-[#EEF0F4] text-[#6B7280]'
+              }`}
+            >
               {profile.plan === 'pro' ? 'PRO' : 'FREE'}
             </span>
             <span className="inline-flex items-center gap-1.5">
@@ -94,7 +140,6 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* Stats */}
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
         <StatCard label="Đã làm" value={String(stats.attempts_total)} hint={`${stats.attempts_submitted} đã nộp`} />
         <StatCard label="Band TB" value={stats.avg_band != null ? stats.avg_band.toFixed(1) : '—'} hint="các bài đã nộp" />
@@ -103,27 +148,25 @@ export default function DashboardPage() {
         <StatCard label="Đã lưu" value={String(stats.bookmarks_count)} hint="bookmark" />
       </div>
 
-      {/* Recent */}
       <div className="mt-8">
         <div className="flex items-center justify-between">
           <h2 className="text-[16px] font-extrabold text-[#2A2740]">Hoạt động gần đây</h2>
-          <Link href="/dashboard/history" className="text-[13px] font-bold text-[#6A48D6] hover:underline">Xem tất cả →</Link>
+          <Link href="/dashboard/history" className="text-[13px] font-bold text-[#6A48D6] hover:underline">
+            Xem tất cả →
+          </Link>
         </div>
         {recent_attempts.length === 0 ? (
-          <p className="mt-3 text-[14px] text-[#857F96]">Chưa có bài làm nào. <Link href="/products" className="font-bold text-[#6A48D6] underline">Bắt đầu luyện tập →</Link></p>
+          <p className="mt-3 text-[14px] text-[#857F96]">
+            Chưa có bài làm nào.{' '}
+            <Link href="/products" className="font-bold text-[#6A48D6] underline">
+              Bắt đầu luyện tập →
+            </Link>
+          </p>
         ) : (
-          <ul className="mt-3 divide-y divide-[#F1EEF7] rounded-[16px] border border-[#EEEAF3] bg-white">
-            {recent_attempts.map((a) => (
-              <li key={a.id} className="flex items-center justify-between px-5 py-3.5">
-                <div>
-                  <div className="text-[14px] font-bold text-[#2A2740]">{a.tests?.title || 'Bài luyện tập'}</div>
-                  <div className="mt-0.5 text-[12.5px] font-semibold text-[#A8A2BA]">
-                    {skillLabel(a.tests?.type ?? null)} · {fmtDate(a.submitted_at || a.started_at)}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[16px] font-extrabold text-[#6A48D6]">{a.band != null ? `Band ${a.band.toFixed(1)}` : a.status === 'submitted' ? '—' : 'Đang làm'}</div>
-                </div>
+          <ul className="mt-3 divide-y divide-[#F1EEF7] overflow-hidden rounded-[16px] border border-[#EEEAF3] bg-white">
+            {recent_attempts.map((attempt) => (
+              <li key={attempt.id}>
+                <RecentAttemptItem attempt={attempt} />
               </li>
             ))}
           </ul>
