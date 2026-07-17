@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { WritingRunner } from '@/components/writing/WritingRunner'
 import { examFontVars } from '@/app/exam-fonts'
+import { testEntryPath } from '@/lib/exam/entry-route'
+import type { ExamSkill } from '@/types/exam'
 import '../../exam.css'
 
 // W10 — /writing/[id] (M07). Writing test (type='writing'): 2 cột đề | vùng viết Task 1+2 + AI result.
@@ -10,6 +12,9 @@ import '../../exam.css'
 export default async function WritingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
+  const { data: test } = await supabase.from('tests').select('type').eq('id', id).maybeSingle()
+  const canonicalPath = test?.type ? testEntryPath(test.type as ExamSkill, id) : `/writing/${id}`
+  if (canonicalPath !== `/writing/${id}`) redirect(canonicalPath)
   const {
     data: { user },
   } = await supabase.auth.getUser()

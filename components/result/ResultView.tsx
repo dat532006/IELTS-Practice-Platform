@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { SKILL_LABEL } from '@/lib/products/access-state'
+import { testEntryPath } from '@/lib/exam/entry-route'
 import { ReviewList } from '@/components/result/ReviewList'
 import type { ResultDTO, ReviewItem } from '@/types/exam'
 
@@ -256,7 +257,7 @@ export function ResultView({ attemptId }: { attemptId: string }) {
             Xem lại trong bài (đáp án + evidence) <span aria-hidden>→</span>
           </Link>
           <Link
-            href={`/exam/${data.test.id}`}
+            href={testEntryPath(data.test.skill, data.test.id)}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
           >
             Thử lại bài kiểm tra <span aria-hidden>→</span>

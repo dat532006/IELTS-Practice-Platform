@@ -17,7 +17,7 @@ export function deriveTestUiState(test: TestAccess, isAuthed: boolean): TestUiSt
   return isAuthed ? 'locked_auth' : 'locked_guest'
 }
 
-// CHỈ khi true mới được render link tới /exam/[id] (Task 4.3 ready signal / LUẬT THÉP #3).
+// CHỈ khi true mới được render link tới route làm bài theo kỹ năng (Task 4.3 ready signal / LUẬT THÉP #3).
 export function canEnterExam(test: TestAccess): boolean {
   return test.is_free || !test.locked
 }

@@ -6,10 +6,11 @@ import { canEnterExam, deriveTestUiState, formatDurationMin } from '@/lib/produc
 import { skillMeta, SkillGlyph } from '@/components/brand/skill'
 import { FishBone } from '@/components/brand/FishBone'
 import { isUuid } from '@/lib/utils'
+import { testEntryPath } from '@/lib/exam/entry-route'
 import type { ExamSkill } from '@/types/exam'
 
 // W4 — Pre-exam page (M05). Server component đọc getTestMeta (SAFE metadata, KHÔNG payload).
-//   CTA theo access-state: free/unlocked → /exam/[id]; locked → login (guest) / mua bundle (auth).
+//   CTA theo access-state: free/unlocked → route theo kỹ năng; locked → login (guest) / mua bundle (auth).
 // 2026-07 redesign: đưa body về ngôn ngữ thương hiệu (tím/san hô) như homepage & product detail.
 //   Header/Footer giữ nguyên. KHÔNG đổi data-fetch/access-logic — chỉ trình bày.
 
@@ -210,7 +211,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
           {canEnter ? (
             <>
               <Link
-                href={`/exam/${meta.id}`}
+                href={testEntryPath(meta.skill, meta.id)}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#7C5CE6] px-[26px] py-[15px] text-[15.5px] font-bold text-white shadow-[0_12px_28px_rgba(124,92,230,0.3)] transition hover:bg-[#6A48D6] sm:w-auto"
               >
                 {meta.is_free ? 'Bắt đầu làm bài →' : 'Vào làm bài →'}
