@@ -64,6 +64,8 @@
   font-size: 9px; font-weight: 800; text-transform: uppercase;
   background: #efebf4; color: #9d96ae; border-radius: 5px; padding: 2px 5px;
 }
+/* On the active (dark) Speaking tab the SOON pill flips to white-on-panel. */
+.dc-home .skill-tab.active .badge-soon { background: rgba(255, 255, 255, .7); color: #c23a6b; }
 
 /* ── Hero ── */
 .dc-home .hero {
@@ -230,10 +232,11 @@
 }
 .dc-home .skill-tab:hover { border-color: #ccc3dc; }
 .dc-home .skill-tab.active { background: #2a2740; color: #fff; border-color: #2a2740; box-shadow: 0 10px 22px -10px rgba(42, 39, 64, .5); }
+/* icon chip — skill-colour rounded square holding a white line glyph (replaces
+   the old R/L/W/S letter monograms) */
 .dc-home .skill-mono {
-  width: 25px; height: 25px; border-radius: 8px; color: #fff;
+  width: 26px; height: 26px; border-radius: 8px; color: #fff; flex: none;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 12.5px;
 }
 .dc-home .skill-panel {
   border-radius: 28px; padding: 42px;
@@ -241,11 +244,10 @@
   border: 1px solid rgba(42, 39, 64, .05);
 }
 .dc-home .skill-copy { flex: 1 1 350px; min-width: min(300px, 100%); }
-.dc-home .skill-name-row { display: inline-flex; align-items: center; gap: 12px; }
+.dc-home .skill-name-row { display: inline-flex; align-items: center; gap: 14px; }
 .dc-home .skill-icon {
-  width: 46px; height: 46px; border-radius: 13px; color: #fff;
+  width: 46px; height: 46px; border-radius: 13px; color: #fff; flex: none;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 20px; box-shadow: 0 8px 18px rgba(0, 0, 0, .12);
 }
 .dc-home .skill-name { font-size: 25px; font-weight: 800; letter-spacing: -.02em; }
 .dc-home .skill-desc { font-size: 16px; color: #4a445e; line-height: 1.65; margin-top: 16px; max-width: 32em; }
@@ -254,17 +256,19 @@
 .dc-home .skill-stat-lbl { font-size: 12.5px; font-weight: 600; color: #857f96; }
 .dc-home .btn-dark {
   display: inline-flex; align-items: center; gap: 8px; margin-top: 26px;
-  font-weight: 700; font-size: 14.5px; color: #fff; background: #2a2740;
-  padding: 13px 22px; border-radius: 12px; transition: background .15s;
+  font-weight: 800; font-size: 14.5px; color: #fff; background: #2a2740;
+  padding: 14px 24px; border-radius: 13px; white-space: nowrap;
+  box-shadow: 0 12px 24px -12px rgba(42, 39, 64, .5); transition: background .15s;
 }
 .dc-home .btn-dark:hover { background: #17152a; }
-.dc-home .skill-card { flex: 1 1 320px; min-width: min(280px, 100%); background: #fff; border-radius: 20px; padding: 24px; box-shadow: 0 20px 44px -22px rgba(42, 39, 64, .32); }
-.dc-home .skill-card-eyebrow { font-size: 12px; font-weight: 700; color: #9d96ae; text-transform: uppercase; letter-spacing: .05em; }
-.dc-home .skill-sample { font-size: 17.5px; font-weight: 700; margin-top: 8px; line-height: 1.45; color: #2a2740; }
-.dc-home .skill-bullets { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
-.dc-home .skill-bullet { display: flex; align-items: center; gap: 11px; font-size: 14px; color: #564f6b; font-weight: 500; }
-.dc-home .bullet-icon { width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex: none; }
-.dc-home .bullet-dot { width: 7px; height: 7px; border-radius: 2px; transform: rotate(45deg); display: block; }
+.dc-home .btn-dark[aria-disabled='true'] { cursor: default; opacity: .82; }
+.dc-home .skill-card { flex: 1 1 340px; min-width: min(300px, 100%); background: #fff; border-radius: 20px; padding: 26px 28px; box-shadow: 0 20px 44px -22px rgba(42, 39, 64, .28); }
+.dc-home .skill-card-eyebrow { font-size: 12px; font-weight: 800; color: #9d96ae; text-transform: uppercase; letter-spacing: .06em; }
+.dc-home .skill-sample { font-size: 19px; font-weight: 800; margin-top: 8px; line-height: 1.4; color: #2a2740; }
+.dc-home .skill-bullets { margin-top: 20px; display: flex; flex-direction: column; gap: 13px; }
+.dc-home .skill-bullet { display: flex; align-items: center; gap: 12px; font-size: 14.5px; color: #3d3654; font-weight: 600; }
+.dc-home .bullet-icon { width: 22px; height: 22px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex: none; }
+.dc-home .bullet-dot { width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); display: block; }
 
 /* ── Collection rows ── */
 .dc-home .section-row { width: min(1200px, 93vw); margin: 0 auto; }
@@ -275,27 +279,46 @@
 .dc-home .row-link:hover { color: var(--brand); }
 .dc-home .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
 
-/* ── Product card ── */
+/* ── Product card ──
+   Redesign (design handoff "Product Cards" → After): tighter body driven by
+   gap + flex:1 + CTA margin-top:auto, skill-eyebrow pill on the cover, badge
+   pills, a skill·meta row, and a full-width skill-coloured action button.
+   The per-skill accent is passed as --skill / --skill-hover / --skill-shadow
+   on the card root so :hover can darken the CTA. */
 .dc-home .product-card {
   display: flex; flex-direction: column;
-  background: #fff; border: 1px solid #eeeaf3; border-radius: 20px;
-  overflow: hidden; box-shadow: 0 14px 30px -22px rgba(60, 40, 90, .32);
+  background: #fff; border: 1px solid #eeeaf3; border-radius: 22px;
+  overflow: hidden; box-shadow: 0 16px 34px -22px rgba(60, 40, 90, .34);
   transition: transform .2s, box-shadow .2s;
 }
-.dc-home .product-card:hover { transform: translateY(-4px); box-shadow: 0 24px 46px -24px rgba(60, 40, 90, .36); }
+.dc-home .product-card:hover { transform: translateY(-4px); box-shadow: 0 26px 50px -24px rgba(60, 40, 90, .4); }
 .dc-home .product-card.dim { opacity: .72; }
 .dc-home .product-cover { position: relative; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.dc-home .cover-lbl { position: absolute; top: 12px; left: 14px; font-size: 11px; font-weight: 800; letter-spacing: .09em; color: rgba(255, 255, 255, .9); }
-.dc-home .cover-circle { position: absolute; top: -18px; right: -10px; width: 90px; height: 90px; border-radius: 50%; background: rgba(255, 255, 255, .22); }
-.dc-home .cover-mono { font-size: 76px; font-weight: 800; color: rgba(255, 255, 255, .6); line-height: 1; }
-.dc-home .product-body { padding: 16px 17px 18px; display: flex; flex-direction: column; flex: 1; }
-.dc-home .product-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.dc-home .product-badge { font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
-.dc-home .product-attempts { font-size: 12px; color: #9aa0ab; font-weight: 600; }
-.dc-home .product-title { font-size: 17px; font-weight: 800; margin-top: 12px; letter-spacing: -.01em; color: #2a2740; }
-.dc-home .product-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-.dc-home .product-tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 7px; text-transform: capitalize; }
-.dc-home .product-cta { margin-top: auto; padding-top: 16px; font-size: 14px; font-weight: 700; }
+/* skill eyebrow pill — white mini-square + initial, then uppercase skill label */
+.dc-home .cover-lbl {
+  position: absolute; top: 13px; left: 15px;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 800; letter-spacing: .09em; color: #fff;
+  padding: 5px 10px 5px 7px; border-radius: 999px;
+  background: rgba(0, 0, 0, .14);
+}
+.dc-home .cover-lbl-mono {
+  width: 18px; height: 18px; border-radius: 6px; background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; letter-spacing: 0;
+}
+.dc-home .cover-circle { position: absolute; top: -26px; right: -18px; width: 118px; height: 118px; border-radius: 50%; background: rgba(255, 255, 255, .16); }
+.dc-home .cover-blob-2 { position: absolute; bottom: -30px; left: -22px; width: 96px; height: 96px; border-radius: 50%; background: rgba(255, 255, 255, .1); }
+.dc-home .product-body { padding: 17px 18px 18px; display: flex; flex-direction: column; flex: 1; gap: 11px; }
+.dc-home .product-meta { display: flex; align-items: center; gap: 7px; }
+.dc-home .product-badge { font-size: 11.5px; font-weight: 800; padding: 4px 11px; border-radius: 999px; }
+.dc-home .product-badge.is-new { color: #c98a1a; background: #fff3dc; }
+.dc-home .product-title { font-size: 17.5px; font-weight: 800; letter-spacing: -.01em; line-height: 1.3; color: #2a2740; }
+.dc-home .product-meta-row { display: flex; align-items: center; gap: 14px; font-size: 12.5px; font-weight: 600; color: #857f96; flex-wrap: wrap; }
+.dc-home .product-skill-chip { display: inline-flex; align-items: center; gap: 6px; text-transform: capitalize; }
+.dc-home .product-skill-dot { width: 7px; height: 7px; border-radius: 2px; transform: rotate(45deg); display: block; }
+.dc-home .product-meta-sep { width: 4px; height: 4px; border-radius: 50%; background: #d2ccdd; }
+.dc-home .product-cta { margin-top: auto; font-size: 14.5px; font-weight: 800; }
 
 /* ── AI Writing ── */
 .dc-home .ai-section { width: min(1200px, 93vw); margin: 0 auto; padding: 72px 0 10px; }
