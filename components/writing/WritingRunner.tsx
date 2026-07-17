@@ -260,15 +260,15 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
                     title="Gợi ý dàn bài"
                     onClick={() => setHintOpen((h) => ({ ...h, [tab]: !h[tab] }))}
                     style={{
-                      width: 34, height: 34, borderRadius: 8, fontSize: 16, cursor: 'pointer',
+                      height: 34, padding: '0 12px', borderRadius: 8, fontSize: 13.5, fontWeight: 700,
+                      cursor: 'pointer', color: '#5B43C7',
                       border: '1px solid #D9CFF2', background: hintOpen[tab] ? '#F0ECFF' : '#fff',
                     }}
                   >
-                    💡
+                    💡 Gợi ý dàn bài
                   </button>
                   {hintOpen[tab] && (
                     <div className="dcx-w-hint" style={{ marginTop: 8 }}>
-                      <div className="dcx-w-hint-title">💡 Gợi ý dàn bài</div>
                       {RICH_RE.test(hint) ? (
                         <div className="dcx-w-hint-body dcx-rich" dangerouslySetInnerHTML={{ __html: hint }} />
                       ) : (
