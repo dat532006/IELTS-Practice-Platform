@@ -44,8 +44,15 @@ export async function POST(request: Request) {
           return fail('ATTEMPT_TERMINAL', 'Bài đang được chấm, vui lòng đợi kết quả', { status: 409 })
         case 'WORD_COUNT_TOO_LOW':
           return fail('WORD_COUNT_TOO_LOW', 'Task 1 cần ≥150 từ và Task 2 cần ≥250 từ', { status: 400 })
+        case 'INSUFFICIENT_COINS':
+          // Pay-per-grade: hết lượt free/ngày và không đủ coins cho lượt tính phí.
+          return fail(
+            'INSUFFICIENT_COINS',
+            `Bạn đã dùng hết lượt chấm miễn phí hôm nay. Lượt tiếp theo cần ${res.needed} coins (bạn đang có ${res.balance}). Nạp thêm coins để chấm ngay.`,
+            { status: 409 },
+          )
         case 'RATE_LIMITED':
-          return fail('RATE_LIMITED', 'Bạn đã dùng hết lượt chấm AI hiện tại, vui lòng thử lại sau', { status: 429 })
+          return fail('RATE_LIMITED', 'Bạn đã chạm giới hạn chấm AI, vui lòng thử lại sau', { status: 429 })
         case 'AI_UNAVAILABLE':
           return fail('AI_UNAVAILABLE', 'Hệ thống chấm AI tạm thời không khả dụng, vui lòng thử lại', { status: 502 })
       }

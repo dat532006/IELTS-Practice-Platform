@@ -6,23 +6,27 @@ import { estimateGradeCostUsd } from '@/lib/ai/grade-cost'
 import { logEvent } from '@/lib/obs/log-event'
 import { pickTaskPassage } from '@/lib/exam/writing-prompts'
 import { computeOverallBand } from '@/lib/scoring/writing-band'
+import { FREE_GRADE_PER_DAY, GRADE_COST_COINS } from '@/lib/exam/writing-pricing'
 import type { WritingGradeResult } from '@/types/exam'
 
 // ============================================================
 // W10/W11 — Writing grading orchestration (M07). SERVER-ONLY.
-// Boundary order: owner guard → word-count → writing type guard → IP/user rate reserve → grade → server overall → persist.
+// Boundary order: owner guard → word-count → writing type guard → IP/user rate reserve → coin charge
+//   (khi vượt hạn free) → grade → server overall → persist.
 //   Write writing_submissions = service_role (RLS deny client write). overall_band server-compute (KHÔNG tin AI).
 //   W11 adds hashed IP/day limit in addition to per-user ai_grade_usage.
+//   Pay-per-grade (2026-07-17): lượt free đầu tiên/ngày miễn phí; vượt hạn → trừ GRADE_COST_COINS coins
+//   (spend_ai_grade). plan='pro' vẫn bypass (unlimited free). AI/finalize fail sau khi trừ → hoàn coins.
 // ============================================================
 
 const T1_MIN_WORDS = 150
 const T2_MIN_WORDS = 250
-const FREE_DAILY_LIMIT = 1
 
 export const countWords = (s: string): number => (s.trim().match(/\S+/g) ?? []).length
 
 export type WritingOutcome =
   | { ok: true; result: WritingGradeResult; warnings: string[] }
+  | { ok: false; code: 'INSUFFICIENT_COINS'; balance: number; needed: number }
   | { ok: false; code: 'NOT_FOUND' | 'ATTEMPT_TERMINAL' | 'WORD_COUNT_TOO_LOW' | 'RATE_LIMITED' | 'AI_UNAVAILABLE' | 'GRADING_CONFLICT' }
 
 type AttemptRow = { id: string; user_id: string; test_id: string; status: string }
@@ -117,6 +121,13 @@ export async function submitWritingGrade(
   // 4) Rate limit — IP/day atomic first, then per-user free quota. Pro bypasses per-user, not IP anti-abuse.
   let ipReserved = false
   let userReserved = false
+  let coinsCharged = 0
+  // Hoàn TẤT CẢ đã reserve/trừ (coins → quota → ip) rồi nhả claim. Dùng ở mọi return lỗi sau khi claim.
+  const rollback = async () => {
+    if (coinsCharged > 0) await admin.rpc('refund_ai_grade_coins', { p_user_id: userId, p_cost: coinsCharged })
+    await refundReservations(admin, userId, body.ip_hash, userReserved, ipReserved)
+    await releaseClaim()
+  }
   const { data: ipCount, error: ipErr } = await admin.rpc('reserve_ai_grade_ip', {
     p_ip_hash: body.ip_hash,
     p_limit: body.ip_daily_limit,
@@ -130,20 +141,29 @@ export async function submitWritingGrade(
     .select('plan')
     .eq('id', userId)
     .maybeSingle()
-  if (pErr) { await refundReservations(admin, userId, body.ip_hash, false, ipReserved); await releaseClaim(); throw new Error(pErr.message) }
+  if (pErr) { await rollback(); throw new Error(pErr.message) }
   const plan = ((pData as { plan?: string } | null)?.plan ?? 'free') as string
   if (plan !== 'pro') {
     const { data: rc, error: rErr } = await admin.rpc('reserve_ai_grade', { p_user_id: userId })
-    if (rErr) { await refundReservations(admin, userId, body.ip_hash, false, ipReserved); await releaseClaim(); throw new Error(rErr.message) }
+    if (rErr) { await rollback(); throw new Error(rErr.message) }
     userReserved = true
-    if (typeof rc === 'number' && rc > FREE_DAILY_LIMIT) {
-      await refundReservations(admin, userId, body.ip_hash, false, ipReserved)
-      await releaseClaim()
-      return { ok: false, code: 'RATE_LIMITED' }
+    // Vượt hạn free/ngày → KHÔNG chặn nữa mà TRỪ coins. Thiếu coins → hoàn quota+ip, nhả claim.
+    if (typeof rc === 'number' && rc > FREE_GRADE_PER_DAY) {
+      const { data: spendData, error: spendErr } = await admin.rpc('spend_ai_grade', {
+        p_user_id: userId,
+        p_cost: GRADE_COST_COINS,
+      })
+      if (spendErr) { await rollback(); throw new Error(spendErr.message) }
+      const spend = spendData as { ok?: boolean; charged?: number; balance?: number; needed?: number } | null
+      if (spend?.ok !== true) {
+        await rollback()
+        return { ok: false, code: 'INSUFFICIENT_COINS', balance: spend?.balance ?? 0, needed: spend?.needed ?? GRADE_COST_COINS }
+      }
+      coinsCharged = spend?.charged ?? GRADE_COST_COINS
     }
   }
 
-  // 5) Grade (Claude/mock). 6) AI fail → refund quota + release claim (cho retry) → AI_UNAVAILABLE.
+  // 5) Grade (Claude/mock). 6) AI fail → hoàn coins/quota + nhả claim (cho retry) → AI_UNAVAILABLE.
   const outcome = await gradeWriting({
     task1_prompt: prompts.task1,
     task2_prompt: prompts.task2,
@@ -151,8 +171,7 @@ export async function submitWritingGrade(
     task2_text: body.task2_text,
   })
   if (!outcome.ok) {
-    await refundReservations(admin, userId, body.ip_hash, userReserved, ipReserved)
-    await releaseClaim()
+    await rollback()
     return { ok: false, code: 'AI_UNAVAILABLE' }
   }
 
@@ -182,6 +201,7 @@ export async function submitWritingGrade(
     overall_band,
     mock: outcome.mock,
     graded_at,
+    coins_charged: coinsCharged, // pay-per-grade: audit số coins đã trừ (0 = trong hạn free/pro)
     ...(usage ? { usage } : {}),
   }
 
@@ -199,14 +219,12 @@ export async function submitWritingGrade(
     p_band: overall_band,
   })
   if (wErr) {
-    await refundReservations(admin, userId, body.ip_hash, userReserved, ipReserved)
-    await releaseClaim()
+    await rollback()
     throw new Error(wErr.message)
   }
   const finalized = finalizeData as { ok?: boolean; code?: string } | null
   if (finalized?.ok !== true) {
-    await refundReservations(admin, userId, body.ip_hash, userReserved, ipReserved)
-    await releaseClaim()
+    await rollback()
     if (finalized?.code === 'ATTEMPT_TERMINAL') return { ok: false, code: 'ATTEMPT_TERMINAL' }
     if (finalized?.code === 'NOT_FOUND') return { ok: false, code: 'NOT_FOUND' }
     return { ok: false, code: 'GRADING_CONFLICT' }
@@ -222,6 +240,7 @@ export async function submitWritingGrade(
     task2_wc,
     graded_at,
     mock: outcome.mock,
+    coins_charged: coinsCharged,
   }
   return { ok: true, result, warnings: outcome.mock ? ['AI_GRADER_MOCK'] : [] }
 }
