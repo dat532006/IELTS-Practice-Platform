@@ -1,0 +1,109 @@
+/* Collection cards keep a predictable merchandising width when a section has only 1–2 items. */
+.dc-home .cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 380px));
+  justify-content: center;
+  gap: 20px;
+}
+
+.dc-home .cards-grid > * {
+  min-width: 0;
+}
+
+.dc-home .product-card-link {
+  display: block;
+  height: 100%;
+}
+
+.dc-home .product-card {
+  height: 100%;
+}
+
+.dc-home .product-cover {
+  isolation: isolate;
+}
+
+.dc-home .product-cover.has-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(25, 20, 42, 0.48) 0%, rgba(25, 20, 42, 0) 46%, rgba(25, 20, 42, 0.08) 100%);
+}
+
+.dc-home .product-cover-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.dc-home .product-card:hover .product-cover-image {
+  transform: scale(1.035);
+}
+
+.dc-home .cover-lbl {
+  z-index: 2;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(24, 18, 40, 0.35);
+}
+
+.dc-home .cover-circle {
+  z-index: 0;
+}
+
+.dc-home .cover-illustration {
+  position: relative;
+  z-index: 1;
+  width: 116px;
+  height: 92px;
+  color: rgba(255, 255, 255, 0.76);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 8px 16px rgba(80, 45, 40, 0.12));
+}
+
+.dc-home .product-body {
+  min-height: 172px;
+}
+
+.dc-home .product-title {
+  min-height: 2.7em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+}
+
+.dc-home .product-cta {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.dc-home .product-cta.free {
+  color: #167a4d;
+  background: #eaf8f0;
+}
+
+.dc-home .product-cta.locked {
+  color: #a96d0b;
+  background: #fff5e5;
+}
+
+.dc-home .product-cta.coming_soon {
+  color: #7d758b;
+  background: #f2eff5;
+}

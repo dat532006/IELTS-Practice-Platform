@@ -13,6 +13,7 @@ export type LandingProduct = {
   state: LandingCardState
   price: number
   href?: string
+  coverUrl?: string | null
 }
 
 const skillMeta: Record<string, { grad1: string; grad2: string; chip: string; chipText: string }> = {
@@ -27,13 +28,7 @@ function badgeFor(state: LandingCardState) {
   return { label: 'Coming soon', bg: '#EFEBF2', color: '#8B8398' }
 }
 
-// FE-F07: user KHÔNG có luồng redeem (Owner W16: redeem chỉ admin/offline) → CTA chỉ nói mua bằng xương cá.
-function ctaFor(state: LandingCardState) {
-  if (state === 'free') return { color: '#1E9E63' }
-  if (state === 'locked') return { color: '#C98A1A' }
-  return { color: '#9D96AE' }
-}
-
+// FE-F07: user không có luồng redeem; CTA premium chỉ nói mua bằng xương cá.
 function CtaContent({ state, price }: { state: LandingCardState; price: number }) {
   if (state === 'free') return <>Try now →</>
   if (state === 'locked')
@@ -45,18 +40,60 @@ function CtaContent({ state, price }: { state: LandingCardState; price: number }
   return <>Coming soon</>
 }
 
+function SkillCoverIllustration({ skill }: { skill: string }) {
+  if (skill === 'listening') {
+    return (
+      <svg className="cover-illustration" viewBox="0 0 160 120" aria-hidden="true">
+        <path d="M37 69V58a43 43 0 0 1 86 0v11" />
+        <rect x="25" y="63" width="26" height="40" rx="13" />
+        <rect x="109" y="63" width="26" height="40" rx="13" />
+        <path d="M75 63v24M88 54v42M101 66v18" />
+      </svg>
+    )
+  }
+
+  if (skill === 'writing') {
+    return (
+      <svg className="cover-illustration" viewBox="0 0 160 120" aria-hidden="true">
+        <rect x="33" y="17" width="75" height="90" rx="10" />
+        <path d="M50 41h40M50 57h31M50 73h24" />
+        <path d="m91 91 32-32 12 12-32 32-17 5Z" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg className="cover-illustration" viewBox="0 0 160 120" aria-hidden="true">
+      <path d="M24 29c19-7 38-3 56 10v69c-18-13-37-17-56-10Z" />
+      <path d="M136 29c-19-7-38-3-56 10v69c18-13 37-17 56-10Z" />
+      <path d="M42 50h20M42 65h25M98 50h20M93 65h25" />
+    </svg>
+  )
+}
+
 export function LandingProductCard({ p }: { p: LandingProduct }) {
-  const sm = skillMeta[p.skills[0]] ?? skillMeta.reading
+  const primarySkill = p.skills[0] ?? 'reading'
+  const sm = skillMeta[primarySkill] ?? skillMeta.reading
   const badge = badgeFor(p.state)
-  const cta = ctaFor(p.state)
   const attemptsText = p.attempts > 0 ? `${p.attempts.toLocaleString('en-US')} attempts` : 'New'
+  const hasCover = Boolean(p.coverUrl)
 
   const card = (
     <div className={`product-card${p.state === 'coming_soon' ? ' dim' : ''}`}>
-      <div className="product-cover" style={{ background: `linear-gradient(135deg,${sm.grad1},${sm.grad2})` }}>
-        <span className="cover-lbl">{p.skills[0].toUpperCase()}</span>
-        <span className="cover-circle" />
-        <span className="cover-mono">{p.skills[0].charAt(0).toUpperCase()}</span>
+      <div
+        className={`product-cover${hasCover ? ' has-image' : ''}`}
+        style={{ background: `linear-gradient(135deg,${sm.grad1},${sm.grad2})` }}
+      >
+        {p.coverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="product-cover-image" src={p.coverUrl} alt="" loading="lazy" decoding="async" />
+        ) : (
+          <>
+            <span className="cover-circle" />
+            <SkillCoverIllustration skill={primarySkill} />
+          </>
+        )}
+        <span className="cover-lbl">{primarySkill.toUpperCase()}</span>
       </div>
       <div className="product-body">
         <div className="product-meta">
@@ -67,16 +104,16 @@ export function LandingProductCard({ p }: { p: LandingProduct }) {
         </div>
         <h3 className="product-title">{p.title}</h3>
         <div className="product-tags">
-          {p.skills.map((s) => {
-            const tag = skillMeta[s] ?? skillMeta.reading
+          {p.skills.map((skill) => {
+            const tag = skillMeta[skill] ?? skillMeta.reading
             return (
-              <span key={s} className="product-tag" style={{ background: tag.chip, color: tag.chipText }}>
-                {s}
+              <span key={skill} className="product-tag" style={{ background: tag.chip, color: tag.chipText }}>
+                {skill}
               </span>
             )
           })}
         </div>
-        <div className="product-cta" style={{ color: cta.color }}>
+        <div className={`product-cta ${p.state}`}>
           <CtaContent state={p.state} price={p.price} />
         </div>
       </div>
@@ -88,7 +125,7 @@ export function LandingProductCard({ p }: { p: LandingProduct }) {
     return <div aria-disabled={p.state === 'coming_soon'}>{card}</div>
   }
   return (
-    <Link href={p.href} className="block">
+    <Link href={p.href} className="product-card-link">
       {card}
     </Link>
   )
