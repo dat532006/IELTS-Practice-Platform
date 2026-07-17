@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { AttemptDTO, ExamPayload, WritingGradeResult } from '@/types/exam'
-import { pickTaskPassage } from '@/lib/exam/writing-prompts'
+import { pickTaskPassage, isBlankHtml } from '@/lib/exam/writing-prompts'
 import { WritingResultView } from '@/components/writing/WritingResultView'
 import { A11yDialog } from '@/components/a11y/A11yDialog'
 import { MenuIcon, CloseIcon, CheckIcon, SparkleIcon, ArrowLeft } from '@/components/exam/ExamIcons'
@@ -243,31 +243,36 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
                 />
               </div>
             )}
-            {/* AI-014 (Owner 2026-07-17): gợi ý do ADMIN tự viết theo đề (passage.hint) — bấm 💡 mới
-                hiện (mặc định ẩn để học viên tự nghĩ trước). Khối "Gợi ý dàn bài" CỨNG chung chung
-                trước đây đã bỏ. Không có hint → không có nút. Render TEXT thuần (React escape). */}
-            {typeof (tab === 1 ? prompts.task1 : prompts.task2)?.hint === 'string' &&
-              ((tab === 1 ? prompts.task1 : prompts.task2)!.hint as string).trim() !== '' && (
+            {/* AI-014/015: gợi ý do ADMIN soạn rich theo đề (passage.hint). Nút vuông nhỏ 💡 TOGGLE
+                (bấm mở, bấm lại đóng — Owner 2026-07-17). Rỗng HTML vỏ = không nút. Rich → đã
+                sanitize server 2 lần → dangerouslySetInnerHTML; hint plain cũ giữ nhánh text. */}
+            {(() => {
+              const hint = (tab === 1 ? prompts.task1 : prompts.task2)?.hint
+              if (typeof hint !== 'string' || isBlankHtml(hint)) return null
+              return (
                 <div className="dcx-w-hint">
-                  {hintOpen[tab] ? (
-                    <>
-                      <div className="dcx-w-hint-title">💡 Gợi ý dàn bài</div>
-                      <div className="dcx-w-hint-body" style={{ whiteSpace: 'pre-line' }}>
-                        {(tab === 1 ? prompts.task1 : prompts.task2)!.hint}
-                      </div>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      className="dcx-w-hint-title"
-                      style={{ cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
-                      onClick={() => setHintOpen((h) => ({ ...h, [tab]: true }))}
-                    >
-                      💡 Xem gợi ý dàn bài
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    aria-expanded={!!hintOpen[tab]}
+                    aria-label={hintOpen[tab] ? 'Đóng gợi ý dàn bài' : 'Xem gợi ý dàn bài'}
+                    title="Gợi ý dàn bài"
+                    onClick={() => setHintOpen((h) => ({ ...h, [tab]: !h[tab] }))}
+                    style={{
+                      width: 34, height: 34, borderRadius: 8, fontSize: 16, cursor: 'pointer',
+                      border: '1px solid #D9CFF2', background: hintOpen[tab] ? '#F0ECFF' : '#fff',
+                    }}
+                  >
+                    💡
+                  </button>
+                  {hintOpen[tab] &&
+                    (RICH_RE.test(hint) ? (
+                      <div className="dcx-w-hint-body dcx-rich" style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: hint }} />
+                    ) : (
+                      <div className="dcx-w-hint-body" style={{ marginTop: 8, whiteSpace: 'pre-line' }}>{hint}</div>
+                    ))}
                 </div>
-              )}
+              )
+            })()}
           </div>
 
           <div className="dcx-w-vsep" />
