@@ -45,12 +45,12 @@
 }
 
 .dc-home .cover-lbl {
-  z-index: 2;
+  z-index: 3;
   color: #fff;
-  text-shadow: 0 1px 6px rgba(24, 18, 40, 0.35);
 }
 
-.dc-home .cover-circle {
+.dc-home .cover-circle,
+.dc-home .cover-blob-2 {
   z-index: 0;
 }
 
@@ -68,42 +68,51 @@
   filter: drop-shadow(0 8px 16px rgba(80, 45, 40, 0.12));
 }
 
-.dc-home .product-body {
-  min-height: 172px;
-}
-
+/* No fixed body min-height: gap + flex:1 + CTA margin-top:auto balances the
+   body without the old dead white space (design handoff). */
 .dc-home .product-title {
-  min-height: 2.7em;
+  min-height: 2.6em;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
+/* Full-width action button; the free variant paints the skill accent, the
+   card root supplies --skill / --skill-hover / --skill-shadow. */
 .dc-home .product-cta {
-  align-self: flex-start;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
-  padding: 9px 12px;
-  border-radius: 10px;
-  font-size: 13.5px;
-  font-weight: 800;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  border-radius: 13px;
+  text-decoration: none;
+  transition: background 0.15s, transform 0.15s;
 }
 
 .dc-home .product-cta.free {
-  color: #167a4d;
-  background: #eaf8f0;
+  color: #fff;
+  background: var(--skill, #7c5ce6);
+  box-shadow: var(--skill-shadow, 0 12px 24px -12px rgba(124, 92, 230, 0.6));
+}
+.dc-home .product-card-link:hover .product-cta.free {
+  background: var(--skill-hover, #6a48d6);
 }
 
 .dc-home .product-cta.locked {
-  color: #a96d0b;
-  background: #fff5e5;
+  color: #fff;
+  background: #2a2740;
+  box-shadow: 0 12px 24px -12px rgba(42, 39, 64, 0.5);
+}
+.dc-home .product-card-link:hover .product-cta.locked {
+  background: #17152a;
 }
 
 .dc-home .product-cta.coming_soon {
   color: #7d758b;
   background: #f2eff5;
+  box-shadow: none;
 }
