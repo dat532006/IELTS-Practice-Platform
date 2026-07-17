@@ -52,7 +52,8 @@ export type GraderInput = {
   task2_text: string
 }
 export type GradeOutcome =
-  | { ok: true; grade: RawAiGrade; mock: boolean; usage?: GradeUsage }
+  // AI-016: provider/model đi kèm để persist usage + tính chi phí (mock không có).
+  | { ok: true; grade: RawAiGrade; mock: boolean; usage?: GradeUsage; provider?: 'openai' | 'anthropic'; model?: string }
   | { ok: false; code: 'AI_UNAVAILABLE' | 'AI_INVALID_OUTPUT' }
 
 // System prompt = official IELTS band descriptors + scoring rules (lib/ai/ielts-writing-rubric.ts).
@@ -160,7 +161,7 @@ async function gradeWithAnthropic(input: GraderInput): Promise<GradeOutcome> {
     if (!toolUse || toolUse.type !== 'tool_use') return { ok: false, code: 'AI_INVALID_OUTPUT' }
     const grade = validateAiGradeOutput(toolUse.input)
     if (!grade) return { ok: false, code: 'AI_INVALID_OUTPUT' }
-    return { ok: true, grade, mock: false, usage: res.usage as GradeUsage }
+    return { ok: true, grade, mock: false, usage: res.usage as GradeUsage, provider: 'anthropic', model: MODEL }
   } catch (err) {
     // DEPLOY-005: quan sát được sự cố provider (timeout/mạng) — CHỈ tên lỗi (vd AbortError), KHÔNG
     //   message/secret/essay. Trước đây catch {} nuốt hoàn toàn → chấm điểm hỏng mà không thấy gì.
@@ -224,7 +225,7 @@ async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
       logEvent('scoring.provider_error', 'error', { provider: 'openai', kind: 'response', reason: 'schema_reject' })
       return { ok: false, code: 'AI_INVALID_OUTPUT' }
     }
-    return { ok: true, grade, mock: false, usage: parsed.usage }
+    return { ok: true, grade, mock: false, usage: parsed.usage, provider: 'openai', model: OPENAI_MODEL }
   } catch (err) {
     // DEPLOY-005: xem gradeWithAnthropic — chỉ tên lỗi, KHÔNG message/secret/essay.
     logEvent('scoring.provider_error', 'error', { provider: 'openai', kind: (err as Error)?.name ?? 'unknown' })

@@ -2,6 +2,8 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { gradeWriting } from '@/lib/ai/writing-grader'
+import { estimateGradeCostUsd } from '@/lib/ai/grade-cost'
+import { logEvent } from '@/lib/obs/log-event'
 import { pickTaskPassage } from '@/lib/exam/writing-prompts'
 import { computeOverallBand } from '@/lib/scoring/writing-band'
 import type { WritingGradeResult } from '@/types/exam'
@@ -157,12 +159,30 @@ export async function submitWritingGrade(
   // 7) Server compute overall (KHÔNG tin AI overall).
   const overall_band = computeOverallBand(outcome.grade.task1.band, outcome.grade.task2.band)
   const graded_at = new Date().toISOString()
+  // AI-016: persist usage + chi phí ước tính THEO TỪNG BÀI (trước đây usage bị vứt sau khi chấm).
+  //   est_cost_usd snapshot theo giá lúc chấm; model lạ → null. Mock không có usage.
+  const est_cost_usd = estimateGradeCostUsd(outcome.model, outcome.usage)
+  const usage = outcome.mock || !outcome.usage ? undefined : {
+    provider: outcome.provider ?? null,
+    model: outcome.model ?? null,
+    input_tokens: outcome.usage.input_tokens ?? null,
+    output_tokens: outcome.usage.output_tokens ?? null,
+    est_cost_usd,
+  }
+  if (usage) {
+    // Quan sát realtime chi phí trong Vercel logs (OBS_EVENT) — không PII, không nội dung bài.
+    logEvent('scoring.usage', 'info', {
+      provider: usage.provider, model: usage.model,
+      in: usage.input_tokens, out: usage.output_tokens, cost_usd: est_cost_usd,
+    })
+  }
   const ai_score = {
     task1: outcome.grade.task1,
     task2: outcome.grade.task2,
     overall_band,
     mock: outcome.mock,
     graded_at,
+    ...(usage ? { usage } : {}),
   }
 
   // 8) Persist: UPDATE claim row đã sở hữu (không delete+insert → không đua/duplicate). Finalize attempt.

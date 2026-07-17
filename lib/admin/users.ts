@@ -198,7 +198,7 @@ export async function getUserDetail(admin: SupabaseClient, userId: string): Prom
       test_type: a.tests?.type ?? null,
     })),
     writing: ((writingRes.data ?? []) as WritingRow[]).map((w) => {
-      const s = (w.ai_score ?? null) as { task1?: unknown; task2?: unknown; overall_band?: unknown } | null
+      const s = (w.ai_score ?? null) as { task1?: unknown; task2?: unknown; overall_band?: unknown; usage?: { est_cost_usd?: unknown } } | null
       return {
         attempt_id: w.attempt_id,
         graded_at: w.graded_at,
@@ -207,6 +207,8 @@ export async function getUserDetail(admin: SupabaseClient, userId: string): Prom
         overall_band: typeof s?.overall_band === 'number' ? s.overall_band : null,
         task1_wc: w.task1_wc,
         task2_wc: w.task2_wc,
+        // AI-016: chi phí AI ước tính/lượt (persist lúc chấm; bài cũ/mock → null).
+        est_cost_usd: typeof s?.usage?.est_cost_usd === 'number' ? s.usage.est_cost_usd : null,
       }
     }),
     counts: {
