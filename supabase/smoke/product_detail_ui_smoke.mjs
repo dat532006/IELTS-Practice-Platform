@@ -9,6 +9,8 @@ import { createClient } from '@supabase/supabase-js'
 
 const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:3100'
 const FREE_ID = '11111111-1111-1111-1111-111111111111' // reading-free-1 (free, published)
+const WRITING_ID = '99999999-9999-9999-9999-999999999999' // writing-task12-free (free, published)
+const WRITING_PROMPT = 'The chart below shows the percentage of households'
 const PREMIUM_ID = '22222222-2222-2222-2222-222222222222' // reading-premium-1 (premium, published)
 const PREMIUM_PRODUCT = '33333333-3333-3333-3333-333333333333' // reading-vol-1 (chứa premium test)
 const PRODUCT_SLUG = 'reading-vol-1'
@@ -25,7 +27,7 @@ const skipped = (n, why) => (skip++, results.push(`  ⏭️  SKIP ${n}${why ? ' 
 
 async function getHtml(path, cookie) {
   const r = await fetch(`${BASE}${path}`, { headers: cookie ? { Cookie: cookie } : {} })
-  return { status: r.status, text: await r.text() }
+  return { status: r.status, text: await r.text(), url: r.url }
 }
 
 function loadEnvLocal() {
@@ -85,6 +87,14 @@ const run = async () => {
     check('guest pre-exam free → có "Kỹ năng"/"Thời lượng"', text.includes('Kỹ năng') && text.includes('Thời lượng'))
     check('guest pre-exam free → KHÔNG lộ passage', !text.includes(FREE_PASSAGE))
   }
+  {
+    const { status, text } = await getHtml(`/tests/${WRITING_ID}`)
+    check('guest pre-exam writing -> 200', status === 200, `got ${status}`)
+    check('guest pre-exam writing -> Writing CTA route', text.includes(`/writing/${WRITING_ID}`))
+    check('guest pre-exam writing -> no Reading CTA route', !text.includes(`/exam/${WRITING_ID}`))
+    check('guest pre-exam writing -> no prompt leak', !text.includes(WRITING_PROMPT))
+  }
+
   // 4) Pre-exam PREMIUM (guest → locked_guest) — KHÔNG link /exam, CTA login
   {
     const { status, text } = await getHtml(`/tests/${PREMIUM_ID}`)
@@ -130,6 +140,19 @@ async function authedStates() {
     if (siErr || !si?.session) return skipped(tag, 'signIn fail: ' + (siErr?.message ?? 'no session'))
     const userId = si.session.user.id
     const Cookie = buildSsrCookie(url, si.session)
+
+    const legacyWriting = await getHtml(`/exam/${WRITING_ID}`, Cookie)
+    check(
+      'legacy /exam writing -> canonical Writing runner',
+      legacyWriting.status === 200 && new URL(legacyWriting.url).pathname === `/writing/${WRITING_ID}`,
+      `got ${legacyWriting.status} ${legacyWriting.url}`,
+    )
+    const wrongReading = await getHtml(`/writing/${FREE_ID}`, Cookie)
+    check(
+      'wrong /writing reading -> canonical Exam runner',
+      wrongReading.status === 200 && new URL(wrongReading.url).pathname === `/exam/${FREE_ID}`,
+      `got ${wrongReading.status} ${wrongReading.url}`,
+    )
 
     // sạch state
     await admin.from('test_unlocks').delete().eq('user_id', userId)
