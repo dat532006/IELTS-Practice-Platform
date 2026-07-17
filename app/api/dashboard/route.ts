@@ -1,11 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { getAuthedUser } from '@/lib/auth/guards'
 import { ok, fail } from '@/lib/api/response'
+import { attachAttemptResultHrefs } from '@/lib/dashboard/attempt-result'
+import { loadWritingResultIds } from '@/lib/dashboard/writing-results'
 
 // GET /api/dashboard — tổng quan tài khoản người dùng (M09, W17).
-//   Dùng server client (session user) → RLS tự lọc OWN-ONLY (attempts/product_unlocks/vocab_log/bookmarks/profiles
-//   đều có policy select own). KHÔNG service_role → không thể lộ dữ liệu người khác kể cả khi query sai.
-//   Chỉ đọc, không mutate. Số liệu tổng hợp phía server.
+// Session client + RLS own-only; recent_attempts chỉ nhận result_href khi kết quả thực sự sẵn sàng.
 export async function GET() {
   const supabase = await createClient()
   const user = await getAuthedUser(supabase)
@@ -28,9 +28,18 @@ export async function GET() {
         .limit(5),
     ])
 
+  if (recentRes.error) return fail('INTERNAL', 'Không tải được hoạt động gần đây', { status: 500 })
+
+  let writingResultIds: Set<string>
+  try {
+    writingResultIds = await loadWritingResultIds(supabase, user.id, recentRes.data ?? [])
+  } catch {
+    return fail('INTERNAL', 'Không tải được trạng thái kết quả', { status: 500 })
+  }
+
   const profile = (profileRes.data ?? {}) as { coins?: number; plan?: string; name?: string | null; email?: string | null }
-  const bands = (bandsRes.data ?? []).map((r) => Number((r as { band: number }).band)).filter((n) => !Number.isNaN(n))
-  const avgBand = bands.length ? Math.round((bands.reduce((a, b) => a + b, 0) / bands.length) * 10) / 10 : null
+  const bands = (bandsRes.data ?? []).map((row) => Number((row as { band: number }).band)).filter((band) => !Number.isNaN(band))
+  const avgBand = bands.length ? Math.round((bands.reduce((sum, band) => sum + band, 0) / bands.length) * 10) / 10 : null
 
   return ok({
     profile: { name: profile.name ?? null, email: profile.email ?? null, plan: profile.plan ?? 'free', coins: profile.coins ?? 0 },
@@ -42,6 +51,6 @@ export async function GET() {
       vocab_count: vocabCount.count ?? 0,
       bookmarks_count: bookmarksCount.count ?? 0,
     },
-    recent_attempts: recentRes.data ?? [],
+    recent_attempts: attachAttemptResultHrefs(recentRes.data ?? [], writingResultIds),
   })
 }
