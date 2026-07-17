@@ -50,6 +50,7 @@ type Detail = {
     overall_band: number | null
     task1_wc: number | null
     task2_wc: number | null
+    est_cost_usd: number | null // AI-016: chi phí AI/lượt (bài cũ → null)
   }[]
   counts: { unlocks: number; transactions: number; attempts: number; writing: number }
   limits: { unlocks: number; transactions: number; attempts: number; writing: number }
@@ -413,7 +414,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                           <td className="px-2 py-2 text-center font-mono font-bold">{a.raw_score != null ? a.raw_score : '—'}</td>
                           <td className="px-2 py-2 text-center font-mono font-bold text-[#6A48D6]">
                             {w
-                              ? `${w.overall_band ?? a.band ?? '—'}${w.task1_band != null || w.task2_band != null ? ` (T1 ${w.task1_band ?? '—'} · T2 ${w.task2_band ?? '—'})` : ''}`
+                              ? `${w.overall_band ?? a.band ?? '—'}${w.task1_band != null || w.task2_band != null ? ` (T1 ${w.task1_band ?? '—'} · T2 ${w.task2_band ?? '—'})` : ''}${w.est_cost_usd != null ? ` · $${w.est_cost_usd.toFixed(4)}` : ''}`
                               : a.band != null
                                 ? a.band
                                 : '—'}
