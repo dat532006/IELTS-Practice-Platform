@@ -113,6 +113,7 @@ export type WritingGradeResult = {
   task2_wc: number
   graded_at: string
   mock: boolean // true nếu chấm bằng mock grader (thiếu key AI ở non-prod) — KHÔNG claim live
+  coins_charged?: number // pay-per-grade: số coins đã trừ cho lượt này (0/undefined = trong hạn free/ngày)
 }
 
 // W6 submit — scoring server-side. KHÔNG bao giờ kèm answer_keys/correct answers (LUẬT THÉP #2).

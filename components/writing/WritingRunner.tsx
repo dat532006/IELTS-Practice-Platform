@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { AttemptDTO, ExamPayload, WritingGradeResult } from '@/types/exam'
 import { pickTaskPassage, isBlankHtml } from '@/lib/exam/writing-prompts'
+import { FREE_GRADE_PER_DAY, GRADE_COST_COINS } from '@/lib/exam/writing-pricing'
 import { WritingResultView } from '@/components/writing/WritingResultView'
 import { WritingFeedback } from '@/components/writing/WritingFeedback'
 import { A11yDialog } from '@/components/a11y/A11yDialog'
@@ -47,6 +48,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
   const [result, setResult] = useState<WritingGradeResult | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [needTopup, setNeedTopup] = useState(false) // pay-per-grade: hết free + thiếu coins → hiện link nạp
   const [restarting, setRestarting] = useState(false)
   // AI-014: gợi ý mở theo TỪNG task (mở task 1 không tự đóng khi mở task 2).
   const [hintOpen, setHintOpen] = useState<Record<number, boolean>>({})
@@ -105,6 +107,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
     if (!attempt) return
     setPhase('submitting')
     setErrorMsg('')
+    setNeedTopup(false)
     try {
       const r = await fetch('/api/grade-writing', {
         method: 'POST',
@@ -119,7 +122,11 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
       }
       const code = j?.meta?.error_code
       if (r.status === 404) return setPhase('notfound')
-      if (r.status === 429) setErrorMsg('Bạn đã dùng hết lượt chấm AI miễn phí hôm nay. Thử lại ngày mai hoặc nâng cấp Pro.')
+      if (code === 'INSUFFICIENT_COINS') {
+        // Hết lượt free/ngày và không đủ coins → dùng message server (kèm số dư/giá) + link nạp.
+        setErrorMsg((j?.message as string) || `Bạn cần ${GRADE_COST_COINS} coins để chấm thêm lượt hôm nay.`)
+        setNeedTopup(true)
+      } else if (r.status === 429) setErrorMsg('Bạn đã chạm giới hạn chấm AI trong hôm nay, vui lòng thử lại sau.')
       else if (code === 'ATTEMPT_TERMINAL') setErrorMsg('Lượt làm này đã được chấm xong. Bấm "← Viết lại" để tạo lượt mới rồi nộp lại — bài viết của bạn vẫn được giữ nguyên.')
       else if (code === 'WORD_COUNT_TOO_LOW') setErrorMsg('Task 1 cần ≥150 từ và Task 2 cần ≥250 từ.')
       else if (r.status === 502) setErrorMsg('Hệ thống chấm AI tạm thời không khả dụng. Bài viết được giữ nguyên — vui lòng thử lại.')
@@ -304,7 +311,17 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
                 placeholder={`Bắt đầu viết bài Task ${tab} của bạn ở đây… (tối thiểu ${activeMin} từ)`}
                 aria-label={`Bài làm Task ${tab}`}
               />
-              {errorMsg && <p className="dcx-w-alert" style={{ marginTop: 12 }}>{errorMsg}</p>}
+              {errorMsg && (
+                <p className="dcx-w-alert" style={{ marginTop: 12 }}>
+                  {errorMsg}
+                  {needTopup && (
+                    <>
+                      {' '}
+                      <Link href="/pricing" className="dcx-link">Nạp coins →</Link>
+                    </>
+                  )}
+                </p>
+              )}
               {/* AI-013 (Owner 2026-07-17): nộp và chấm là MỘT hành động (1 lần gọi API, 1 lần/bài) —
                   bỏ nút "Chấm bằng AI" riêng (gợi ý sai rằng chấm thử được trước khi nộp). CTA duy nhất
                   ở footer: "Nộp bài & chấm AI". */}
@@ -313,7 +330,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
                   {preview
                     ? 'Chế độ xem trước (admin) — không tạo bài làm, không chấm.'
                     : canSubmit
-                      ? 'Nộp bài ở nút dưới — AI chấm ngay khi nộp (4 tiêu chí band descriptor, 1 lần/bài).'
+                      ? `Nộp bài ở nút dưới — AI chấm ngay khi nộp (4 tiêu chí band descriptor, 1 lần/bài). Miễn phí ${FREE_GRADE_PER_DAY} lượt/ngày, sau đó ${GRADE_COST_COINS} coins/lượt.`
                       : `Cần đủ ${T1_MIN} từ (Task 1) và ${T2_MIN} từ (Task 2) mới nộp được.`}
                 </span>
               </div>
@@ -352,6 +369,11 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
               </div>
             )}
             <div className="dcx-ai-body">
+              {!result.mock && (result.coins_charged ?? 0) > 0 && (
+                <p style={{ margin: '0 0 14px', fontSize: 13, color: '#857f96' }}>
+                  Đã dùng <b>{result.coins_charged}</b> coins cho lượt chấm này.
+                </p>
+              )}
               <div className="dcx-ai-bars">
                 {CRITERIA.map((c) => {
                   const val = modalGrade.criteria[c.key]

@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
+import { GRADE_COST_COINS } from '../../lib/exam/writing-pricing.ts'
 
 const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:3100'
 const WRITING = '99999999-9999-9999-9999-999999999999'
@@ -147,12 +148,29 @@ const run = async () => {
     check('B-05: writing_submissions KHÔNG bị ghi đè/nhân bản (=1)', (ws ?? []).length === 1, `count=${(ws ?? []).length}`)
   }
 
-  // === 3b) Free 2nd grade same day → 429 (rate limit, không gọi Claude) — attempt MỚI (in_progress) để qua guard terminal ===
+  // === 3b) Pay-per-grade: hết lượt free/ngày → lượt 2 KHÔNG còn 429 mà TRỪ coins (Owner 2026-07-17).
+  //   (i) 0 coins → 409 INSUFFICIENT_COINS, KHÔNG trừ.  (ii) đủ coins → 200 + coins_charged, trừ đúng + ledger.
   {
+    // (i) 0 coins → INSUFFICIENT_COINS, no debit
+    await A.admin.from('profiles').update({ coins: 0 }).eq('id', A.session.user.id)
     const attemptA2 = await startAttempt(A.cookie)
     const r = await api('POST', '/api/grade-writing', A.cookie, { attempt_id: attemptA2, task1_text: words(160), task2_text: words(260) })
-    check('free 2nd/day → 429', r.status === 429, `got ${r.status}`)
-    check('error_code RATE_LIMITED', r.body?.meta?.error_code === 'RATE_LIMITED', JSON.stringify(r.body?.meta))
+    check('free 2nd/day + 0 coins → 409', r.status === 409, `got ${r.status}`)
+    check('error_code INSUFFICIENT_COINS', r.body?.meta?.error_code === 'INSUFFICIENT_COINS', JSON.stringify(r.body?.meta))
+    const { data: p0 } = await A.admin.from('profiles').select('coins').eq('id', A.session.user.id).maybeSingle()
+    check('INSUFFICIENT_COINS KHÔNG trừ coins (vẫn 0)', p0?.coins === 0, `coins=${p0?.coins}`)
+
+    // (ii) đủ coins → lượt tính phí OK, trừ đúng GRADE_COST_COINS + ghi ledger spend
+    await A.admin.from('profiles').update({ coins: GRADE_COST_COINS + 3 }).eq('id', A.session.user.id)
+    await A.admin.from('transactions').delete().eq('user_id', A.session.user.id).eq('type', 'spend').is('order_id', null)
+    const attemptA3 = await startAttempt(A.cookie)
+    const r2 = await api('POST', '/api/grade-writing', A.cookie, { attempt_id: attemptA3, task1_text: words(160), task2_text: words(260) })
+    check('paid grade (đủ coins) → 200', r2.status === 200, `got ${r2.status} ${JSON.stringify(r2.body?.meta)}`)
+    check('coins_charged = GRADE_COST_COINS', r2.body?.data?.coins_charged === GRADE_COST_COINS, `got ${r2.body?.data?.coins_charged}`)
+    const { data: p1 } = await A.admin.from('profiles').select('coins').eq('id', A.session.user.id).maybeSingle()
+    check('coins trừ đúng (còn 3)', p1?.coins === 3, `coins=${p1?.coins}`)
+    const { data: led } = await A.admin.from('transactions').select('amount_coins,type,order_id').eq('user_id', A.session.user.id).eq('type', 'spend').is('order_id', null)
+    check('ledger spend -GRADE_COST_COINS (provider=system order_id=null)', (led ?? []).some((t) => t.amount_coins === -GRADE_COST_COINS), JSON.stringify(led))
   }
 
   // === 4) Pro bypass: B plan=pro → chấm nhiều lần OK (mỗi lần 1 attempt mới — attempt terminal không chấm lại, B-05) ===
