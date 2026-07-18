@@ -78,7 +78,9 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
   const anchorTimer = useCallback((att: AttemptDTO) => {
     baseRemainingRef.current = att.duration_sec > 0 ? att.time_remaining_sec : -1
     loadAtRef.current = Date.now()
-    autoSubmittedRef.current = false
+    // FB-06: attempt load về đã HẾT GIỜ sẵn (edge — server startAttempt giờ tự expire + cấp attempt
+    //   mới cho writing, nhưng phòng dữ liệu cũ/race): chỉ hiện 00:00, KHÔNG auto-submit bài rỗng.
+    autoSubmittedRef.current = att.duration_sec > 0 && att.time_remaining_sec <= 0
     setTimedOut(false)
     setRemaining(att.duration_sec > 0 ? att.time_remaining_sec : null)
   }, [])
@@ -226,13 +228,18 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
       if (rem <= 0 && !autoSubmittedRef.current && phase === 'active') {
         autoSubmittedRef.current = true
         setTimedOut(true)
-        void submit()
+        // FB-06: cả 2 task trống → không có gì để chấm, đừng bắn request rỗng (Zod 400 khó hiểu).
+        if (countWords(task1) === 0 && countWords(task2) === 0) {
+          setErrorMsg('⏰ Hết giờ — bạn chưa viết nội dung nào nên không có gì để chấm. Tải lại trang để bắt đầu lượt mới.')
+        } else {
+          void submit()
+        }
       }
     }
     tick()
     const t = setInterval(tick, 1000)
     return () => clearInterval(t)
-  }, [phase, preview, result, submit])
+  }, [phase, preview, result, submit, task1, task2])
 
   // ---- Non-editor states ----
   if (phase === 'loading') return <Centered>Đang tải bài viết…</Centered>

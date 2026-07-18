@@ -236,6 +236,35 @@ const run = async () => {
     }
   }
 
+  // === FB-06: resume attempt writing ĐÃ QUÁ GIỜ → expire + cấp attempt MỚI (không trả attempt chết) ===
+  {
+    // Dọn attempt in_progress hiện có của B trên đề writing để start sạch.
+    await B.admin.from('attempts').delete().eq('test_id', WRITING).eq('user_id', B.session.user.id).eq('status', 'in_progress')
+    const stale = await startAttempt(B.cookie)
+    if (!stale) check('FB-06 start attempt để backdate', false, 'không start được')
+    else {
+      // Backdate started_at vượt duration (3600) + grace → attempt đã "chết đồng hồ".
+      const past = new Date(Date.now() - 4000 * 1000).toISOString()
+      await B.admin.from('attempts').update({ started_at: past }).eq('id', stale)
+      const r2 = await api('POST', `/api/exam/${WRITING}/start`, B.cookie, {})
+      const fresh = r2.body?.data?.attempt_id
+      check('FB-06 start lại → attempt MỚI (id khác)', !!fresh && fresh !== stale, `stale=${stale} fresh=${fresh}`)
+      check('FB-06 attempt mới đồng hồ đầy (time_remaining > 0)', (r2.body?.data?.time_remaining_sec ?? 0) > 0, `rem=${r2.body?.data?.time_remaining_sec}`)
+      const { data: old } = await B.admin.from('attempts').select('status, raw_score').eq('id', stale).maybeSingle()
+      check('FB-06 attempt cũ → expired (không chấm)', old?.status === 'expired' && old?.raw_score == null, `status=${old?.status}`)
+      // Reading KHÔNG bị đổi hành vi: backdate attempt reading rồi start lại → vẫn resume CÙNG attempt.
+      const READING = '66666666-6666-6666-6666-666666666666'
+      await B.admin.from('attempts').delete().eq('test_id', READING).eq('user_id', B.session.user.id).eq('status', 'in_progress')
+      const sr = await api('POST', `/api/exam/${READING}/start`, B.cookie, {})
+      const rid = sr.body?.data?.attempt_id
+      if (rid) {
+        await B.admin.from('attempts').update({ started_at: past }).eq('id', rid)
+        const sr2 = await api('POST', `/api/exam/${READING}/start`, B.cookie, {})
+        check('FB-06 reading quá giờ vẫn RESUME cùng attempt (giữ W5 behavior)', sr2.body?.data?.attempt_id === rid, `got ${sr2.body?.data?.attempt_id}`)
+      } else check('FB-06 reading control start được', false)
+    }
+  }
+
   finish()
 }
 
