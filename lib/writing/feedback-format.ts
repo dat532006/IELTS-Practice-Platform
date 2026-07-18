@@ -14,8 +14,13 @@ export type WritingFeedbackSection = {
 const HEADING_RE =
   /(?:^|\s)(Task\s+(?:Response|Achievement)(?:\s*\/\s*Achievement)?|Coherence\s*(?:&|and)\s*Cohesion|Lexical\s+Resource|Grammatical\s+Range\s*(?:&|and)\s*Accuracy|Grammar)\s*(?:\(\s*)?(?:Band\s*)?([0-9](?:\.[05])?)?(?:\s*\))?\s*:\s*/gim
 
-const CUE_RE =
-  /\s+(?=(?:Tuy nhiên|Dù vậy|Vì vậy|Do đó|Điểm mạnh|Điểm cần cải thiện|Hạn chế|Chưa đạt|Để đạt|Cần cải thiện|Ví dụ)\b)/giu
+// FB-03 (Owner báo 2026-07-18): cue chỉ được ngắt ý khi nó MỞ ĐẦU một câu. Bản cũ (CUE_RE replace
+//   toàn văn bản) cắt NGANG câu mỗi khi gặp cue — "Vì vậy bài chưa đạt Band 8" bị chặt thành
+//   "Vì vậy bài" + "chưa đạt Band 8", và "… tiếp. Bài chưa đạt Band 9 …" bỏ rơi chủ ngữ "Bài"
+//   ở cuối ý trước. Giờ tách câu TRƯỚC (sentenceChunks) rồi mới xét cue ở ĐẦU câu → không bao giờ
+//   cắt giữa câu.
+const CUE_START_RE =
+  /^(?:Tuy nhiên|Dù vậy|Vì vậy|Do đó|Điểm mạnh|Điểm cần cải thiện|Hạn chế|Chưa đạt|Để đạt|Cần cải thiện|Ví dụ)\b/iu
 
 function criterionFromLabel(label: string): WritingFeedbackCriterion {
   const value = label.toLowerCase()
@@ -35,7 +40,8 @@ function sentenceChunks(value: string): string[] {
   let sentenceCount = 0
   for (const sentence of sentences) {
     const next = current ? `${current} ${sentence}` : sentence
-    if (current && (next.length > 260 || sentenceCount >= 2)) {
+    // Ngắt ý tại RANH GIỚI CÂU khi: câu mới mở đầu bằng cue, hoặc chunk đã đủ dài/đủ 2 câu.
+    if (current && (CUE_START_RE.test(sentence) || next.length > 260 || sentenceCount >= 2)) {
       chunks.push(current)
       current = sentence
       sentenceCount = 1
@@ -50,7 +56,6 @@ function sentenceChunks(value: string): string[] {
 
 function toPoints(value: string): string[] {
   return value
-    .replace(CUE_RE, '\n')
     .split(/\n+/)
     .map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim())
     .filter(Boolean)

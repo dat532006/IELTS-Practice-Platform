@@ -42,5 +42,25 @@ check('feedback không có heading vẫn hiển thị tổng quan', fallback.len
 check('feedback xuống dòng/list được giữ thành ý riêng', fallback[0]?.points.length === 3, `got ${fallback[0]?.points.length}`)
 check('chuỗi rỗng degrade sạch', parseWritingFeedback('   ').length === 0)
 
+// FB-03 (Owner báo 2026-07-18): cue KHÔNG được cắt ngang câu — chỉ ngắt ý tại ranh giới câu.
+const midCue = parseWritingFeedback(
+  'Task Response 7: Lập luận rõ và có ví dụ đi kèm. Vì vậy bài chưa đạt Band 8 do thiếu dẫn chứng cụ thể.',
+)
+check(
+  '"Vì vậy bài chưa đạt Band 8..." giữ nguyên 1 ý (không chặt tại "Chưa đạt")',
+  midCue[0]?.points.some((p) => p.includes('Vì vậy bài chưa đạt Band 8')),
+  JSON.stringify(midCue[0]?.points),
+)
+check('không ý nào kết thúc lửng "Vì vậy bài"', midCue[0]?.points.every((p) => !/Vì vậy bài$/u.test(p)))
+const dangling = parseWritingFeedback(
+  'Grammar 8: Câu phức được dùng chính xác và đa dạng hơn hẳn phần trước đó, cần tiếp tục phát huy thêm nữa để giữ phong độ ổn định về sau này tiếp. Bài chưa đạt Band 9 vì còn vài lỗi nhỏ.',
+)
+check(
+  'chủ ngữ "Bài" KHÔNG bị bỏ rơi cuối ý trước ("... tiếp." hết câu)',
+  dangling[0]?.points.every((p) => !/\sBài$/u.test(p)),
+  JSON.stringify(dangling[0]?.points),
+)
+check('"Bài chưa đạt Band 9..." nằm nguyên trong 1 ý', dangling[0]?.points.some((p) => p.includes('Bài chưa đạt Band 9 vì còn vài lỗi nhỏ')))
+
 console.log(`\nRESULT: ${pass} passed, ${fail} failed`)
 process.exitCode = fail ? 1 : 0
