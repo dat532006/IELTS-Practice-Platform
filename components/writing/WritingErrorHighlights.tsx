@@ -170,11 +170,25 @@ export function WritingErrorHighlights({
                   </div>
                 </div>
               ) : (
-                // Fallback: bài chấm cũ (không có fix) hoặc lỗi không viết lại trực tiếp được.
-                <div>
-                  <q className="italic text-slate-600">{h.quote}</q>
-                  <p className="mt-1 text-slate-700">{h.suggestion}</p>
-                  {h.reason_vi?.trim() && <p className="mt-1 text-[13px] text-[#655E75]">{h.reason_vi}</p>}
+                // FB-08: lỗi KHÔNG có bản viết lại trực tiếp (fix rỗng — thường là lỗi Task Response/
+                //   nội dung lạc đề: cả câu sai so với ĐỀ, không có "sửa tối thiểu" để diff) hoặc bài
+                //   chấm cũ thiếu fix → vẫn dùng CÙNG layout 3 dòng cho đồng bộ với card có diff:
+                //   Trong bài / Gợi ý (thay vì "Sửa thành") / Vì sao.
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
+                    <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-[#9D96AE]">Trong bài</span>
+                    <span className="italic leading-relaxed text-slate-600">“{h.quote}”</span>
+                  </div>
+                  <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
+                    <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-emerald-700">Gợi ý</span>
+                    <span className="leading-relaxed text-slate-700">{h.suggestion}</span>
+                  </div>
+                  {h.reason_vi?.trim() && (
+                    <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
+                      <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-[#9D96AE]">Vì sao</span>
+                      <span className="leading-relaxed text-[#655E75]">{h.reason_vi}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </li>

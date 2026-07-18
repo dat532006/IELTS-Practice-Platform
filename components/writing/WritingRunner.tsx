@@ -72,6 +72,13 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
   //   thông điệp theo giai đoạn + progress; chặn đóng trang giữa chừng (request đã gửi là đã tính tiền).
   const [gradeElapsed, setGradeElapsed] = useState(0)
   const gradeStartRef = useRef(0)
+  // FB-07: tự lưu nháp bài viết (Owner 2026-07-18) — dùng CHUNG kênh autosave attempt answers của
+  //   Reading (POST /api/attempts/[id]/answers, optimistic rev EXAM-004): answers = {task1, task2}
+  //   nguyên văn. Reload/rời trang → start DTO trả lại answers → khôi phục.
+  const [draftState, setDraftState] = useState<'idle' | 'saving' | 'saved' | 'conflict'>('idle')
+  const answersRevRef = useRef(0)
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const draftRef = useRef({ task1: '', task2: '' }) // bản mới nhất cho flush pagehide (không chờ state)
 
   // FB-04: neo timer vào attempt hiện tại — time_remaining_sec do SERVER tính từ started_at
   //   (resume/reload không reset đồng hồ); duration_sec = 0/null → đề không giới hạn giờ, không timer.
@@ -110,6 +117,20 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
         }
         setAttempt(sj.data as AttemptDTO)
         anchorTimer(sj.data as AttemptDTO)
+        // FB-07: khôi phục nháp đã autosave (answers = {task1, task2}) + neo rev cho optimistic concurrency.
+        {
+          const att = sj.data as AttemptDTO
+          answersRevRef.current = att.answers_rev ?? 0
+          const draft = (att.answers ?? {}) as Record<string, unknown>
+          if (typeof draft.task1 === 'string' && draft.task1) {
+            setTask1(draft.task1)
+            draftRef.current.task1 = draft.task1
+          }
+          if (typeof draft.task2 === 'string' && draft.task2) {
+            setTask2(draft.task2)
+            draftRef.current.task2 = draft.task2
+          }
+        }
         const pr = await fetch(`/api/exam/${testId}`)
         const pj = await pr.json().catch(() => null)
         if (!active) return
@@ -130,6 +151,62 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
       active = false
     }
   }, [testId, preview, anchorTimer])
+
+  // FB-07: ghi nháp lên server (kênh autosave answers sẵn có — owner-only, chỉ khi in_progress,
+  //   optimistic rev). keepalive=true cho flush lúc rời trang (request sống qua unload).
+  const saveDraft = useCallback(
+    (body: { task1: string; task2: string }, keepalive = false) => {
+      if (!attempt || preview) return
+      setDraftState('saving')
+      void fetch(`/api/attempts/${attempt.attempt_id}/answers`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ answers: body, expected_rev: answersRevRef.current }),
+        keepalive,
+      })
+        .then(async (r) => {
+          const b = await r.json().catch(() => null)
+          if (r.ok && b?.success) {
+            if (typeof b.data?.answers_rev === 'number') answersRevRef.current = b.data.answers_rev
+            setDraftState('saved')
+          } else if (b?.meta?.error_code === 'ANSWERS_STALE') {
+            setDraftState('conflict') // tab khác đã lưu bản mới hơn — không đè (EXAM-004)
+          } else {
+            setDraftState('idle') // terminal/mạng lỗi: không chặn viết; submit vẫn mang text hiện tại
+          }
+        })
+        .catch(() => setDraftState('idle'))
+    },
+    [attempt, preview],
+  )
+
+  const scheduleDraftSave = useCallback(
+    (t1: string, t2: string) => {
+      draftRef.current = { task1: t1, task2: t2 }
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+      draftTimerRef.current = setTimeout(() => saveDraft(draftRef.current), 800)
+    },
+    [saveDraft],
+  )
+
+  // FB-07: rời trang/ẩn tab → flush nháp đang chờ debounce ngay (keepalive).
+  useEffect(() => {
+    const flush = () => {
+      if (!draftTimerRef.current) return
+      clearTimeout(draftTimerRef.current)
+      draftTimerRef.current = null
+      saveDraft(draftRef.current, true)
+    }
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [saveDraft])
 
   const prompts = useMemo(() => getPrompts(payload), [payload])
   const wc1 = countWords(task1)
@@ -183,6 +260,9 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
       if (sr.ok && sj?.data?.attempt_id) {
         setAttempt(sj.data as AttemptDTO)
         anchorTimer(sj.data as AttemptDTO) // FB-04: lượt mới → đồng hồ mới, cho phép auto-submit lại
+        // FB-07: attempt mới rev mới; text đang giữ nguyên → lưu nháp sang attempt mới luôn.
+        answersRevRef.current = (sj.data as AttemptDTO).answers_rev ?? 0
+        scheduleDraftSave(task1, task2)
         setResult(null)
         setAiOpen(false)
         setPhase('active')
@@ -194,7 +274,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
     } finally {
       setRestarting(false)
     }
-  }, [restarting, testId, anchorTimer])
+  }, [restarting, testId, anchorTimer, scheduleDraftSave, task1, task2])
 
   // FB-05 — Trong lúc chấm: đếm elapsed cho overlay loading + chặn đóng trang (beforeunload).
   //   Request chấm đã bay đi là provider đã xử lý/tính tiền — đóng tab chỉ làm mất kết quả.
@@ -377,6 +457,20 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
               <div className="dcx-w-editor-head">
                 <span className="dcx-w-editor-eyebrow">Bài làm của bạn · Task {tab}</span>
                 <span className="dcx-w-count-wrap">
+                  {/* FB-07: trạng thái lưu nháp — aria-live để screen reader biết bài đã được giữ. */}
+                  {!preview && draftState !== 'idle' && (
+                    <span
+                      className="dcx-w-draft-state"
+                      aria-live="polite"
+                      style={{ color: draftState === 'conflict' ? '#C2402F' : '#9d96ae' }}
+                    >
+                      {draftState === 'saving'
+                        ? 'Đang lưu nháp…'
+                        : draftState === 'saved'
+                          ? 'Đã lưu nháp ✓'
+                          : 'Nháp đã đổi ở tab khác — tải lại trang'}
+                    </span>
+                  )}
                   <span className="dcx-w-count-lbl">Số từ:</span>
                   <span className="dcx-w-count">{activeWc}</span>
                   <span className={`dcx-w-count-badge${wcOk ? ' ok' : ''}`}>
@@ -387,7 +481,12 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
               <textarea
                 className="dcx-w-textarea"
                 value={activeVal}
-                onChange={(e) => setActive(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setActive(v)
+                  // FB-07: autosave debounce 800ms (pattern ExamRunner) — nháp gồm CẢ 2 task.
+                  scheduleDraftSave(tab === 1 ? v : task1, tab === 2 ? v : task2)
+                }}
                 disabled={submitting}
                 placeholder={`Bắt đầu viết bài Task ${tab} của bạn ở đây… (tối thiểu ${activeMin} từ)`}
                 aria-label={`Bài làm Task ${tab}`}

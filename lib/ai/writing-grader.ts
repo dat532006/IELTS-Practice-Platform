@@ -87,6 +87,7 @@ function mockGrade(input: GraderInput): RawAiGrade {
       feedback: '[MOCK] Deterministic placeholder feedback (AI grader not configured).',
       suggestions: ['[MOCK] Add more specific examples.', '[MOCK] Vary sentence structures.'],
       // FB-01: mock PHẢI có fix/reason_vi — không thì dev không bao giờ thấy UI diff trước/sau.
+      // FB-08: kèm 1 highlight fix RỖNG (lỗi nội dung không viết lại được) để thấy cả layout fallback.
       error_highlights: [
         {
           quote: text.trim().split(/\s+/).slice(0, 8).join(' ') || 'sample text',
@@ -94,6 +95,13 @@ function mockGrade(input: GraderInput): RawAiGrade {
           suggestion: '[MOCK] Replace vague wording with more precise vocabulary.',
           fix: `${(text.trim().split(/\s+/).slice(0, 7).join(' ') || 'sample')} precisely`,
           reason_vi: '[MOCK] Cách diễn đạt mơ hồ — thay bằng từ chính xác hơn.',
+        },
+        {
+          quote: text.trim().split(/\s+/).slice(8, 14).join(' ') || 'second sample',
+          type: 'task_response' as const,
+          suggestion: '[MOCK] Address the actual chart described in the prompt.',
+          fix: '',
+          reason_vi: '[MOCK] Nội dung lạc đề — không có bản sửa tối thiểu, cần viết lại theo đúng đề.',
         },
       ],
       // FB-02: mock sinh improvement_plan để dev thấy UI lộ trình mới (suggestions ở trên là fallback cũ).

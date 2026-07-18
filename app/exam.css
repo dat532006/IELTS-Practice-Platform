@@ -1070,6 +1070,12 @@
   font-weight: 600;
   color: #9d96ae;
 }
+/* FB-07 — trạng thái lưu nháp cạnh word count. */
+.dc-exam .dcx-w-draft-state {
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 10px;
+}
 .dc-exam .dcx-w-banner {
   flex: none;
   background: linear-gradient(100deg, #f4f0ff, #fdeee7);
