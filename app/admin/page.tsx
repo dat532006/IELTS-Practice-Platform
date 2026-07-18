@@ -114,7 +114,7 @@ export default async function AdminDashboard() {
               className="flex h-11 w-11 items-center justify-center rounded-[12px]"
               style={{ background: a.iconBg }}
             >
-              <span className="block h-[15px] w-[15px] rotate-45 rounded-[4px]" style={{ background: a.iconDot }} />
+              <span className="block h-[15px] w-[15px] rounded-full" style={{ background: a.iconDot }} />
             </span>
             <div className="mt-[15px] text-[16.5px] font-extrabold">{a.title}</div>
             <p className="mt-1.5 text-[13.5px] leading-[1.55] text-[#6A6480]">{a.desc}</p>

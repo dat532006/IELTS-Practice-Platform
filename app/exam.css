@@ -121,23 +121,14 @@
   gap: 11px;
   flex: none;
 }
+/* Brand 2026-07-18: mark = logo mèo (Mascot) thay hình thoi trên nền tím cũ. */
 .dc-exam .dcx-logo-mark {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--brand);
-  border-radius: 12px;
   width: 40px;
   height: 40px;
-  box-shadow: 0 8px 18px rgba(124, 92, 230, 0.34);
-}
-.dc-exam .dcx-logo-diamond {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: #fff;
-  transform: rotate(45deg);
-  display: block;
+  filter: drop-shadow(0 6px 11px rgba(90, 60, 160, 0.28));
 }
 .dc-exam .dcx-brand {
   display: flex;

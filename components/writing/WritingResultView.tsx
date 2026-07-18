@@ -211,8 +211,9 @@ export function WritingResultView({
             <span className="mt-1 text-[11px] font-bold text-white/80">IELTS Band</span>
           </div>
         </div>
+        {/* Owner 2026-07-18: KHÔNG lộ công thức tính điểm — chỉ ghi lưu ý tham khảo. */}
         <p className="relative mt-5 border-t border-[#E7DFF1] pt-4 text-[11px] font-semibold text-[#8B849B]">
-          Công thức: Task 1 × 1/3 + Task 2 × 2/3 · làm tròn đến 0.5 band gần nhất.
+          Điểm AI chỉ mang tính tham khảo, có thể lệch ±0.5 band so với thi thật.
         </p>
       </section>
 
@@ -228,7 +229,7 @@ export function WritingResultView({
       </div>
 
       <p className="mt-5 rounded-[14px] bg-[#F4F1F8] px-4 py-3 text-xs font-medium leading-relaxed text-[#7D768D]">
-        Điểm AI chỉ mang tính tham khảo. Task 1: <b>{result.task1_wc} từ</b> · Task 2: <b>{result.task2_wc} từ</b>.
+        Task 1: <b>{result.task1_wc} từ</b> · Task 2: <b>{result.task2_wc} từ</b>.
       </p>
     </div>
   )
