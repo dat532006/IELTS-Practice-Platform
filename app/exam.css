@@ -1008,6 +1008,68 @@
    khỏi build CSS để lightningcss không cảnh báo). KHÔNG khai báo `::highlight` ở đây. */
 
 /* ─────────────────────────── Writing screen ─────────────────────────── */
+/* FB-05 — overlay loading khi AI đang chấm (WritingRunner GradingOverlay). Dùng chung .dcx-overlay. */
+.dc-exam .dcx-w-grading-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 34px 30px 26px;
+  width: min(430px, 92vw);
+  text-align: center;
+  box-shadow: 0 30px 70px -30px rgba(42, 39, 64, 0.55);
+  animation: dcx-pop 0.22s ease;
+}
+.dc-exam .dcx-w-grading-mascot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 6px;
+}
+.dc-exam .dcx-w-grading-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid #ede6ff;
+  border-top-color: var(--brand);
+  animation: dcx-w-spin 1s linear infinite;
+}
+@keyframes dcx-w-spin {
+  to { transform: rotate(360deg); }
+}
+.dc-exam .dcx-w-grading-title {
+  margin: 4px 0 6px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.dc-exam .dcx-w-grading-stage {
+  min-height: 22px;
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #5b43c7;
+}
+.dc-exam .dcx-w-grading-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #f1edf6;
+  overflow: hidden;
+}
+.dc-exam .dcx-w-grading-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), #a88ef5);
+  transition: width 0.9s ease;
+}
+.dc-exam .dcx-w-grading-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9d96ae;
+}
 .dc-exam .dcx-w-banner {
   flex: none;
   background: linear-gradient(100deg, #f4f0ff, #fdeee7);
