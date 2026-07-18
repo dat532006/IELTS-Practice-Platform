@@ -12,10 +12,29 @@ import { z } from 'zod'
 //   nhét `overall_band` vào cũng bị REJECT. Đây là chống AI tự gộp điểm cho người trả tiền.
 // ============================================================
 
+// FB-01 (Owner 2026-07-18): tách "bản sửa" khỏi "lý do" để UI diff-màu được phần đã sửa.
+//   fix = bản viết lại TỐI THIỂU của đúng quote (English) — UI so từng từ với quote để tô màu.
+//   reason_vi = giải thích tiếng Việt sai vì sao (quy tắc/lý do). Cả 2 OPTIONAL: bài chấm cũ
+//   trong DB (ai_score jsonb) không có → UI fallback về suggestion.
 export const ErrorHighlight = z.object({
   quote: z.string().min(1).max(240),
   type: z.enum(['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar']),
   suggestion: z.string().min(1).max(500),
+  // Cap Zod NỚI hơn chỉ thị prompt (240/300) — model lỡ dài hơn chút không làm cả grade bị reject.
+  fix: z.string().max(400).optional(),
+  reason_vi: z.string().max(400).optional(),
+}).strict()
+
+// FB-02 (Owner 2026-07-18): "Lộ trình cải thiện" có cấu trúc thay cho suggestions text tự do —
+//   title_vi ngắn làm anchor đọc lướt, kind tách việc-cần-sửa khỏi điểm-mạnh-cần-giữ, priority
+//   để UI xếp việc quan trọng lên đầu. OPTIONAL toàn khối: bài cũ chỉ có suggestions vẫn render.
+export const ImprovementItem = z.object({
+  criterion: z.enum(['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar', 'general']),
+  kind: z.enum(['fix', 'keep']),
+  priority: z.union([z.literal(1), z.literal(2), z.literal(3)]), // infer đúng 1|2|3 (khớp type DTO)
+  title_vi: z.string().min(1).max(160),
+  detail_vi: z.string().min(1).max(600),
+  example: z.string().max(400).optional(),
 }).strict()
 
 // AI-005: bảng "vocabulary upgrade" — từ/cụm ĐÁNG HỌC xuất hiện trong corrected_version.
@@ -49,6 +68,7 @@ export const TaskGrade = z.object({
   // optional: Anthropic (đường lui) được phép bỏ qua, và bài chấm CŨ trong DB không có field này.
   corrected_version: z.string().max(MAX_CORRECTED_CHARS).optional(),
   vocabulary_upgrades: z.array(VocabUpgrade).max(MAX_VOCAB_ITEMS).optional(),
+  improvement_plan: z.array(ImprovementItem).max(8).optional(),
 }).strict()
 
 export const AiGradeSchema = z.object({ task1: TaskGrade, task2: TaskGrade }).strict()
@@ -62,8 +82,23 @@ const ERROR_HIGHLIGHT_JSON = {
     quote: { type: 'string', description: 'Exact short quote from the candidate response containing the issue.' },
     type: { type: 'string', enum: ['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar'] },
     suggestion: { type: 'string', description: 'Concrete correction or improvement suggestion.' },
+    fix: { type: 'string', description: 'Minimal corrected rewrite of the quote (English, <=240 chars). Change only what is wrong.' },
+    reason_vi: { type: 'string', description: 'Vietnamese: why the quoted text is wrong (rule/reason), <=300 chars.' },
   },
   required: ['quote', 'type', 'suggestion'],
+}
+const IMPROVEMENT_JSON = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    criterion: { type: 'string', enum: ['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar', 'general'] },
+    kind: { type: 'string', enum: ['fix', 'keep'], description: 'fix = action to improve; keep = strength to maintain.' },
+    priority: { type: 'integer', description: '1 = highest band impact, 2 = medium, 3 = minor. Must be 1, 2 or 3.' },
+    title_vi: { type: 'string', description: 'Short Vietnamese imperative headline (<=120 chars).' },
+    detail_vi: { type: 'string', description: 'Vietnamese explanation referencing this essay (<=500 chars).' },
+    example: { type: 'string', description: 'Optional English example sentence (<=300 chars).' },
+  },
+  required: ['criterion', 'kind', 'priority', 'title_vi', 'detail_vi'],
 }
 const VOCAB_JSON = {
   type: 'object',
@@ -98,6 +133,7 @@ const TASK_JSON = {
     error_highlights: { type: 'array', items: ERROR_HIGHLIGHT_JSON, maxItems: 12 },
     corrected_version: { type: 'string' },
     vocabulary_upgrades: { type: 'array', items: VOCAB_JSON, maxItems: MAX_VOCAB_ITEMS },
+    improvement_plan: { type: 'array', items: IMPROVEMENT_JSON, maxItems: 8 },
   },
   required: ['band', 'criteria', 'feedback', 'suggestions'],
 }
@@ -119,8 +155,24 @@ const OPENAI_ERROR_HIGHLIGHT = {
     quote: { type: 'string', description: 'Exact short quote (≤240 chars) from the candidate response containing the issue.' },
     type: { type: 'string', enum: ['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar'] },
     suggestion: { type: 'string', description: 'Concrete correction or improvement suggestion.' },
+    // Strict mode: required-nhưng-cho-rỗng (empty string = bỏ qua) — cùng pattern corrected_version.
+    fix: { type: 'string', description: 'Minimal corrected rewrite of the quote (English, ≤240 chars). Change only what is wrong. Empty string if not applicable.' },
+    reason_vi: { type: 'string', description: 'Vietnamese: why the quoted text is wrong (rule/reason), ≤300 chars. Empty string if not applicable.' },
   },
-  required: ['quote', 'type', 'suggestion'],
+  required: ['quote', 'type', 'suggestion', 'fix', 'reason_vi'],
+}
+const OPENAI_IMPROVEMENT = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    criterion: { type: 'string', enum: ['task_response', 'coherence_cohesion', 'lexical_resource', 'grammar', 'general'] },
+    kind: { type: 'string', enum: ['fix', 'keep'], description: 'fix = action to improve; keep = strength to maintain.' },
+    priority: { type: 'integer', description: '1 = highest band impact, 2 = medium, 3 = minor. Must be exactly 1, 2 or 3.' },
+    title_vi: { type: 'string', description: 'Short Vietnamese imperative headline (≤120 chars).' },
+    detail_vi: { type: 'string', description: 'Vietnamese explanation referencing this essay (≤500 chars).' },
+    example: { type: 'string', description: 'English example sentence (≤300 chars). Empty string if none.' },
+  },
+  required: ['criterion', 'kind', 'priority', 'title_vi', 'detail_vi', 'example'],
 }
 const OPENAI_VOCAB = {
   type: 'object',
@@ -155,8 +207,9 @@ const OPENAI_TASK_JSON = {
     error_highlights: { type: 'array', items: OPENAI_ERROR_HIGHLIGHT },
     corrected_version: { type: 'string', description: 'Version A — corrected rewrite of the candidate essay (English).' },
     vocabulary_upgrades: { type: 'array', items: OPENAI_VOCAB },
+    improvement_plan: { type: 'array', items: OPENAI_IMPROVEMENT, description: 'Structured improvement roadmap (4–8 items). Empty array only when there is truly nothing to say.' },
   },
-  required: ['band', 'criteria', 'feedback', 'suggestions', 'error_highlights', 'corrected_version', 'vocabulary_upgrades'],
+  required: ['band', 'criteria', 'feedback', 'suggestions', 'error_highlights', 'corrected_version', 'vocabulary_upgrades', 'improvement_plan'],
 }
 export const OPENAI_GRADE_SCHEMA = {
   type: 'object',

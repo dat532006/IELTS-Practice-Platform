@@ -13,6 +13,8 @@ type Row = {
   user_id: string
   task1_wc: number | null
   task2_wc: number | null
+  task1_text: string | null
+  task2_text: string | null
   ai_score: unknown
   graded_at: string | null
 }
@@ -32,9 +34,11 @@ export async function getWritingResult(
   attemptId: string,
   userId: string,
 ): Promise<WritingResultOutcome> {
+  // FB-01: đọc thêm task1_text/task2_text (bài làm của CHÍNH owner — guard own-row ngay dưới)
+  //   để trang xem lại render essay kèm highlight lỗi như ngay sau khi chấm.
   const { data, error } = await admin
     .from('writing_submissions')
-    .select('attempt_id, user_id, task1_wc, task2_wc, ai_score, graded_at')
+    .select('attempt_id, user_id, task1_wc, task2_wc, task1_text, task2_text, ai_score, graded_at')
     .eq('attempt_id', attemptId)
     .maybeSingle()
   if (error) throw new Error(error.message)
@@ -54,6 +58,7 @@ export async function getWritingResult(
     task2_wc: row.task2_wc ?? 0,
     graded_at: row.graded_at ?? ai.graded_at ?? '',
     mock: !!ai.mock,
+    essays: { task1: row.task1_text ?? '', task2: row.task2_text ?? '' },
   }
   return { ok: true, result }
 }
