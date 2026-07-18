@@ -7,8 +7,11 @@ import { z } from 'zod'
 //   answers[question.id] = string (single) | string[] (mcq_multi). Strict size/shape guard.
 // ============================================================
 
+// FB-07 (2026-07-18): nháp Writing (task1/task2 nguyên văn) đi CÙNG kênh autosave này → cap chuỗi đơn
+//   nâng 2000 → 20000 (Task 2 ~400 từ ≈ 2.5KB; 20KB đủ cho bài rất dài). Tổng vẫn bị route chặn 64KB
+//   (MAX_ANSWERS_BYTES). Mảng (mcq_multi — chữ cái đáp án) giữ cap ngắn.
 const AnswerValueSchema = z.union([
-  z.string().max(2000),
+  z.string().max(20_000),
   z.array(z.string().max(2000)).max(50),
 ])
 
