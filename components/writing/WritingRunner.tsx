@@ -68,6 +68,10 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
   const baseRemainingRef = useRef(-1)
   const loadAtRef = useRef(0)
   const autoSubmittedRef = useRef(false)
+  // FB-05: màn loading khi AI đang chấm (thường 30–90s với reasoning model) — đếm elapsed để đổi
+  //   thông điệp theo giai đoạn + progress; chặn đóng trang giữa chừng (request đã gửi là đã tính tiền).
+  const [gradeElapsed, setGradeElapsed] = useState(0)
+  const gradeStartRef = useRef(0)
 
   // FB-04: neo timer vào attempt hiện tại — time_remaining_sec do SERVER tính từ started_at
   //   (resume/reload không reset đồng hồ); duration_sec = 0/null → đề không giới hạn giờ, không timer.
@@ -189,6 +193,24 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
       setRestarting(false)
     }
   }, [restarting, testId, anchorTimer])
+
+  // FB-05 — Trong lúc chấm: đếm elapsed cho overlay loading + chặn đóng trang (beforeunload).
+  //   Request chấm đã bay đi là provider đã xử lý/tính tiền — đóng tab chỉ làm mất kết quả.
+  useEffect(() => {
+    if (phase !== 'submitting') return
+    gradeStartRef.current = Date.now()
+    setGradeElapsed(0)
+    const t = setInterval(() => setGradeElapsed((Date.now() - gradeStartRef.current) / 1000), 1000)
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => {
+      clearInterval(t)
+      window.removeEventListener('beforeunload', warn)
+    }
+  }, [phase])
 
   // FB-04 — Đồng hồ đếm ngược + tự nộp khi hết giờ (Owner 2026-07-18). Đếm bằng timestamp
   //   (sleep-safe, pattern ExamRunner); hết giờ → gọi ĐÚNG submit() hiện có, đúng 1 lần/attempt
@@ -405,6 +427,10 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
         </div>
       </div>
 
+      {/* FB-05: overlay loading khi AI đang chấm — che toàn màn, không đóng được (không hủy được
+          request đã gửi; hủy client cũng không dừng tính tiền provider). */}
+      {submitting && <GradingOverlay elapsed={gradeElapsed} />}
+
       {/* AI result modal */}
       {aiOpen && modalGrade && result && (
         <div className="dcx-overlay" onClick={() => setAiOpen(false)}>
@@ -487,6 +513,41 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
           </A11yDialog>
         </div>
       )}
+    </div>
+  )
+}
+
+// FB-05 — Màn loading lúc chấm AI. Thông điệp đổi theo THỜI GIAN đã chờ (tiến trình thật không đo
+//   được — 1 request duy nhất), progress tiệm cận 94% (không bao giờ tự đầy — tránh "100% mà chưa
+//   xong"). Thời lượng thật quan sát trên prod: ~30–90s (gpt-5.6-terra, effort medium).
+const GRADING_STAGES: Array<[number, string]> = [
+  [0, 'Đang gửi bài viết cho giám khảo AI…'],
+  [7, 'AI đang đọc Task 1 và Task 2 của bạn…'],
+  [20, 'Đang đối chiếu 4 tiêu chí band descriptor…'],
+  [35, 'Đang viết nhận xét chi tiết và bản sửa lỗi…'],
+  [50, 'Đang tổng hợp lộ trình cải thiện…'],
+  [70, 'Sắp xong — bài dài có thể mất hơn 1 phút, cảm ơn bạn đã chờ…'],
+]
+
+function GradingOverlay({ elapsed }: { elapsed: number }) {
+  const stage = [...GRADING_STAGES].reverse().find(([at]) => elapsed >= at)?.[1] ?? GRADING_STAGES[0][1]
+  const pct = Math.min(94, Math.round(100 * (1 - Math.exp(-elapsed / 35))))
+  return (
+    <div className="dcx-overlay" role="status" aria-live="polite" aria-label="AI đang chấm bài viết">
+      <div className="dcx-w-grading-card">
+        <div className="dcx-w-grading-mascot">
+          <span className="dcx-w-grading-ring" aria-hidden />
+          <Mascot size={62} />
+        </div>
+        <h2 className="dcx-w-grading-title">AI đang chấm bài của bạn</h2>
+        <p className="dcx-w-grading-stage">{stage}</p>
+        <div className="dcx-w-grading-track" aria-hidden>
+          <div className="dcx-w-grading-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <p className="dcx-w-grading-note">
+          Đã chờ <b>{clock(elapsed)}</b> · thường mất 30–90 giây · vui lòng không đóng trang
+        </p>
+      </div>
     </div>
   )
 }
