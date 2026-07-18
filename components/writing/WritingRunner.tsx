@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { AttemptDTO, ExamPayload, WritingGradeResult } from '@/types/exam'
 import { pickTaskPassage, isBlankHtml } from '@/lib/exam/writing-prompts'
@@ -8,7 +8,7 @@ import { FREE_GRADE_PER_DAY, GRADE_COST_COINS } from '@/lib/exam/writing-pricing
 import { WritingResultView } from '@/components/writing/WritingResultView'
 import { WritingFeedback } from '@/components/writing/WritingFeedback'
 import { A11yDialog } from '@/components/a11y/A11yDialog'
-import { MenuIcon, CloseIcon, CheckIcon, SparkleIcon, ArrowLeft } from '@/components/exam/ExamIcons'
+import { ClockIcon, MenuIcon, CloseIcon, CheckIcon, SparkleIcon, ArrowLeft } from '@/components/exam/ExamIcons'
 import { Mascot } from '@/components/brand/Mascot'
 
 // W10 — Writing UI (M07). dc-exam restyle: tab Task1/Task2 + 1 editor, word count realtime,
@@ -24,6 +24,11 @@ const RICH_RE = /<(\/?)(p|br|strong|b|em|i|u|s|h2|h3|ul|ol|li|span|div)(\s|>|\/)
 const T1_MIN = 150
 const T2_MIN = 250
 const countWords = (s: string): number => (s.trim().match(/\S+/g) ?? []).length
+// FB-04: đồng hồ đếm ngược — format mm:ss như ExamRunner.
+const clock = (sec: number): string => {
+  const s = Math.max(0, Math.floor(sec))
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}
 
 const CRITERIA: { key: 'task_response' | 'coherence_cohesion' | 'lexical_resource' | 'grammar'; label: string }[] = [
   { key: 'task_response', label: 'Task Achievement' },
@@ -48,11 +53,31 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
   const [tab, setTab] = useState<1 | 2>(1)
   const [result, setResult] = useState<WritingGradeResult | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
+  // FB-04 (Owner 2026-07-18): modal điểm có tab Task 1/Task 2 RIÊNG (không ăn theo tab editor —
+  //   trước đây viết xong ở tab 2 thì modal chỉ hiện điểm Task 2, không có cách xem Task 1).
+  const [modalTab, setModalTab] = useState<1 | 2>(1)
   const [errorMsg, setErrorMsg] = useState('')
   const [needTopup, setNeedTopup] = useState(false) // pay-per-grade: hết free + thiếu coins → hiện link nạp
   const [restarting, setRestarting] = useState(false)
   // AI-014: gợi ý mở theo TỪNG task (mở task 1 không tự đóng khi mở task 2).
   const [hintOpen, setHintOpen] = useState<Record<number, boolean>>({})
+  // FB-04: timer server-anchored (pattern ExamRunner) — neo time_remaining_sec tại lúc load attempt,
+  //   đếm bằng timestamp (sleep-safe), hết giờ TỰ NỘP cho AI đúng 1 lần.
+  const [remaining, setRemaining] = useState<number | null>(null)
+  const [timedOut, setTimedOut] = useState(false)
+  const baseRemainingRef = useRef(-1)
+  const loadAtRef = useRef(0)
+  const autoSubmittedRef = useRef(false)
+
+  // FB-04: neo timer vào attempt hiện tại — time_remaining_sec do SERVER tính từ started_at
+  //   (resume/reload không reset đồng hồ); duration_sec = 0/null → đề không giới hạn giờ, không timer.
+  const anchorTimer = useCallback((att: AttemptDTO) => {
+    baseRemainingRef.current = att.duration_sec > 0 ? att.time_remaining_sec : -1
+    loadAtRef.current = Date.now()
+    autoSubmittedRef.current = false
+    setTimedOut(false)
+    setRemaining(att.duration_sec > 0 ? att.time_remaining_sec : null)
+  }, [])
 
   useEffect(() => {
     // AI-012: preview — payload có sẵn từ form admin, không tạo attempt, không gọi API nào.
@@ -78,6 +103,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
           return setPhase('error')
         }
         setAttempt(sj.data as AttemptDTO)
+        anchorTimer(sj.data as AttemptDTO)
         const pr = await fetch(`/api/exam/${testId}`)
         const pj = await pr.json().catch(() => null)
         if (!active) return
@@ -97,7 +123,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
     return () => {
       active = false
     }
-  }, [testId, preview])
+  }, [testId, preview, anchorTimer])
 
   const prompts = useMemo(() => getPrompts(payload), [payload])
   const wc1 = countWords(task1)
@@ -118,6 +144,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
       const j = await r.json().catch(() => null)
       if (r.status === 200 && j?.data) {
         setResult(j.data as WritingGradeResult)
+        setModalTab(1) // FB-04: modal luôn mở từ Task 1 (đọc theo thứ tự), có tab chuyển sang Task 2
         setAiOpen(true)
         return setPhase('active')
       }
@@ -149,6 +176,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
       const sj = await sr.json().catch(() => null)
       if (sr.ok && sj?.data?.attempt_id) {
         setAttempt(sj.data as AttemptDTO)
+        anchorTimer(sj.data as AttemptDTO) // FB-04: lượt mới → đồng hồ mới, cho phép auto-submit lại
         setResult(null)
         setAiOpen(false)
         setPhase('active')
@@ -160,7 +188,29 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
     } finally {
       setRestarting(false)
     }
-  }, [restarting, testId])
+  }, [restarting, testId, anchorTimer])
+
+  // FB-04 — Đồng hồ đếm ngược + tự nộp khi hết giờ (Owner 2026-07-18). Đếm bằng timestamp
+  //   (sleep-safe, pattern ExamRunner); hết giờ → gọi ĐÚNG submit() hiện có, đúng 1 lần/attempt
+  //   (autoSubmittedRef). Bài chưa đủ từ thì server trả WORD_COUNT_TOO_LOW → errorMsg hiện như thường,
+  //   học viên vẫn sửa và nộp tay được (server không khoá attempt theo giờ). Đã chấm xong (result)
+  //   thì dừng — không auto-submit lượt đã terminal.
+  useEffect(() => {
+    if (preview || phase === 'result' || result || baseRemainingRef.current < 0) return
+    if (phase !== 'active' && phase !== 'submitting') return
+    const tick = () => {
+      const rem = Math.max(0, baseRemainingRef.current - (Date.now() - loadAtRef.current) / 1000)
+      setRemaining(rem)
+      if (rem <= 0 && !autoSubmittedRef.current && phase === 'active') {
+        autoSubmittedRef.current = true
+        setTimedOut(true)
+        void submit()
+      }
+    }
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => clearInterval(t)
+  }, [phase, preview, result, submit])
 
   // ---- Non-editor states ----
   if (phase === 'loading') return <Centered>Đang tải bài viết…</Centered>
@@ -181,7 +231,8 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
   const activeMin = tab === 1 ? T1_MIN : T2_MIN
   const wcOk = activeWc >= activeMin
   const submitting = phase === 'submitting'
-  const modalGrade = result ? (tab === 1 ? result.task1 : result.task2) : null
+  // FB-04: modal điểm đọc theo modalTab (tab RIÊNG của modal), không ăn theo tab editor.
+  const modalGrade = result ? (modalTab === 1 ? result.task1 : result.task2) : null
 
   // ---- Result phase (chi tiết đầy đủ — WritingResultView) ----
   if (phase === 'result' && result) {
@@ -208,7 +259,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
   return (
     <div className="dc-exam ct-bw ts-regular">
       <div className="dcx-shell">
-        <Header title={title} />
+        <Header title={title} remaining={result ? null : remaining} />
 
         {/* Banner + tabs */}
         <div className="dcx-w-banner">
@@ -341,7 +392,13 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
 
         {/* Footer */}
         <div className="dcx-w-footer">
-          <span className="dcx-w-footer-note">{preview ? 'Xem trước — nút nộp bị khoá.' : 'Task 1 & Task 2 nộp cùng lúc · nộp xong AI chấm ngay.'}</span>
+          <span className="dcx-w-footer-note">
+            {preview
+              ? 'Xem trước — nút nộp bị khoá.'
+              : timedOut && !result
+                ? '⏰ Hết giờ — hệ thống đã tự nộp bài cho AI.'
+                : 'Task 1 & Task 2 nộp cùng lúc · nộp xong AI chấm ngay.'}
+          </span>
           <button className="dcx-submit" onClick={submit} disabled={!!preview || !canSubmit || submitting}>
             {submitting ? 'Đang nộp & chấm…' : 'Nộp bài & chấm AI'} <CheckIcon className="h-4 w-4" />
           </button>
@@ -358,10 +415,26 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
               </button>
               <div className="dcx-ai-head-row">
                 <div>
-                  <div id="dcx-ai-title" className="dcx-ai-band-lbl">Band ước tính (Task {tab}) · Overall {result.overall_band.toFixed(1)}</div>
+                  <div id="dcx-ai-title" className="dcx-ai-band-lbl">Band ước tính (Task {modalTab}) · Overall {result.overall_band.toFixed(1)}</div>
                   <div className="dcx-ai-band">{modalGrade.band.toFixed(1)}</div>
                 </div>
                 <span className="dcx-ai-tag">✦ AI đã chấm</span>
+              </div>
+              {/* FB-04 (Owner 2026-07-18): tab chuyển Task 1/Task 2 NGAY trong modal điểm — trước đây
+                  modal ăn theo tab editor (thường đang ở Task 2 lúc nộp) nên không xem được điểm Task 1
+                  cho tới khi bấm "Xem kết quả đầy đủ". */}
+              <div className="dcx-w-tabs" role="tablist" aria-label="Chuyển task để xem điểm" style={{ marginTop: 12 }}>
+                {([1, 2] as const).map((n) => (
+                  <button
+                    key={n}
+                    role="tab"
+                    aria-selected={modalTab === n}
+                    className={`dcx-w-tab${modalTab === n ? ' on' : ''}`}
+                    onClick={() => setModalTab(n)}
+                  >
+                    Task {n} · {(n === 1 ? result.task1 : result.task2).band.toFixed(1)}
+                  </button>
+                ))}
               </div>
             </div>
             {result.mock && (
@@ -418,7 +491,10 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
   )
 }
 
-function Header({ title }: { title: string }) {
+function Header({ title, remaining }: { title: string; remaining?: number | null }) {
+  // FB-04: pill đếm ngược như ExamRunner — đỏ khi còn ≤60s. remaining null/undefined → không hiện
+  //   (đề không giới hạn giờ, preview, hoặc đã chấm xong).
+  const low = remaining != null && remaining <= 60
   return (
     <header className="dcx-header">
       <div className="dcx-header-inner">
@@ -430,6 +506,15 @@ function Header({ title }: { title: string }) {
           </div>
         </div>
         <div className="dcx-header-spacer" />
+        {remaining != null && (
+          <div className={`dcx-timer${low ? ' low' : ''}`}>
+            <span style={{ color: 'var(--brand)', display: 'flex' }}>
+              <ClockIcon className="h-[18px] w-[18px]" />
+            </span>
+            <span className="dcx-timer-val">{clock(remaining)}</span>
+            <span className="dcx-timer-lbl">còn lại</span>
+          </div>
+        )}
         <button className="dcx-opts-btn" aria-label="Menu" disabled>
           <MenuIcon className="h-[18px] w-[18px]" />
         </button>
