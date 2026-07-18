@@ -95,6 +95,27 @@ export async function startAttempt(
   if (exErr) throw new Error(exErr.message)
 
   let attempt = existing as AttemptRow | null
+
+  // FB-06 (Owner báo 2026-07-18): resume attempt WRITING khi đồng hồ ĐÃ hết → không trả về "attempt
+  //   chết" (client hiện 00:00 + auto-submit bài rỗng). Đánh dấu expired (KHÔNG chấm — writing không
+  //   có answer_keys, text nằm client-side đã mất khi rời trang) rồi tạo attempt MỚI với đồng hồ mới.
+  //   CHỈ áp cho writing: reading/listening giữ nguyên resume → auto-submit → chấm answers đã autosave
+  //   server-side (expired vẫn được chấm điểm — hành vi W5/W6). Cùng ngưỡng expiry với submitAttempt.
+  if (attempt && meta.skill === 'writing') {
+    const dur = attempt.duration_sec ?? 0
+    const elapsedSec = Math.max(0, nowSec() - isoSec(attempt.started_at))
+    if (dur > 0 && elapsedSec > dur + GRACE_SEC) {
+      // Conditional update: thua race (tab khác vừa expire/grade) → 0 row, vẫn rơi xuống nhánh tạo mới
+      //   (insert đụng partial unique 23505 sẽ reselect — idempotent như contract).
+      await admin
+        .from('attempts')
+        .update({ status: 'expired', time_spent: dur, submitted_at: new Date().toISOString() })
+        .eq('id', attempt.id)
+        .eq('status', 'in_progress')
+      attempt = null
+    }
+  }
+
   if (!attempt) {
     // started_at = now() do DB set (KHÔNG nhận từ client). duration_sec snapshot từ test.
     const { data: created, error: insErr } = await admin
