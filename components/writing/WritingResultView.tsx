@@ -1,4 +1,4 @@
-import type { WritingGradeResult, WritingTaskGrade, WritingVocabUpgrade } from '@/types/exam'
+import type { WritingGradeResult, WritingImprovementItem, WritingTaskGrade, WritingVocabUpgrade } from '@/types/exam'
 import { WritingErrorHighlights } from '@/components/writing/WritingErrorHighlights'
 import { WritingFeedback } from '@/components/writing/WritingFeedback'
 
@@ -17,6 +17,88 @@ const LEVEL_STYLE: Record<WritingVocabUpgrade['level'], string> = {
   B2: 'bg-sky-100 text-sky-800',
   C1: 'bg-violet-100 text-violet-800',
   C2: 'bg-rose-100 text-rose-800',
+}
+
+// FB-02 — "Lộ trình cải thiện" cấu trúc: chip tiêu chí đúng màu accent của 4 card điểm, title đậm
+//   làm anchor đọc lướt, sắp theo priority (1 = tác động band lớn nhất), điểm mạnh tách khối riêng.
+const IMPROVE_CRIT: Record<WritingImprovementItem['criterion'], { label: string; accent: string; soft: string }> = {
+  task_response: { label: 'Task Response', accent: '#7C5CE6', soft: '#F2EEFF' },
+  coherence_cohesion: { label: 'Coherence & Cohesion', accent: '#3B82F6', soft: '#EEF6FF' },
+  lexical_resource: { label: 'Lexical Resource', accent: '#D97706', soft: '#FFF6E5' },
+  grammar: { label: 'Grammar', accent: '#F26B4D', soft: '#FFF0EB' },
+  general: { label: 'Tổng thể', accent: '#6A4BD0', soft: '#F6F3FF' },
+}
+const PRIORITY_BADGE: Record<1 | 2 | 3, { label: string; cls: string }> = {
+  1: { label: 'Ưu tiên cao', cls: 'bg-[#FDE8E4] text-[#C2402F]' },
+  2: { label: 'Nên làm', cls: 'bg-[#FFF6E5] text-[#B45309]' },
+  3: { label: 'Hoàn thiện', cls: 'bg-[#F1EDF6] text-[#6A6480]' },
+}
+
+function ImprovementPlan({ items, band }: { items: WritingImprovementItem[]; band: number }) {
+  const fixes = [...items.filter((it) => it.kind === 'fix')].sort((a, b) => a.priority - b.priority)
+  const keeps = items.filter((it) => it.kind === 'keep')
+  const nextBand = Math.min(9, band + 0.5)
+  return (
+    <div className="rounded-[20px] border border-[#E7DFFF] bg-[#FAF8FF] p-4 sm:p-5">
+      <div className="flex items-center gap-2.5">
+        <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#EDE6FF] text-sm font-black text-[#6A4BD0]">↗</span>
+        <div>
+          <h4 className="text-sm font-extrabold text-[#2A2740]">
+            Lộ trình cải thiện — hướng tới band {nextBand.toFixed(1)}
+          </h4>
+          <p className="text-[11px] font-semibold text-[#9D96AE]">Sắp xếp theo mức tác động tới band, việc quan trọng nhất lên đầu</p>
+        </div>
+      </div>
+
+      <ol className="mt-4 space-y-2.5">
+        {fixes.map((it, index) => {
+          const crit = IMPROVE_CRIT[it.criterion] ?? IMPROVE_CRIT.general
+          const prio = PRIORITY_BADGE[it.priority] ?? PRIORITY_BADGE[3]
+          return (
+            <li
+              key={index}
+              className="rounded-[14px] border border-[#EDE8F5] bg-white p-3.5 shadow-[0_10px_24px_-22px_rgba(42,39,64,0.55)]"
+              style={{ borderLeft: `4px solid ${crit.accent}` }}
+            >
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-[#F0ECFF] text-[10px] font-extrabold text-[#6A4BD0]">
+                  {index + 1}
+                </span>
+                <span className="rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ backgroundColor: crit.soft, color: crit.accent }}>
+                  {crit.label}
+                </span>
+                <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${prio.cls}`}>{prio.label}</span>
+              </div>
+              <p className="mt-2 text-[13.5px] font-extrabold leading-snug text-[#2A2740]">{it.title_vi}</p>
+              <p className="mt-1 text-[13px] leading-[1.65] text-[#514B63]">{it.detail_vi}</p>
+              {it.example?.trim() && (
+                <p className="mt-2 rounded-[10px] border-l-2 border-[#CBBFF0] bg-[#F8F6FE] px-3 py-2 text-[12.5px] italic leading-relaxed text-[#5F46BD]">
+                  {it.example}
+                </p>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+
+      {keeps.length > 0 && (
+        <div className="mt-3 rounded-[14px] border border-[#D8EEDF] bg-[#F4FBF6] p-3.5">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#1E7A43]">Điểm mạnh cần duy trì</p>
+          <ul className="mt-2 space-y-2">
+            {keeps.map((it, index) => (
+              <li key={index} className="grid grid-cols-[18px_minmax(0,1fr)] gap-2 text-[13px] leading-[1.6] text-[#3D5A48]">
+                <span className="pt-px font-black text-[#1E9E56]" aria-hidden>✓</span>
+                <span>
+                  <span className="font-extrabold text-[#255C3C]">{it.title_vi}</span>
+                  {it.detail_vi && <span className="text-[#3D5A48]"> — {it.detail_vi}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function VocabTable({ items }: { items: WritingVocabUpgrade[] }) {
@@ -128,26 +210,32 @@ function TaskResult({ n, grade, essay }: { n: number; grade: WritingTaskGrade; e
           </div>
         )}
 
-        {grade.suggestions?.length > 0 && (
-          <div className="rounded-[20px] border border-[#E7DFFF] bg-[#FAF8FF] p-4 sm:p-5">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#EDE6FF] text-sm font-black text-[#6A4BD0]">↗</span>
-              <div>
-                <h4 className="text-sm font-extrabold text-[#2A2740]">Lộ trình cải thiện</h4>
-                <p className="text-[11px] font-semibold text-[#9D96AE]">Các bước ưu tiên để nâng band</p>
+        {/* FB-02: lộ trình cấu trúc (title đậm + chip tiêu chí + priority); bài chấm cũ chỉ có
+            suggestions text tự do → fallback layout cũ. */}
+        {grade.improvement_plan && grade.improvement_plan.length > 0 ? (
+          <ImprovementPlan items={grade.improvement_plan} band={grade.band} />
+        ) : (
+          grade.suggestions?.length > 0 && (
+            <div className="rounded-[20px] border border-[#E7DFFF] bg-[#FAF8FF] p-4 sm:p-5">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#EDE6FF] text-sm font-black text-[#6A4BD0]">↗</span>
+                <div>
+                  <h4 className="text-sm font-extrabold text-[#2A2740]">Lộ trình cải thiện</h4>
+                  <p className="text-[11px] font-semibold text-[#9D96AE]">Các bước ưu tiên để nâng band</p>
+                </div>
               </div>
+              <ol className="mt-4 grid gap-2.5 md:grid-cols-2">
+                {grade.suggestions.map((suggestion, index) => (
+                  <li key={index} className="flex gap-3 rounded-[14px] border border-[#EDE8F5] bg-white p-3.5 text-[13px] leading-[1.6] text-[#514B63]">
+                    <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-[#F0ECFF] text-[10px] font-extrabold text-[#6A4BD0]">
+                      {index + 1}
+                    </span>
+                    <span>{suggestion}</span>
+                  </li>
+                ))}
+              </ol>
             </div>
-            <ol className="mt-4 grid gap-2.5 md:grid-cols-2">
-              {grade.suggestions.map((suggestion, index) => (
-                <li key={index} className="flex gap-3 rounded-[14px] border border-[#EDE8F5] bg-white p-3.5 text-[13px] leading-[1.6] text-[#514B63]">
-                  <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-[#F0ECFF] text-[10px] font-extrabold text-[#6A4BD0]">
-                    {index + 1}
-                  </span>
-                  <span>{suggestion}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
+          )
         )}
 
         {grade.error_highlights && grade.error_highlights.length > 0 && (
@@ -179,6 +267,9 @@ export function WritingResultView({
   result: WritingGradeResult
   essays?: { task1: string; task2: string }
 }) {
+  // FB-01: WritingRunner truyền essays từ client state (ngay sau khi chấm); trang /writing-result
+  //   không truyền → dùng result.essays (DTO owner-only) — trang xem lại vẫn có bài + highlight lỗi.
+  const essayData = essays ?? result.essays
   return (
     <div className="text-[#2A2740]">
       <section className="relative mb-6 overflow-hidden rounded-[26px] border border-[#E8E0F4] bg-[linear-gradient(118deg,#F2ECFF_0%,#FFFFFF_52%,#FFF0E9_100%)] p-6 shadow-[0_24px_60px_-42px_rgba(64,45,105,0.75)] sm:p-8">
@@ -224,8 +315,8 @@ export function WritingResultView({
       )}
 
       <div className="space-y-6">
-        <TaskResult n={1} grade={result.task1} essay={essays?.task1} />
-        <TaskResult n={2} grade={result.task2} essay={essays?.task2} />
+        <TaskResult n={1} grade={result.task1} essay={essayData?.task1} />
+        <TaskResult n={2} grade={result.task2} essay={essayData?.task2} />
       </div>
 
       <p className="mt-5 rounded-[14px] bg-[#F4F1F8] px-4 py-3 text-xs font-medium leading-relaxed text-[#7D768D]">

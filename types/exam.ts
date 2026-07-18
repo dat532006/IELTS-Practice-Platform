@@ -84,6 +84,18 @@ export type WritingErrorHighlight = {
   quote: string
   type: 'task_response' | 'coherence_cohesion' | 'lexical_resource' | 'grammar'
   suggestion: string
+  // FB-01: optional — bài chấm cũ không có; '' = không áp dụng (OpenAI strict required-nhưng-cho-rỗng).
+  fix?: string // bản viết lại TỐI THIỂU của quote (English) — UI diff từng từ với quote để tô màu
+  reason_vi?: string // giải thích tiếng Việt: sai vì sao (quy tắc/lý do)
+}
+// FB-02: item "Lộ trình cải thiện" có cấu trúc (thay suggestions text tự do).
+export type WritingImprovementItem = {
+  criterion: 'task_response' | 'coherence_cohesion' | 'lexical_resource' | 'grammar' | 'general'
+  kind: 'fix' | 'keep' // fix = việc cần sửa; keep = điểm mạnh cần duy trì
+  priority: 1 | 2 | 3 // 1 = tác động band lớn nhất
+  title_vi: string
+  detail_vi: string
+  example?: string
 }
 // AI-005: bảng "vocabulary upgrade" — từ/cụm đáng học lấy TỪ corrected_version của chính task đó.
 export type WritingVocabUpgrade = {
@@ -103,6 +115,7 @@ export type WritingTaskGrade = {
   //   không có 2 field này (ai_score là jsonb, không migration) → UI phải render có điều kiện.
   corrected_version?: string // Version A — bài viết lại (tiếng Anh), giữ ý/trình độ gốc
   vocabulary_upgrades?: WritingVocabUpgrade[]
+  improvement_plan?: WritingImprovementItem[] // FB-02: optional — bài cũ chỉ có suggestions
 }
 export type WritingGradeResult = {
   attempt_id: string
@@ -114,6 +127,9 @@ export type WritingGradeResult = {
   graded_at: string
   mock: boolean // true nếu chấm bằng mock grader (thiếu key AI ở non-prod) — KHÔNG claim live
   coins_charged?: number // pay-per-grade: số coins đã trừ cho lượt này (0/undefined = trong hạn free/ngày)
+  // FB-01: bài làm của CHÍNH owner (GET /api/writing-result đọc từ writing_submissions) — để trang
+  //   xem lại render essay kèm highlight lỗi. Owner-only theo guard sẵn có; KHÔNG phải dữ liệu nhạy cảm mới.
+  essays?: { task1: string; task2: string }
 }
 
 // W6 submit — scoring server-side. KHÔNG bao giờ kèm answer_keys/correct answers (LUẬT THÉP #2).

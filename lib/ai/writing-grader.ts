@@ -86,11 +86,32 @@ function mockGrade(input: GraderInput): RawAiGrade {
       criteria: { task_response: b, coherence_cohesion: b, lexical_resource: b, grammar: b },
       feedback: '[MOCK] Deterministic placeholder feedback (AI grader not configured).',
       suggestions: ['[MOCK] Add more specific examples.', '[MOCK] Vary sentence structures.'],
+      // FB-01: mock PHẢI có fix/reason_vi — không thì dev không bao giờ thấy UI diff trước/sau.
       error_highlights: [
         {
           quote: text.trim().split(/\s+/).slice(0, 8).join(' ') || 'sample text',
           type: 'lexical_resource' as const,
           suggestion: '[MOCK] Replace vague wording with more precise vocabulary.',
+          fix: `${(text.trim().split(/\s+/).slice(0, 7).join(' ') || 'sample')} precisely`,
+          reason_vi: '[MOCK] Cách diễn đạt mơ hồ — thay bằng từ chính xác hơn.',
+        },
+      ],
+      // FB-02: mock sinh improvement_plan để dev thấy UI lộ trình mới (suggestions ở trên là fallback cũ).
+      improvement_plan: [
+        {
+          criterion: 'task_response' as const,
+          kind: 'fix' as const,
+          priority: 1 as const,
+          title_vi: '[MOCK] Thêm ví dụ cụ thể cho luận điểm chính',
+          detail_vi: '[MOCK] Sau câu chủ đề, bổ sung một ví dụ thực tế để phát triển ý.',
+          example: 'For instance, national parks such as Cuc Phuong have helped species recover.',
+        },
+        {
+          criterion: 'grammar' as const,
+          kind: 'keep' as const,
+          priority: 3 as const,
+          title_vi: '[MOCK] Duy trì câu phức chính xác',
+          detail_vi: '[MOCK] Các câu phức hiện tại ít lỗi — tiếp tục phát huy.',
         },
       ],
       // AI-005: mock PHẢI sinh cả field mới — nếu không, dev/test không bao giờ thấy UI Version A/vocab
@@ -139,7 +160,7 @@ async function gradeWithAnthropic(input: GraderInput): Promise<GradeOutcome> {
     const client = new Anthropic({ maxRetries: 0 }) // đọc ANTHROPIC_API_KEY từ env (server-only)
     const userContent = buildUserContent(
       input,
-      `Call the ${GRADE_TOOL} tool with the grade. All bands in 0..9, steps of 0.5. Include up to 12 short error_highlights per task when useful; omit the field if there are no specific highlights. Also include corrected_version (Version A rewrite) and up to 10 vocabulary_upgrades per task, as specified in the system instructions.`,
+      `Call the ${GRADE_TOOL} tool with the grade. All bands in 0..9, steps of 0.5. Include up to 12 short error_highlights per task when useful (each with fix + reason_vi); omit the field if there are no specific highlights. Also include corrected_version (Version A rewrite), up to 10 vocabulary_upgrades and a 4–8 item improvement_plan per task, as specified in the system instructions.`,
     )
 
     // AI-001: deadline ứng dụng — quá hạn → AbortSignal.timeout abort → SDK throw → catch → AI_UNAVAILABLE.
@@ -185,7 +206,7 @@ async function gradeWithOpenAi(input: GraderInput): Promise<GradeOutcome> {
   try {
     const userContent = buildUserContent(
       input,
-      'Return the grade as JSON. All bands in 0..9, steps of 0.5. At most 8 suggestions, 12 error_highlights and 10 vocabulary_upgrades per task; use an empty array when there is nothing to list. corrected_version and vocabulary_upgrades are required fields — follow the system instructions for how to produce them.',
+      'Return the grade as JSON. All bands in 0..9, steps of 0.5. At most 12 error_highlights (each with fix + reason_vi), 10 vocabulary_upgrades and 8 improvement_plan items per task; use an empty array when there is nothing to list. corrected_version, vocabulary_upgrades and improvement_plan are required fields — follow the system instructions for how to produce them. improvement_plan priority must be exactly 1, 2 or 3.',
     )
     // AI-001: deadline ứng dụng — provider treo → AbortSignal.timeout abort → throw → catch → AI_UNAVAILABLE.
     const res = await fetchWithDeadline('https://api.openai.com/v1/responses', {
