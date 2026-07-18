@@ -9,6 +9,7 @@ import { MatchingMatrixQuestion } from '@/components/exam/questions/MatchingMatr
 import { SummaryQuestion } from '@/components/exam/questions/SummaryQuestion'
 import { MatchingBankQuestion } from '@/components/exam/questions/MatchingBankQuestion'
 import { ListeningAudioPlayer } from '@/components/exam/ListeningAudioPlayer'
+import { Mascot } from '@/components/brand/Mascot'
 import {
   ClockIcon,
   MenuIcon,
@@ -785,7 +786,7 @@ export function ExamRunner({
         <header className="dcx-header">
           <div className="dcx-header-inner">
             <div className="dcx-logo">
-              <span className="dcx-logo-mark"><span className="dcx-logo-diamond" /></span>
+              <span className="dcx-logo-mark"><Mascot size={40} /></span>
               <div className="dcx-brand">
                 <span className="dcx-brand-name"><b>IELTS</b>Practice</span>
                 <span className="dcx-subtitle">{payload?.test.title}</span>
@@ -828,7 +829,7 @@ export function ExamRunner({
         <header className="dcx-header">
           <div className="dcx-header-inner">
             <div className="dcx-logo">
-              <span className="dcx-logo-mark"><span className="dcx-logo-diamond" /></span>
+              <span className="dcx-logo-mark"><Mascot size={40} /></span>
               <div className="dcx-brand">
                 <span className="dcx-brand-name"><b>IELTS</b>Practice</span>
                 <span className="dcx-subtitle">{payload?.test.title}</span>

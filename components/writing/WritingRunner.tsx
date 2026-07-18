@@ -9,6 +9,7 @@ import { WritingResultView } from '@/components/writing/WritingResultView'
 import { WritingFeedback } from '@/components/writing/WritingFeedback'
 import { A11yDialog } from '@/components/a11y/A11yDialog'
 import { MenuIcon, CloseIcon, CheckIcon, SparkleIcon, ArrowLeft } from '@/components/exam/ExamIcons'
+import { Mascot } from '@/components/brand/Mascot'
 
 // W10 — Writing UI (M07). dc-exam restyle: tab Task1/Task2 + 1 editor, word count realtime,
 //   chấm qua /api/grade-writing → modal AI (band + 4 tiêu chí). LUẬT THÉP #2/#12: KHÔNG tự tính band.
@@ -422,7 +423,7 @@ function Header({ title }: { title: string }) {
     <header className="dcx-header">
       <div className="dcx-header-inner">
         <div className="dcx-logo">
-          <span className="dcx-logo-mark"><span className="dcx-logo-diamond" /></span>
+          <span className="dcx-logo-mark"><Mascot size={40} /></span>
           <div className="dcx-brand">
             <span className="dcx-brand-name"><b>IELTS</b>Practice</span>
             <span className="dcx-subtitle">{title} · IELTS Writing · Task 1 + Task 2</span>

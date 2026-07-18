@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { WritingGradeResult } from '@/types/exam'
+import { Mascot } from '@/components/brand/Mascot'
 import { WritingResultView } from '@/components/writing/WritingResultView'
 
 type Phase = 'loading' | 'notfound' | 'error' | 'ready'
@@ -56,8 +57,9 @@ export function WritingResultClient({ attemptId }: { attemptId: string }) {
     <div className="min-h-screen bg-[#F8F6FC] text-[#2A2740]">
       <header className="border-b border-[#ECE7F3] bg-white/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-[1180px] items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-[13px] bg-[#7C5CE6] shadow-[0_10px_22px_-12px_rgba(92,63,180,0.9)]">
-            <span className="h-4 w-4 rotate-45 rounded-[4px] bg-white" />
+          {/* Brand 2026-07-18: logo mèo (Mascot) thay hình thoi cũ — đồng bộ Header/auth. */}
+          <span className="flex flex-none" style={{ filter: 'drop-shadow(0 6px 11px rgba(90,60,160,.28))' }}>
+            <Mascot size={40} />
           </span>
           <div>
             <div className="text-sm font-black tracking-[-0.01em]">IELTSPractice</div>
