@@ -37,7 +37,7 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint?:
     <div className="rounded-[16px] border border-[#EEEAF3] bg-white px-5 py-4 shadow-[0_6px_16px_rgba(42,39,64,0.04)]">
       <div className="text-[12px] font-extrabold uppercase tracking-[0.05em] text-[#9088A2]">{label}</div>
       <div className="mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] text-[#2A2740]">{value}</div>
-      {hint && <div className="mt-0.5 text-[12px] font-semibold text-[#A8A2BA]">{hint}</div>}
+      {hint && <div className="mt-0.5 text-[12px] font-semibold text-[var(--text-subtle)]">{hint}</div>}
     </div>
   )
 }
@@ -47,7 +47,7 @@ function RecentAttemptItem({ attempt }: { attempt: RecentAttempt }) {
     <>
       <div className="min-w-0">
         <div className="truncate text-[14px] font-bold text-[#2A2740]">{attempt.tests?.title || 'Bài luyện tập'}</div>
-        <div className="mt-0.5 text-[12.5px] font-semibold text-[#A8A2BA]">
+        <div className="mt-0.5 text-[12.5px] font-semibold text-[var(--text-subtle)]">
           {skillLabel(attempt.tests?.type ?? null)} · {fmtDate(attempt.submitted_at || attempt.started_at)}
         </div>
       </div>
@@ -100,10 +100,10 @@ export default function DashboardPage() {
     }
   }, [])
 
-  if (state === 'loading') return <p className="text-[14px] text-[#857F96]">Đang tải…</p>
+  if (state === 'loading') return <p className="text-[14px] text-[var(--text-muted)]">Đang tải…</p>
   if (state === 'unauth')
     return (
-      <p className="text-[14px] text-[#857F96]">
+      <p className="text-[14px] text-[var(--text-muted)]">
         Bạn cần{' '}
         <Link href="/login" className="font-bold text-[#6A48D6] underline">
           đăng nhập
@@ -119,7 +119,7 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-[#EEEAF3] bg-[#FBFAFF] px-6 py-5">
         <div>
           <div className="text-[18px] font-extrabold text-[#2A2740]">Chào {profile.name || profile.email || 'bạn'} 👋</div>
-          <div className="mt-1 flex items-center gap-2 text-[13px] font-semibold text-[#857F96]">
+          <div className="mt-1 flex items-center gap-2 text-[13px] font-semibold text-[var(--text-muted)]">
             <span
               className={`rounded-full px-2.5 py-0.5 text-[12px] font-bold ${
                 profile.plan === 'pro' ? 'bg-[#F0ECFF] text-[#6A48D6]' : 'bg-[#EEF0F4] text-[#6B7280]'
@@ -156,7 +156,7 @@ export default function DashboardPage() {
           </Link>
         </div>
         {recent_attempts.length === 0 ? (
-          <p className="mt-3 text-[14px] text-[#857F96]">
+          <p className="mt-3 text-[14px] text-[var(--text-muted)]">
             Chưa có bài làm nào.{' '}
             <Link href="/products" className="font-bold text-[#6A48D6] underline">
               Bắt đầu luyện tập →

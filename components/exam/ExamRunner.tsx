@@ -717,7 +717,7 @@ export function ExamRunner({
   if (phase === 'loading')
     return (
       <Shell>
-        <p className="rmuted">Đang tải đề thi…</p>
+        <h1 style={{ fontSize: 22, fontWeight: 800 }}>Đang tải đề thi…</h1>
       </Shell>
     )
   if (phase === 'locked')
@@ -798,7 +798,7 @@ export function ExamRunner({
             </button>
           </div>
         </header>
-        <main className="dcx-center" style={{ minHeight: 'calc(100vh - 66px)' }}>
+        <main id="main-content" tabIndex={-1} className="dcx-center" style={{ minHeight: 'calc(100vh - 66px)' }}>
           <div className="dcx-center-card" style={{ textAlign: 'left', maxWidth: 720 }}>
             <h1 style={{ textAlign: 'center', fontSize: 28, fontWeight: 800 }}>Hướng dẫn làm bài kiểm tra</h1>
             <h2 style={{ marginTop: 24, fontSize: 18, fontWeight: 800, textTransform: 'uppercase' }}>Lưu ý trước khi làm bài</h2>
@@ -894,7 +894,8 @@ export function ExamRunner({
         )}
 
         {/* 2 cột + divider kéo */}
-        <main ref={mainRef} className="dcx-split">
+        <main id="main-content" tabIndex={-1} ref={mainRef} className="dcx-split">
+          <h1 id="exam-main-title" className="sr-only">{payload?.test.title ?? 'Bài thi IELTS'}</h1>
           {showPassage && (
             <section
               className="dcx-left"
@@ -1245,9 +1246,9 @@ export function ExamRunner({
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div data-testid="exam-runner" className="dc-exam ct-bw ts-regular">
-      <div className="dcx-center">
+      <main id="main-content" tabIndex={-1} className="dcx-center">
         <div className="dcx-center-card">{children}</div>
-      </div>
+      </main>
     </div>
   )
 }

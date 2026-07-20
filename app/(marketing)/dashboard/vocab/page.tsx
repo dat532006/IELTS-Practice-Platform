@@ -70,10 +70,10 @@ export default function VocabPage() {
     }
   }
 
-  if (state === 'loading') return <p className="text-[14px] text-[#857F96]">Đang tải…</p>
+  if (state === 'loading') return <p className="text-[14px] text-[var(--text-muted)]">Đang tải…</p>
   if (state === 'unauth')
     return (
-      <p className="text-[14px] text-[#857F96]">
+      <p className="text-[14px] text-[var(--text-muted)]">
         Bạn cần <Link href="/login" className="font-bold text-[#6A48D6] underline">đăng nhập</Link> để dùng sổ từ vựng.
       </p>
     )
@@ -134,9 +134,9 @@ export default function VocabPage() {
 
       {/* List */}
       <div className="mt-6">
-        <div className="text-[13px] font-bold text-[#857F96]">{items.length} từ</div>
+        <div className="text-[13px] font-bold text-[var(--text-muted)]">{items.length} từ</div>
         {items.length === 0 ? (
-          <p className="mt-3 text-[14px] text-[#857F96]">Chưa có từ nào. Thêm từ đầu tiên phía trên.</p>
+          <p className="mt-3 text-[14px] text-[var(--text-muted)]">Chưa có từ nào. Thêm từ đầu tiên phía trên.</p>
         ) : (
           <ul className="mt-3 divide-y divide-[#F1EEF7] rounded-[16px] border border-[#EEEAF3] bg-white">
             {items.map((v) => (
@@ -144,7 +144,7 @@ export default function VocabPage() {
                 <div className="min-w-0">
                   <div className="text-[15px] font-extrabold text-[#2A2740]">{v.word}</div>
                   {v.definition && <div className="mt-0.5 text-[13.5px] text-[#5C5670]">{v.definition}</div>}
-                  {v.example && <div className="mt-0.5 text-[13px] italic text-[#A8A2BA]">“{v.example}”</div>}
+                  {v.example && <div className="mt-0.5 text-[13px] italic text-[var(--text-subtle)]">“{v.example}”</div>}
                 </div>
                 <button
                   type="button"

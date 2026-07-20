@@ -88,7 +88,7 @@ export default async function AdminDashboard() {
   return (
     <div className="text-[#2A2740]">
       <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Bảng điều khiển</h1>
-      <p className="mt-1.5 text-[14.5px] font-semibold text-[#857F96]">
+      <p className="mt-1.5 text-[14.5px] font-semibold text-[var(--text-muted)]">
         Tạo và xuất bản đề thi. Đáp án được tách riêng và chỉ lưu server-side.
       </p>
 

@@ -79,7 +79,7 @@ export function AdminUserList() {
   return (
     <div className="rounded-[20px] border border-[#E7E4EE] bg-white p-6 text-[#2A2740] shadow-[0_30px_60px_-38px_rgba(60,40,90,0.4)] sm:p-8">
       <h1 className="text-[21px] font-extrabold tracking-[-0.02em]">Người dùng ({total})</h1>
-      <p className="mt-1 text-[13.5px] font-semibold text-[#857F96]">
+      <p className="mt-1 text-[13.5px] font-semibold text-[var(--text-muted)]">
         Tài khoản đã đăng ký. Bấm vào email để xem hồ sơ: gói sở hữu, giao dịch, lịch sử làm bài.
       </p>
 
@@ -113,12 +113,12 @@ export function AdminUserList() {
           <tbody>
             {loading && items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-sm text-[#A8A2BA]">Đang tải…</td>
+                <td colSpan={6} className="px-3 py-6 text-center text-sm text-[var(--text-subtle)]">Đang tải…</td>
               </tr>
             )}
             {!loading && items.length === 0 && !loadErr && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-sm text-[#A8A2BA]">
+                <td colSpan={6} className="px-3 py-6 text-center text-sm text-[var(--text-subtle)]">
                   Không có tài khoản nào khớp tìm kiếm.
                 </td>
               </tr>
@@ -146,7 +146,7 @@ export function AdminUserList() {
                     {u.role}
                   </span>
                 </td>
-                <td className="px-3 py-2.5 text-[#857F96]">{fmtDate(u.created_at)}</td>
+                <td className="px-3 py-2.5 text-[var(--text-muted)]">{fmtDate(u.created_at)}</td>
               </tr>
             ))}
           </tbody>
@@ -158,7 +158,7 @@ export function AdminUserList() {
           <button type="button" disabled={page <= 1} onClick={() => void load(page - 1, q)} className="rounded-[9px] border border-[#E4DEEE] px-3 py-1.5 disabled:opacity-40">
             ← Trước
           </button>
-          <span className="text-[#857F96]">
+          <span className="text-[var(--text-muted)]">
             Trang {page}/{pages}
           </span>
           <button type="button" disabled={page >= pages} onClick={() => void load(page + 1, q)} className="rounded-[9px] border border-[#E4DEEE] px-3 py-1.5 disabled:opacity-40">

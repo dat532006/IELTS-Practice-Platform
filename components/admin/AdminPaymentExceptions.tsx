@@ -107,7 +107,7 @@ export function AdminPaymentExceptions() {
       ) : (
         <div className="overflow-x-auto rounded-[10px] border border-[#EBE8F1] bg-white">
           <table className="w-full min-w-[720px] text-left text-[13px]">
-            <thead className="border-b border-[#EBE8F1] text-[12px] text-[#857F96]">
+            <thead className="border-b border-[#EBE8F1] text-[12px] text-[var(--text-muted)]">
               <tr>
                 <th className="px-3 py-2.5 font-semibold">Thời gian</th>
                 <th className="px-3 py-2.5 font-semibold">Cổng / Mã</th>
@@ -142,7 +142,7 @@ export function AdminPaymentExceptions() {
                         </button>
                       </div>
                     ) : (
-                      <span className="text-[12px] text-[#857F96]" title={r.resolution_note ?? ''}>{r.resolution_note ? '📝' : '—'}</span>
+                      <span className="text-[12px] text-[var(--text-muted)]" title={r.resolution_note ?? ''}>{r.resolution_note ? '📝' : '—'}</span>
                     )}
                   </td>
                 </tr>

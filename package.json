@@ -26,6 +26,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/cli": "^0.1.17",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^20.14.10",
     "@types/react": "^19.0.0",

@@ -15,18 +15,18 @@ const META = 'mt-0.5 text-[12.5px] font-semibold'
 function StateChip({ state }: { state: TestUiState }) {
   if (state === 'free')
     return (
-      <span className="rounded-full bg-[#E7F7EE] px-[11px] py-1.5 text-[12px] font-extrabold text-[#1E9E63]">
+      <span className="rounded-full bg-[#E7F7EE] px-[11px] py-1.5 text-[12px] font-extrabold text-[var(--text-success)]">
         Miễn phí
       </span>
     )
   if (state === 'unlocked')
     return (
-      <span className="rounded-full bg-[#E7F7EE] px-[11px] py-1.5 text-[12px] font-extrabold text-[#1E9E63]">
+      <span className="rounded-full bg-[#E7F7EE] px-[11px] py-1.5 text-[12px] font-extrabold text-[var(--text-success)]">
         Đã mở
       </span>
     )
   return (
-    <span className="rounded-full bg-[#F2EFF7] px-[11px] py-1.5 text-[12px] font-extrabold text-[#9D96AE]">
+    <span className="rounded-full bg-[#F2EFF7] px-[11px] py-1.5 text-[12px] font-extrabold text-[var(--text-subtle)]">
       🔒 Khóa
     </span>
   )
@@ -42,7 +42,7 @@ export function CurriculumList({
   isAuthed: boolean
 }) {
   if (tests.length === 0) {
-    return <p className="text-[14px] font-semibold text-[#9D96AE]">Bộ đề chưa có đề nào.</p>
+    return <p className="text-[14px] font-semibold text-[var(--text-subtle)]">Bộ đề chưa có đề nào.</p>
   }
   return (
     <div className="flex flex-col gap-2.5">
@@ -50,7 +50,7 @@ export function CurriculumList({
         const state = deriveTestUiState(t, isAuthed)
         const locked = state === 'locked_guest' || state === 'locked_auth'
         const meta = (
-          <p className={`${META} ${locked ? 'text-[#9D96AE]' : 'text-[#857F96]'}`}>
+          <p className={`${META} ${locked ? 'text-[var(--text-subtle)]' : 'text-[var(--text-muted)]'}`}>
             {SKILL_LABEL[t.skill]} · {formatDurationMin(t.duration_sec)}
           </p>
         )
@@ -58,7 +58,7 @@ export function CurriculumList({
         if (locked) {
           return (
             <div key={t.id} className={`${ROW} bg-[#FBFAFD] opacity-[0.78]`}>
-              <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[11px] bg-[#EDE8F3] text-[#A8A2BA]">
+              <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[11px] bg-[#EDE8F3] text-[var(--text-subtle)]">
                 <LockIcon size={18} strokeWidth={2.2} />
               </span>
               <div className="min-w-0 flex-1">

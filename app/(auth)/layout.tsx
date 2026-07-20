@@ -1,10 +1,15 @@
 import { Logo } from '@/components/brand/Logo'
+import { SkipLink } from '@/components/layout/SkipLink'
 
 // Auth shell (handoff): nền radial-blob (coral top-right, violet top-left) trên #FBF9FF,
 // logo lockup phía trên, mỗi form tự render card trắng + footer link riêng.
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div
+    <>
+    <SkipLink />
+    <main
+      id="main-content"
+      tabIndex={-1}
       className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-12"
       style={{
         background:
@@ -19,6 +24,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <Logo size={46} textClassName="text-[20px]" />
         <div className="mt-[26px] w-full">{children}</div>
       </div>
-    </div>
+    </main>
+    </>
   )
 }

@@ -14,11 +14,11 @@ const check = (n, c, e = '') => { if (c) { pass++; console.log(`  ✅ ${n}`) } e
 
 console.log('UI-004 — mobile nav (Header):')
 const h = read('components/layout/Header.tsx')
-check('hamburger md:hidden + aria-expanded + aria-controls', /md:hidden/.test(h) && /aria-expanded=\{menuOpen\}/.test(h) && /aria-controls="mobile-nav"/.test(h))
-check('panel #mobile-nav md:hidden render MAIN_NAV', /id="mobile-nav"[\s\S]*md:hidden/.test(h) && /MAIN_NAV\.map/.test(h) && (h.match(/MAIN_NAV\.map/g) || []).length >= 2)
-check('Escape đóng menu', /e\.key === 'Escape'\) setMenuOpen\(false\)/.test(h))
+check('hamburger uses content-fit breakpoint + disclosure semantics', /xl:hidden/.test(h) && /aria-expanded=\{menuOpen\}/.test(h) && /aria-controls="mobile-nav"/.test(h))
+check('panel #mobile-nav uses content-fit breakpoint + shared nav source', /id="mobile-nav"[\s\S]*xl:hidden/.test(h) && /const navItems/.test(h) && /MAIN_NAV\.map/.test(h))
+check('Escape đóng menu và restore focus', /event\.key !== 'Escape'/.test(h) && /setMenuOpen\(false\)/.test(h) && /toggleRef\.current\?\.focus\(\)/.test(h))
 check('link mobile onClick đóng menu', /onClick=\{\(\) => setMenuOpen\(false\)\}/.test(h))
-check('nav desktop vẫn hidden md:flex (không đổi)', /className="hidden flex-1 items-center gap-\[22px\] md:flex"/.test(h))
+check('nav desktop waits for xl content-fit breakpoint', /className="hidden min-w-0 flex-1 items-center gap-\[22px\] xl:flex"/.test(h))
 
 console.log('\nUI-004 — home.css không còn min-width cứng gây tràn:')
 const css = read('app/home.css')

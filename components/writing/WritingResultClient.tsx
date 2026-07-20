@@ -63,7 +63,7 @@ export function WritingResultClient({ attemptId }: { attemptId: string }) {
           </span>
           <div>
             <div className="text-sm font-black tracking-[-0.01em]">IELTSPractice</div>
-            <div className="text-[11px] font-semibold text-[#9D96AE]">Kết quả Writing</div>
+            <div className="text-[11px] font-semibold text-[var(--text-subtle)]">Kết quả Writing</div>
           </div>
         </div>
       </header>

@@ -64,10 +64,10 @@ export default function HistoryPage() {
     }
   }, [])
 
-  if (state === 'loading') return <p className="text-[14px] text-[#857F96]">Đang tải…</p>
+  if (state === 'loading') return <p className="text-[14px] text-[var(--text-muted)]">Đang tải…</p>
   if (state === 'unauth')
     return (
-      <p className="text-[14px] text-[#857F96]">
+      <p className="text-[14px] text-[var(--text-muted)]">
         Bạn cần{' '}
         <Link href="/login" className="font-bold text-[#6A48D6] underline">
           đăng nhập
@@ -96,7 +96,7 @@ export default function HistoryPage() {
       )}
 
       {data.items.length === 0 ? (
-        <p className="text-[14px] text-[#857F96]">
+        <p className="text-[14px] text-[var(--text-muted)]">
           Chưa có bài làm nào.{' '}
           <Link href="/products" className="font-bold text-[#6A48D6] underline">
             Bắt đầu luyện tập →
@@ -123,8 +123,8 @@ export default function HistoryPage() {
                       <span className="line-clamp-2">{attempt.tests?.title || 'Bài luyện tập'}</span>
                     </td>
                     <td className="px-3 py-3 text-[#5C5670]">{skillLabel(attempt.tests?.type ?? null)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-[#857F96]">{fmtDate(attempt.submitted_at || attempt.started_at)}</td>
-                    <td className="px-3 py-3 text-[#857F96]">{statusLabel(attempt.status)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-[var(--text-muted)]">{fmtDate(attempt.submitted_at || attempt.started_at)}</td>
+                    <td className="px-3 py-3 text-[var(--text-muted)]">{statusLabel(attempt.status)}</td>
                     <td className="px-3 py-3 text-right font-extrabold text-[#6A48D6]">{attempt.band != null ? attempt.band.toFixed(1) : '—'}</td>
                     <td className="px-5 py-3 text-right">
                       <ResultLink attempt={attempt} />

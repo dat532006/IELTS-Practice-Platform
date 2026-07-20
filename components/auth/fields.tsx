@@ -23,9 +23,9 @@ export function AuthCard({
 }
 
 const ROW =
-  'flex items-center gap-2.5 rounded-[12px] border border-[#E8E2F0] bg-white px-3.5 shadow-[0_4px_12px_rgba(42,39,64,0.04)] focus-within:border-[#7C5CE6]'
+  'auth-field-control flex items-center gap-2.5 rounded-[12px] border border-[#E8E2F0] bg-white px-3.5 shadow-[0_4px_12px_rgba(42,39,64,0.04)] focus-within:border-[#7C5CE6]'
 const INPUT =
-  'min-w-0 flex-1 border-none bg-transparent py-[13px] text-[14.5px] text-[#2A2740] outline-none placeholder:text-[#B9B0C8]'
+  'min-w-0 flex-1 border-none bg-transparent py-[13px] text-[14.5px] text-[#2A2740] outline-none placeholder:text-[var(--text-placeholder)]'
 
 // UI-001: nhãn phải LIÊN KẾT chương trình với input. `htmlFor` set → render <label htmlFor> (screen reader
 //   đọc đúng tên field); không set → <span> (trang trí, vd nhãn phụ). Style giữ nguyên.
@@ -59,7 +59,7 @@ export function AuthField({ label, icon, labelRow, className, ...input }: FieldP
     <div className={className}>
       {labelRow != null ? renderLabelRow(labelRow, id) : label != null ? <FieldLabel htmlFor={id}>{label}</FieldLabel> : null}
       <div className={ROW}>
-        <span className="flex flex-none text-[#B9B0C8]">{icon}</span>
+        <span className="flex flex-none text-[var(--text-placeholder)]">{icon}</span>
         <input className={INPUT} {...input} id={id} />
       </div>
     </div>
@@ -89,7 +89,7 @@ export function PasswordField({
     <div className={className}>
       {labelRow != null ? renderLabelRow(labelRow, id) : label != null ? <FieldLabel htmlFor={id}>{label}</FieldLabel> : null}
       <div className={ROW}>
-        <span className="flex flex-none text-[#B9B0C8]">{icon}</span>
+        <span className="flex flex-none text-[var(--text-placeholder)]">{icon}</span>
         <input
           type={show ? 'text' : 'password'}
           className={INPUT}
@@ -101,7 +101,7 @@ export function PasswordField({
           type="button"
           onClick={() => setShow((v) => !v)}
           aria-label={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-          className="flex flex-none text-[#B9B0C8] transition hover:text-[#7C5CE6]"
+          className="flex h-11 w-11 flex-none items-center justify-center rounded-[9px] text-[var(--text-placeholder)] transition-colors hover:text-[#5B43C7]"
         >
           {show ? <EyeOffIcon /> : <EyeIcon />}
         </button>
@@ -124,5 +124,26 @@ export function PrimaryButton({
     >
       {children}
     </button>
+  )
+}
+
+export function AuthMessage({
+  id,
+  tone = 'error',
+  children,
+}: {
+  id: string
+  tone?: 'error' | 'success'
+  children: ReactNode
+}) {
+  return (
+    <p
+      id={id}
+      role={tone === 'error' ? 'alert' : 'status'}
+      aria-live={tone === 'error' ? 'assertive' : 'polite'}
+      className={'mt-3.5 text-[13.5px] font-semibold ' + (tone === 'error' ? 'text-[var(--text-error)]' : 'text-[var(--text-success)]')}
+    >
+      {children}
+    </p>
   )
 }

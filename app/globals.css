@@ -17,6 +17,14 @@
   --skill-listening: #eca22b;
   --skill-writing: #7c5ce6;
   --skill-speaking: #ee5c92;
+  /* Verified accessibility tokens: all meet WCAG AA on white and pale surfaces used in the UI. */
+  --text-muted: #625b73;
+  --text-subtle: #6f687f;
+  --text-placeholder: #756e83;
+  --text-error: #b4232f;
+  --text-success: #137a4a;
+  --text-danger: #a33636;
+  --focus-ring: #6842d8;
 }
 
 html {
@@ -43,6 +51,30 @@ html {
 
 body {
   font-family: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+:is(a, button, input, select, textarea, [role='button'], [role='textbox'], [tabindex]):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  transform: translateY(-160%);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 14px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 8px 28px rgba(42, 39, 64, 0.2);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
 }
 
 /* W8 — Highlight đoạn văn: rule `::highlight(exam-highlight)` được inject lúc runtime
@@ -117,7 +149,7 @@ body {
   content: attr(data-ph);
   color: #a49dbb;
 }
-.admin-rte-area:focus {
+.admin-rte-area:focus-visible {
   box-shadow: inset 0 0 0 2px #7c5ce6;
 }
 /* Typo trong editor cho khớp cảm giác đề thi (tiêu đề/phụ đề căn giữa, đoạn thụt đầu dòng). */
@@ -150,4 +182,11 @@ body {
 }
 .admin-rte-area li {
   margin: 2px 0;
+}
+
+@media (max-width: 767px) {
+  .admin-rte-btn {
+    min-width: 44px;
+    height: 44px;
+  }
 }

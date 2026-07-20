@@ -125,7 +125,7 @@ export function AdminActivationCodeGenerator() {
 
           <label className={labelCls}>Sản phẩm
             {products && products.length === 0 ? (
-              <p className="mt-1 text-sm font-semibold text-[#857F96]">
+              <p className="mt-1 text-sm font-semibold text-[var(--text-muted)]">
                 Chưa có sản phẩm — <Link href="/admin/products" className="text-[#6A48D6] underline">tạo sản phẩm</Link> trước.
               </p>
             ) : (
@@ -183,9 +183,9 @@ export function AdminActivationCodeGenerator() {
               <tbody>
                 {result.codes.map((c, i) => (
                   <tr key={c.code} className="border-t border-[#F1EEF7]">
-                    <td className="px-3 py-2 text-[#A8A2BA]">{i + 1}</td>
+                    <td className="px-3 py-2 text-[var(--text-subtle)]">{i + 1}</td>
                     <td className="px-3 py-2 font-mono font-bold">{c.code}</td>
-                    <td className="px-3 py-2 text-[#857F96]">{c.expires_at ? c.expires_at.slice(0, 10) : '—'}</td>
+                    <td className="px-3 py-2 text-[var(--text-muted)]">{c.expires_at ? c.expires_at.slice(0, 10) : '—'}</td>
                   </tr>
                 ))}
               </tbody>

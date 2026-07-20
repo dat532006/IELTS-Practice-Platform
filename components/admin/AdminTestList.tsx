@@ -22,7 +22,7 @@ const inputCls =
   'rounded-[11px] border border-[#E4DEEE] bg-white px-3.5 py-2.5 text-sm text-[#2A2740] focus:border-[#7C5CE6] focus:outline-none'
 
 function statusStyle(status: string) {
-  if (status === 'published') return 'bg-[#E7F7EE] text-[#1E9E63]'
+  if (status === 'published') return 'bg-[#E7F7EE] text-[var(--text-success)]'
   if (status === 'draft') return 'bg-[#FFF1DC] text-[#C98A1A]'
   return 'bg-[#EFEBF2] text-[#8B8398]'
 }
@@ -148,7 +148,7 @@ export function AdminTestList() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[21px] font-extrabold tracking-[-0.02em]">Đề thi ({total})</h1>
-          <p className="mt-1 text-[13.5px] font-semibold text-[#857F96]">
+          <p className="mt-1 text-[13.5px] font-semibold text-[var(--text-muted)]">
             Danh sách metadata — đáp án không bao giờ tải về trang này.
           </p>
         </div>
@@ -197,7 +197,7 @@ export function AdminTestList() {
       {/* rows */}
       <div className="mt-4 flex flex-col gap-2">
         {items.length === 0 && !loadErr && (
-          <p className="py-6 text-center text-sm text-[#A8A2BA]">Không có đề nào khớp bộ lọc.</p>
+          <p className="py-6 text-center text-sm text-[var(--text-subtle)]">Không có đề nào khớp bộ lọc.</p>
         )}
         {items.map((t) => {
           const chip = TYPE_CHIP[t.type ?? ''] ?? { bg: '#EFEBF2', color: '#8B8398' }
@@ -213,7 +213,7 @@ export function AdminTestList() {
                   </span>
                   <span className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-extrabold ${statusStyle(t.status)}`}>{t.status}</span>
                 </div>
-                <div className="mt-0.5 truncate text-[11.5px] text-[#A8A2BA]">
+                <div className="mt-0.5 truncate text-[11.5px] text-[var(--text-subtle)]">
                   <span className="font-mono">{t.slug ?? t.id.slice(0, 8)}</span>
                   {t.products.length > 0 && (
                     <> · trong: {t.products.map((p) => p.title ?? p.slug ?? p.id.slice(0, 8)).join(', ')}</>
@@ -227,7 +227,7 @@ export function AdminTestList() {
                 disabled={busy === t.id}
                 title="Đổi miễn phí ↔ tính phí (đề tính phí cần mua VOL mới làm được)"
                 className={`rounded-full px-3 py-1.5 text-[12px] font-extrabold transition disabled:opacity-50 ${
-                  t.is_free ? 'bg-[#E7F7EE] text-[#1E9E63] hover:bg-[#D4F0E1]' : 'bg-[#FFF3DC] text-[#A87614] hover:bg-[#FBE9C4]'
+                  t.is_free ? 'bg-[#E7F7EE] text-[var(--text-success)] hover:bg-[#D4F0E1]' : 'bg-[#FFF3DC] text-[#A87614] hover:bg-[#FBE9C4]'
                 }`}
               >
                 {t.is_free ? 'Miễn phí' : 'Tính phí'}
@@ -283,7 +283,7 @@ export function AdminTestList() {
           <button type="button" disabled={page <= 1} onClick={() => refresh(page - 1)} className="rounded-[9px] border border-[#E4DEEE] px-3 py-1.5 disabled:opacity-40">
             ← Trước
           </button>
-          <span className="text-[#857F96]">
+          <span className="text-[var(--text-muted)]">
             Trang {page}/{pages}
           </span>
           <button type="button" disabled={page >= pages} onClick={() => refresh(page + 1)} className="rounded-[9px] border border-[#E4DEEE] px-3 py-1.5 disabled:opacity-40">

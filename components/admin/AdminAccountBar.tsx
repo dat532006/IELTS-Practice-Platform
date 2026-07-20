@@ -22,11 +22,11 @@ export function AdminAccountBar({ email, userId }: { email: string | null; userI
   }
 
   return (
-    <div className="ml-auto flex items-center gap-2.5">
+    <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
       <Link
         href={`/admin/users/${userId}`}
         title="Xem hồ sơ tài khoản admin này (ví, giao dịch, lịch sử)"
-        className="hidden max-w-[220px] truncate rounded-[9px] px-2.5 py-1.5 text-[12.5px] font-semibold text-[#6A6480] transition hover:bg-[#F2EFF7] hover:text-[#2A2740] sm:block"
+        className="flex min-h-[44px] min-w-0 max-w-[220px] items-center truncate rounded-[9px] px-2.5 text-[12.5px] font-semibold text-[var(--text-muted)] transition-colors hover:bg-[#F2EFF7] hover:text-[#2A2740]"
       >
         {email ?? 'Tài khoản admin'}
       </Link>
@@ -34,7 +34,7 @@ export function AdminAccountBar({ email, userId }: { email: string | null; userI
         type="button"
         onClick={logout}
         disabled={busy}
-        className="rounded-[9px] border border-[#E4DEEE] bg-white px-3 py-1.5 text-[12.5px] font-bold text-[#564F6B] transition hover:border-[#CCC3DC] hover:bg-[#F8F6FC] disabled:opacity-50"
+        className="min-h-[44px] rounded-[9px] border border-[#E4DEEE] bg-white px-3 text-[12.5px] font-bold text-[#564F6B] transition-colors hover:border-[#CCC3DC] hover:bg-[#F8F6FC] disabled:opacity-50"
       >
         {busy ? 'Đang thoát…' : 'Đăng xuất'}
       </button>

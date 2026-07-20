@@ -46,7 +46,7 @@ function ImprovementPlan({ items, band }: { items: WritingImprovementItem[]; ban
           <h4 className="text-sm font-extrabold text-[#2A2740]">
             Lộ trình cải thiện — hướng tới band {nextBand.toFixed(1)}
           </h4>
-          <p className="text-[11px] font-semibold text-[#9D96AE]">Sắp xếp theo mức tác động tới band, việc quan trọng nhất lên đầu</p>
+          <p className="text-[11px] font-semibold text-[var(--text-subtle)]">Sắp xếp theo mức tác động tới band, việc quan trọng nhất lên đầu</p>
         </div>
       </div>
 
@@ -105,7 +105,7 @@ function VocabTable({ items }: { items: WritingVocabUpgrade[] }) {
   return (
     <div className="rounded-[20px] border border-[#E9E3F1] bg-white p-4 sm:p-5">
       <h4 className="text-sm font-extrabold text-[#2A2740]">Từ vựng nên học</h4>
-      <p className="mt-1 text-[11px] font-semibold text-[#9D96AE]">Các từ và cụm từ phù hợp để nâng chất lượng bài viết.</p>
+      <p className="mt-1 text-[11px] font-semibold text-[var(--text-subtle)]">Các từ và cụm từ phù hợp để nâng chất lượng bài viết.</p>
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[640px] border-separate border-spacing-0 text-left text-xs">
           <thead>
@@ -178,7 +178,7 @@ function TaskResult({ n, grade, essay }: { n: number; grade: WritingTaskGrade; e
           <p className="mt-1 text-xs font-semibold text-[#8B849B]">Phân tích theo 4 tiêu chí band descriptor</p>
         </div>
         <div className="flex items-center gap-3 rounded-[18px] border border-white/80 bg-white/85 px-4 py-3 shadow-[0_12px_30px_-22px_rgba(42,39,64,0.8)]">
-          <span className="text-right text-[11px] font-bold uppercase leading-tight tracking-[0.08em] text-[#9D96AE]">
+          <span className="text-right text-[11px] font-bold uppercase leading-tight tracking-[0.08em] text-[var(--text-subtle)]">
             Task
             <br />
             Band
@@ -191,7 +191,7 @@ function TaskResult({ n, grade, essay }: { n: number; grade: WritingTaskGrade; e
         <div>
           <div className="mb-3 flex items-center justify-between gap-3">
             <h4 className="text-sm font-extrabold text-[#2A2740]">Điểm theo 4 tiêu chí</h4>
-            <span className="text-[11px] font-semibold text-[#9D96AE]">Thang điểm 0–9</span>
+            <span className="text-[11px] font-semibold text-[var(--text-subtle)]">Thang điểm 0–9</span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {CRITERIA.map((item) => (
@@ -204,7 +204,7 @@ function TaskResult({ n, grade, essay }: { n: number; grade: WritingTaskGrade; e
           <div>
             <div className="mb-3">
               <h4 className="text-sm font-extrabold text-[#2A2740]">Nhận xét chi tiết</h4>
-              <p className="mt-1 text-xs font-medium text-[#9D96AE]">Các ý đã được nhóm theo tiêu chí để bạn dễ đọc và đối chiếu.</p>
+              <p className="mt-1 text-xs font-medium text-[var(--text-subtle)]">Các ý đã được nhóm theo tiêu chí để bạn dễ đọc và đối chiếu.</p>
             </div>
             <WritingFeedback feedback={grade.feedback} />
           </div>
@@ -221,7 +221,7 @@ function TaskResult({ n, grade, essay }: { n: number; grade: WritingTaskGrade; e
                 <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#EDE6FF] text-sm font-black text-[#6A4BD0]">↗</span>
                 <div>
                   <h4 className="text-sm font-extrabold text-[#2A2740]">Lộ trình cải thiện</h4>
-                  <p className="text-[11px] font-semibold text-[#9D96AE]">Các bước ưu tiên để nâng band</p>
+                  <p className="text-[11px] font-semibold text-[var(--text-subtle)]">Các bước ưu tiên để nâng band</p>
                 </div>
               </div>
               <ol className="mt-4 grid gap-2.5 md:grid-cols-2">
