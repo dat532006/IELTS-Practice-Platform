@@ -15,8 +15,8 @@ export default function VerifyEmailPage() {
             <CheckIcon size={12} strokeWidth={3.6} />
           </span>
         </span>
-        <h2 className="mt-5 text-[22px] font-extrabold tracking-[-0.02em]">Kiểm tra hộp thư</h2>
-        <p className="mx-auto mt-2 max-w-[32ch] text-[14.5px] font-semibold leading-[1.6] text-[#857F96]">
+        <h1 className="mt-5 text-[22px] font-extrabold tracking-[-0.02em]">Kiểm tra hộp thư</h1>
+        <p className="mx-auto mt-2 max-w-[32ch] text-[14.5px] font-semibold leading-[1.6] text-[var(--text-muted)]">
           Chúng tôi đã gửi email xác nhận. Mở email và làm theo hướng dẫn để kích hoạt tài khoản.
         </p>
 
@@ -32,7 +32,7 @@ export default function VerifyEmailPage() {
           Về đăng nhập
         </Link>
       </AuthCard>
-      <p className="mt-[18px] text-[13.5px] font-semibold text-[#857F96]">
+      <p className="mt-[18px] text-[13.5px] font-semibold text-[var(--text-muted)]">
         Nhầm địa chỉ?{' '}
         <Link href="/register" className="font-bold text-[#6A48D6]">
           Đăng ký lại

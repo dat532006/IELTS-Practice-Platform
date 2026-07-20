@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton'
-import { AuthCard, AuthField, PasswordField, PrimaryButton } from '@/components/auth/fields'
+import { AuthCard, AuthField, AuthMessage, PasswordField, PrimaryButton } from '@/components/auth/fields'
 import { StrengthMeter } from '@/components/auth/StrengthMeter'
 import { passwordLevel, WEAK_PASSWORD_ERROR } from '@/lib/auth/password'
 import { MailIcon, LockIcon, UserIcon, CheckIcon } from '@/components/brand/icons'
+import { LEGAL_SLUG } from '@/lib/legal'
+import { toAuthErrorMessage } from '@/lib/auth/error-message'
 
 const OTP_INPUT =
   'w-full rounded-[12px] border border-[#E8E2F0] bg-white px-3.5 py-[13px] text-center text-[18px] font-bold tracking-[0.5em] text-[#2A2740] outline-none shadow-[0_4px_12px_rgba(42,39,64,0.04)] focus:border-[#7C5CE6]'
@@ -35,109 +37,140 @@ export function RegisterForm() {
     if (data.user) await supabase.from('profiles').update({ name: name.trim() }).eq('id', data.user.id)
   }
 
+  function showError(message: string, fieldId: string) {
+    setError(message)
+    window.requestAnimationFrame(() => document.getElementById(fieldId)?.focus())
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    const normalizedEmail = email.trim()
+    if (!name.trim()) {
+      showError('Vui lòng nhập họ và tên.', 'register-name')
+      return
+    }
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      showError('Vui lòng nhập địa chỉ email hợp lệ.', 'register-email')
+      return
+    }
     if (level < 1) {
-      setError(WEAK_PASSWORD_ERROR)
+      showError(WEAK_PASSWORD_ERROR, 'register-password')
       return
     }
     if (password !== confirm) {
-      setError('Mật khẩu nhập lại không khớp.')
+      showError('Mật khẩu nhập lại không khớp.', 'register-confirm')
       return
     }
     if (!agree) {
-      setError('Vui lòng đồng ý với Điều khoản & Chính sách bảo mật.')
+      showError('Vui lòng đồng ý với Điều khoản và Chính sách bảo mật.', 'register-agree')
       return
     }
-    setLoading(true)
-    const supabase = createClient()
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        data: { full_name: name.trim(), name: name.trim() },
-      },
-    })
-    if (error) {
-      setLoading(false)
-      setError(error.message)
-      return
-    }
-    // Nếu project TẮT email confirmation, signUp trả về session luôn → vào thẳng.
-    if (data.session) {
-      await saveName(supabase)
-      setLoading(false)
-      router.push('/')
-      router.refresh()
-      return
-    }
-    setLoading(false)
-    // Còn lại: cần xác nhận → chuyển sang bước nhập mã OTP gửi về email.
-    setPhase('otp')
-  }
 
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          emailRedirectTo: window.location.origin + '/auth/callback',
+          data: { full_name: name.trim(), name: name.trim() },
+        },
+      })
+      if (authError) {
+        showError(toAuthErrorMessage(authError, 'Không thể tạo tài khoản lúc này. Vui lòng thử lại.'), 'register-email')
+        return
+      }
+      if (data.session) {
+        await saveName(supabase)
+        router.push('/')
+        router.refresh()
+        return
+      }
+      setPhase('otp')
+    } catch (authError) {
+      showError(toAuthErrorMessage(authError, 'Không thể tạo tài khoản lúc này. Vui lòng thử lại.'), 'register-email')
+    } finally {
+      setLoading(false)
+    }
+  }
   async function onVerify(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    setLoading(true)
-    const supabase = createClient()
-    const { error } = await supabase.auth.verifyOtp({ email, token: otp.trim(), type: 'signup' })
-    if (error) {
-      setLoading(false)
-      setError(error.message)
+    if (!/^\d{6}$/.test(otp.trim())) {
+      showError('Vui lòng nhập đủ mã xác nhận gồm 6 chữ số.', 'register-otp')
       return
     }
-    await saveName(supabase)
-    setLoading(false)
-    router.push('/')
-    router.refresh()
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { error: authError } = await supabase.auth.verifyOtp({ email, token: otp.trim(), type: 'signup' })
+      if (authError) {
+        showError(toAuthErrorMessage(authError, 'Không thể xác nhận email lúc này. Vui lòng thử lại.'), 'register-otp')
+        return
+      }
+      await saveName(supabase)
+      router.push('/')
+      router.refresh()
+    } catch (authError) {
+      showError(toAuthErrorMessage(authError, 'Không thể xác nhận email lúc này. Vui lòng thử lại.'), 'register-otp')
+    } finally {
+      setLoading(false)
+    }
   }
-
   async function resend() {
     setError(null)
     setNotice(null)
-    const supabase = createClient()
-    const { error } = await supabase.auth.resend({ type: 'signup', email })
-    if (error) {
-      setError(error.message)
-      return
+    try {
+      const supabase = createClient()
+      const { error: authError } = await supabase.auth.resend({ type: 'signup', email })
+      if (authError) {
+        showError(toAuthErrorMessage(authError, 'Không thể gửi lại mã lúc này. Vui lòng thử lại.'), 'register-otp')
+        return
+      }
+      setNotice('Đã gửi lại mã xác nhận.')
+    } catch (authError) {
+      showError(toAuthErrorMessage(authError, 'Không thể gửi lại mã lúc này. Vui lòng thử lại.'), 'register-otp')
     }
-    setNotice('Đã gửi lại mã xác nhận.')
   }
 
   if (phase === 'otp') {
     return (
       <div className="flex flex-col items-center">
         <AuthCard>
-          <h2 className="text-[22px] font-extrabold tracking-[-0.02em]">Xác nhận email</h2>
-          <p className="mt-2 text-[14px] font-semibold text-[#857F96]">
+          <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Xác nhận email</h1>
+          <p className="mt-2 text-[14px] font-semibold text-[var(--text-muted)]">
             Đã gửi mã xác nhận tới <span className="font-extrabold text-[#2A2740]">{email}</span>.
             Nhập mã 6 số để hoàn tất đăng ký.
           </p>
-          <form onSubmit={onVerify} className="mt-5">
+          <form onSubmit={onVerify} noValidate className="mt-5">
+            <label htmlFor="register-otp" className="mb-2 block text-[13px] font-bold text-[#4A445E]">Mã xác nhận gồm 6 chữ số</label>
             <input
+              id="register-otp"
+              name="otp"
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
               required
+              aria-invalid={!!error || undefined}
+              aria-describedby={error ? 'register-otp-error' : notice ? 'register-otp-notice' : undefined}
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
               className={OTP_INPUT}
               placeholder="••••••"
             />
-            {error && <p className="mt-3 text-[13.5px] font-semibold text-[#EF5B5B]">{error}</p>}
-            {notice && <p className="mt-3 text-[13.5px] font-semibold text-[#1E9E63]">{notice}</p>}
+            {error && <AuthMessage id="register-otp-error">{error}</AuthMessage>}
+            {notice && <AuthMessage id="register-otp-notice" tone="success">{notice}</AuthMessage>}
             <PrimaryButton type="submit" disabled={loading || otp.length < 6} className="mt-4">
-              {loading ? 'Đang xác nhận...' : 'Xác nhận'}
+              {loading ? 'Đang xác nhận…' : 'Xác nhận'}
             </PrimaryButton>
           </form>
-          <div className="mt-4 flex justify-between text-[12.5px] font-bold text-[#857F96]">
-            <button type="button" onClick={resend} className="transition hover:text-[#6A48D6]">
+          <div className="mt-4 flex justify-between text-[12.5px] font-bold text-[var(--text-muted)]">
+            <button type="button" onClick={resend} className="min-h-[44px] rounded-[8px] px-1 transition-colors hover:text-[#5B43C7]">
               Gửi lại mã
             </button>
-            <button type="button" onClick={() => setPhase('form')} className="transition hover:text-[#6A48D6]">
+            <button type="button" onClick={() => setPhase('form')} className="min-h-[44px] rounded-[8px] px-1 transition-colors hover:text-[#5B43C7]">
               Đổi email
             </button>
           </div>
@@ -149,8 +182,8 @@ export function RegisterForm() {
   return (
     <div className="flex flex-col items-center">
       <AuthCard>
-        <h2 className="text-[23px] font-extrabold tracking-[-0.02em]">Tạo tài khoản</h2>
-        <p className="mt-1.5 text-[14px] font-semibold text-[#857F96]">
+        <h1 className="text-[23px] font-extrabold tracking-[-0.02em]">Tạo tài khoản</h1>
+        <p className="mt-1.5 text-[14px] font-semibold text-[var(--text-muted)]">
           Bắt đầu với các đề miễn phí — không cần thẻ.
         </p>
 
@@ -158,14 +191,18 @@ export function RegisterForm() {
           <GoogleAuthButton label="Đăng ký với Google" />
         </div>
 
-        <div className="my-5 flex items-center gap-3">
+        <div className="my-5 flex items-center gap-3" aria-hidden="true">
           <span className="h-px flex-1 bg-[#EDE8F3]" />
           <span className="text-[12px] font-bold text-[#B0A9C0]">hoặc</span>
           <span className="h-px flex-1 bg-[#EDE8F3]" />
         </div>
 
-        <form onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} noValidate>
           <AuthField
+            id="register-name"
+            name="name"
+            aria-invalid={!!error || undefined}
+            aria-describedby={error ? 'register-error' : undefined}
             label="Họ và tên"
             type="text"
             required
@@ -174,6 +211,10 @@ export function RegisterForm() {
             onChange={(e) => setName(e.target.value)}
           />
           <AuthField
+            id="register-email"
+            name="email"
+            aria-invalid={!!error || undefined}
+            aria-describedby={error ? 'register-error' : undefined}
             className="mt-[15px]"
             label="Email"
             type="email"
@@ -183,6 +224,10 @@ export function RegisterForm() {
             onChange={(e) => setEmail(e.target.value)}
           />
           <PasswordField
+            id="register-password"
+            name="password"
+            aria-invalid={!!error || undefined}
+            aria-describedby={error ? 'register-error' : undefined}
             className="mt-[15px]"
             label="Mật khẩu"
             required
@@ -195,6 +240,10 @@ export function RegisterForm() {
           <StrengthMeter level={level} />
 
           <PasswordField
+            id="register-confirm"
+            name="password-confirmation"
+            aria-invalid={!!error || undefined}
+            aria-describedby={error ? 'register-error' : undefined}
             className="mt-[15px]"
             label="Xác nhận mật khẩu"
             required
@@ -203,18 +252,19 @@ export function RegisterForm() {
             onChange={(e) => setConfirm(e.target.value)}
             rightAdornment={
               confirm.length > 0 && confirm === password ? (
-                <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-[#E7F7EE] text-[#1E9E63]">
+                <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-[#E7F7EE] text-[var(--text-success)]">
                   <CheckIcon size={11} strokeWidth={3.4} />
                 </span>
               ) : undefined
             }
           />
-          {confirm.length > 0 && confirm !== password && (
-            <p className="mt-1.5 text-[12px] font-semibold text-[#EF5B5B]">Mật khẩu nhập lại không khớp.</p>
-          )}
 
           <label className="mt-4 flex cursor-pointer items-start gap-2.5">
             <input
+              id="register-agree"
+              name="agree"
+              aria-invalid={!!error || undefined}
+              aria-describedby={error ? 'register-error' : undefined}
               type="checkbox"
               checked={agree}
               onChange={(e) => setAgree(e.target.checked)}
@@ -225,26 +275,26 @@ export function RegisterForm() {
             </span>
             <span className="text-[12.5px] font-semibold leading-[1.5] text-[#6A6480]">
               Tôi đồng ý với{' '}
-              <Link href="/legal/terms" className="font-bold text-[#6A48D6]">
+              <Link href={'/legal/' + LEGAL_SLUG.TRANSACTION_TERMS} className="font-bold text-[#6A48D6]">
                 Điều khoản
               </Link>{' '}
               &amp;{' '}
-              <Link href="/legal/privacy" className="font-bold text-[#6A48D6]">
+              <Link href={'/legal/' + LEGAL_SLUG.PRIVACY} className="font-bold text-[#6A48D6]">
                 Chính sách bảo mật
               </Link>
               .
             </span>
           </label>
 
-          {error && <p className="mt-3.5 text-[13.5px] font-semibold text-[#EF5B5B]">{error}</p>}
+          {error && <AuthMessage id="register-error">{error}</AuthMessage>}
 
           <PrimaryButton type="submit" disabled={loading} className="mt-5">
-            {loading ? 'Đang tạo...' : 'Đăng ký miễn phí'}
+            {loading ? 'Đang tạo…' : 'Đăng ký miễn phí'}
           </PrimaryButton>
         </form>
       </AuthCard>
 
-      <p className="mt-5 text-[13.5px] font-semibold text-[#857F96]">
+      <p className="mt-5 text-[13.5px] font-semibold text-[var(--text-muted)]">
         Đã có tài khoản?{' '}
         <Link href="/login" className="font-bold text-[#6A48D6]">
           Đăng nhập →

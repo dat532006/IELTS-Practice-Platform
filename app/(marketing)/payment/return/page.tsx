@@ -20,7 +20,7 @@ export default function PaymentReturnPage() {
           khoản <b className="text-[#2A2740]">sau khi server xác minh thành công</b> — thường trong vài giây, đôi khi
           tới vài phút.
         </p>
-        <p className="mt-2 text-[13.5px] leading-[1.6] text-[#857F96]">
+        <p className="mt-2 text-[13.5px] leading-[1.6] text-[var(--text-muted)]">
           Nếu sau vài phút số dư chưa cập nhật, vui lòng liên hệ hỗ trợ kèm mã giao dịch (xem{' '}
           <Link href="/legal/contact" className="font-semibold text-[#6A48D6] hover:underline">
             trang Liên hệ

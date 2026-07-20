@@ -94,7 +94,7 @@ export function TopupQrPanel({ refCode, amountVnd, amountCoins, initialStatus, e
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[20px] font-extrabold tracking-[-0.02em] text-[#2A2740]">Chuyển khoản VietQR</h2>
         {!expired && mm != null && (
-          <span className="text-[13px] font-bold text-[#857F96]">
+          <span className="text-[13px] font-bold text-[var(--text-muted)]">
             Hết hạn sau <span className="font-mono text-[#C7542F]">{mm}:{ss}</span>
           </span>
         )}
@@ -112,7 +112,7 @@ export function TopupQrPanel({ refCode, amountVnd, amountCoins, initialStatus, e
         <div className="mx-auto">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={qrUrl} alt="VietQR chuyển khoản" width={220} height={220} className="rounded-[14px] border border-[#EEEAF3]" />
-          <p className="mt-2 text-center text-[12px] font-semibold text-[#9D96AE]">Quét bằng app ngân hàng bất kỳ</p>
+          <p className="mt-2 text-center text-[12px] font-semibold text-[var(--text-subtle)]">Quét bằng app ngân hàng bất kỳ</p>
         </div>
 
         <div className="space-y-3 text-[14px]">
@@ -124,7 +124,7 @@ export function TopupQrPanel({ refCode, amountVnd, amountCoins, initialStatus, e
             { label: 'Nội dung CK', value: refCode, tag: 'ref' },
           ].map((row) => (
             <div key={row.label} className="flex items-center justify-between gap-3 rounded-[11px] border border-[#F0EDF6] bg-[#FBFAFF] px-3.5 py-2.5">
-              <span className="font-semibold text-[#857F96]">{row.label}</span>
+              <span className="font-semibold text-[var(--text-muted)]">{row.label}</span>
               <span className="flex items-center gap-2 font-extrabold text-[#2A2740]">
                 <span className={row.tag === 'ref' ? 'font-mono text-[13px]' : ''}>{row.value}</span>
                 {row.tag && (
@@ -145,7 +145,7 @@ export function TopupQrPanel({ refCode, amountVnd, amountCoins, initialStatus, e
             hệ thống khớp tự động theo nội dung này. Sai nội dung/số tiền sẽ phải đối soát tay.
           </div>
 
-          <div className="flex items-center gap-2 text-[13px] font-semibold text-[#857F96]">
+          <div className="flex items-center gap-2 text-[13px] font-semibold text-[var(--text-muted)]">
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#7C5CE6]" />
             Đang chờ thanh toán — trang tự cập nhật khi server xác nhận (thường vài giây sau khi chuyển).
           </div>

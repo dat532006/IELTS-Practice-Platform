@@ -24,7 +24,7 @@ const inputCls =
   'mt-1 w-full rounded-[10px] border border-[#E4DEEE] bg-white p-2.5 text-sm text-[#2A2740] focus:border-[#7C5CE6] focus:outline-none'
 
 function statusStyle(status: string) {
-  if (status === 'published') return 'bg-[#E7F7EE] text-[#1E9E63]'
+  if (status === 'published') return 'bg-[#E7F7EE] text-[var(--text-success)]'
   if (status === 'draft') return 'bg-[#FFF1DC] text-[#C98A1A]'
   return 'bg-[#EFEBF2] text-[#8B8398]'
 }
@@ -114,7 +114,7 @@ export function AdminProductManager() {
             </Link>
             <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Sản phẩm / Bundle</h1>
           </div>
-          <p className="mt-1 text-[14px] font-semibold text-[#857F96]">Gồm cả draft &amp; hidden — khác catalog công khai</p>
+          <p className="mt-1 text-[14px] font-semibold text-[var(--text-muted)]">Gồm cả draft &amp; hidden — khác catalog công khai</p>
         </div>
         <button
           type="button"
@@ -137,7 +137,7 @@ export function AdminProductManager() {
             Slug
             <input className={`${inputCls} font-mono`} value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="ielts-reading-bundle-1" />
           </label>
-          <p className="mt-1 text-[11px] text-[#A8A2BA]">Chữ thường, số và dấu gạch ngang (kebab-case).</p>
+          <p className="mt-1 text-[11px] text-[var(--text-subtle)]">Chữ thường, số và dấu gạch ngang (kebab-case).</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <label className={labelCls}>
               Loại
@@ -197,9 +197,9 @@ export function AdminProductManager() {
             <span className="text-right">Thao tác</span>
           </div>
 
-          {!items && !loadErr && <p className="px-[18px] py-6 text-center text-sm text-[#A8A2BA]">Đang tải…</p>}
+          {!items && !loadErr && <p className="px-[18px] py-6 text-center text-sm text-[var(--text-subtle)]">Đang tải…</p>}
           {items && items.length === 0 && (
-            <p className="px-[18px] py-6 text-center text-sm text-[#A8A2BA]">Chưa có sản phẩm. Tạo sản phẩm đầu tiên.</p>
+            <p className="px-[18px] py-6 text-center text-sm text-[var(--text-subtle)]">Chưa có sản phẩm. Tạo sản phẩm đầu tiên.</p>
           )}
 
           {items?.map((p) => (
@@ -216,7 +216,7 @@ export function AdminProductManager() {
                 </span>
                 <div className="min-w-0">
                   <div className="truncate text-[14px] font-bold text-[#2A2740]">{p.title || '(chưa có tiêu đề)'}</div>
-                  <div className="truncate font-mono text-[11.5px] font-semibold text-[#A8A2BA]">{p.slug}</div>
+                  <div className="truncate font-mono text-[11.5px] font-semibold text-[var(--text-subtle)]">{p.slug}</div>
                 </div>
               </div>
               <span className="justify-self-start rounded-[7px] bg-[#F0ECFF] px-2 py-1 text-[12px] font-bold capitalize text-[#5B43C7]">

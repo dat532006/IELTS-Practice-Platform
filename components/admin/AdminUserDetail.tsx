@@ -181,7 +181,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
     return (
       <div>
         {backLink}
-        <p className="mt-6 text-center text-sm text-[#857F96]">Không tìm thấy tài khoản.</p>
+        <p className="mt-6 text-center text-sm text-[var(--text-muted)]">Không tìm thấy tài khoản.</p>
       </div>
     )
   if (loadErr)
@@ -195,7 +195,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
     return (
       <div>
         {backLink}
-        <p className="mt-6 text-center text-sm text-[#A8A2BA]">Đang tải…</p>
+        <p className="mt-6 text-center text-sm text-[var(--text-subtle)]">Đang tải…</p>
       </div>
     )
 
@@ -214,7 +214,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
         </span>
         {p.banned && <span className="rounded-full bg-[#FDECEC] px-2.5 py-1 text-[12px] font-extrabold text-[#C0392B]">Đã khóa</span>}
       </div>
-      <p className="mt-1 text-[13px] font-semibold text-[#857F96]">
+      <p className="mt-1 text-[13px] font-semibold text-[var(--text-muted)]">
         {p.name ? `${p.name} · ` : ''}Đăng ký {fmtDateTime(p.created_at)} · <span className="font-mono text-[11.5px]">{p.id}</span>
       </p>
 
@@ -254,11 +254,11 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                 </button>
               </div>
               {coinMsg && (
-                <p aria-live="polite" className={`mt-2 text-[12.5px] font-bold ${coinMsg.tone === 'ok' ? 'text-[#1E9E63]' : 'text-[#D24A4A]'}`}>
+                <p aria-live="polite" className={`mt-2 text-[12.5px] font-bold ${coinMsg.tone === 'ok' ? 'text-[var(--text-success)]' : 'text-[#D24A4A]'}`}>
                   {coinMsg.text}
                 </p>
               )}
-              <p className="mt-2 text-[11px] leading-[1.5] text-[#A8A2BA]">
+              <p className="mt-2 text-[11px] leading-[1.5] text-[var(--text-subtle)]">
                 Mọi lần chỉnh đều ghi giao dịch (cộng = “Admin cộng”, trừ = “Admin trừ”) kèm lý do — người dùng thấy được trong ví của họ.
               </p>
             </div>
@@ -292,7 +292,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                 {p.banned ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
               </button>
             )}
-            <p className="mt-2 text-[11px] leading-[1.5] text-[#A8A2BA]">
+            <p className="mt-2 text-[11px] leading-[1.5] text-[var(--text-subtle)]">
               Khóa chặn đăng nhập/làm mới phiên. Phiên đang mở còn hiệu lực tối đa ~1 giờ trước khi bị chặn hẳn.
             </p>
           </div>
@@ -303,14 +303,14 @@ export function AdminUserDetail({ userId }: { userId: string }) {
           <div className={cardCls}>
             <div className={secTitleCls}>Gói đề sở hữu ({countLabel(d.unlocks.length, d.counts.unlocks)})</div>
             {d.unlocks.length === 0 ? (
-              <p className="mt-2 text-sm text-[#A8A2BA]">Chưa sở hữu gói nào.</p>
+              <p className="mt-2 text-sm text-[var(--text-subtle)]">Chưa sở hữu gói nào.</p>
             ) : (
               <div className="mt-2 flex flex-col gap-1.5">
                 {d.unlocks.map((u) => (
                   <div key={u.product_id} className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#F0EDF6] px-3 py-2 text-[13px]">
                     <span className="font-bold">{u.title ?? u.slug ?? u.product_id.slice(0, 8)}</span>
                     <span className="rounded-full bg-[#F4F1FB] px-2 py-0.5 text-[11px] font-extrabold text-[#6A48D6]">{VIA_LABEL[u.via] ?? u.via}</span>
-                    <span className="ml-auto text-[11.5px] text-[#A8A2BA]">{fmtDateTime(u.created_at)}</span>
+                    <span className="ml-auto text-[11.5px] text-[var(--text-subtle)]">{fmtDateTime(u.created_at)}</span>
                   </div>
                 ))}
               </div>
@@ -320,7 +320,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
           <div className={cardCls}>
             <div className={secTitleCls}>Lịch sử giao dịch ({countLabel(d.transactions.length, d.counts.transactions)})</div>
             {d.transactions.length === 0 ? (
-              <p className="mt-2 text-sm text-[#A8A2BA]">Chưa có giao dịch nào.</p>
+              <p className="mt-2 text-sm text-[var(--text-subtle)]">Chưa có giao dịch nào.</p>
             ) : (
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full min-w-[560px] border-collapse text-left text-[12.5px]">
@@ -340,7 +340,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                       return (
                         <tr key={t.id} className="border-b border-[#F3F1F8]">
                           <td className="px-2 py-2 font-bold">{TXN_LABEL[t.type] ?? t.type}{t.provider ? ` · ${t.provider}` : ''}</td>
-                          <td className={`px-2 py-2 text-right font-mono font-bold ${credit ? 'text-[#1E9E63]' : 'text-[#C0392B]'}`}>
+                          <td className={`px-2 py-2 text-right font-mono font-bold ${credit ? 'text-[var(--text-success)]' : 'text-[#C0392B]'}`}>
                             {credit ? '+' : '−'}
                             {t.amount_coins}
                           </td>
@@ -349,7 +349,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
                                 t.status === 'success'
-                                  ? 'bg-[#E7F7EE] text-[#1E9E63]'
+                                  ? 'bg-[#E7F7EE] text-[var(--text-success)]'
                                   : t.status === 'pending'
                                     ? 'bg-[#FFF1DC] text-[#C98A1A]'
                                     : 'bg-[#EFEBF2] text-[#8B8398]'
@@ -358,10 +358,10 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                               {t.status}
                             </span>
                           </td>
-                          <td className="max-w-[180px] truncate px-2 py-2 text-[#857F96]" title={t.note ?? ''}>
+                          <td className="max-w-[180px] truncate px-2 py-2 text-[var(--text-muted)]" title={t.note ?? ''}>
                             {t.note ?? '—'}
                           </td>
-                          <td className="px-2 py-2 text-[#857F96]">{fmtDateTime(t.created_at)}</td>
+                          <td className="px-2 py-2 text-[var(--text-muted)]">{fmtDateTime(t.created_at)}</td>
                         </tr>
                       )
                     })}
@@ -374,7 +374,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
           <div className={cardCls}>
             <div className={secTitleCls}>Lịch sử làm bài ({countLabel(d.attempts.length, d.counts.attempts)})</div>
             {d.attempts.length === 0 ? (
-              <p className="mt-2 text-sm text-[#A8A2BA]">Chưa làm đề nào.</p>
+              <p className="mt-2 text-sm text-[var(--text-subtle)]">Chưa làm đề nào.</p>
             ) : (
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full min-w-[620px] border-collapse text-left text-[12.5px]">
@@ -402,7 +402,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
                                 a.status === 'submitted'
-                                  ? 'bg-[#E7F7EE] text-[#1E9E63]'
+                                  ? 'bg-[#E7F7EE] text-[var(--text-success)]'
                                   : a.status === 'in_progress'
                                     ? 'bg-[#FFF1DC] text-[#C98A1A]'
                                     : 'bg-[#EFEBF2] text-[#8B8398]'
@@ -420,7 +420,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                                 : '—'}
                           </td>
                           <td className="px-2 py-2 text-center">{fmtDur(a.time_spent)}</td>
-                          <td className="px-2 py-2 text-[#857F96]">{fmtDateTime(a.submitted_at)}</td>
+                          <td className="px-2 py-2 text-[var(--text-muted)]">{fmtDateTime(a.submitted_at)}</td>
                         </tr>
                       )
                     })}

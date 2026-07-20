@@ -68,7 +68,7 @@ export default async function ProductsPage({
       </div>
 
       {cards.length === 0 ? (
-        <p className="mt-12 text-center text-[15px] font-semibold text-[#9D96AE]">
+        <p className="mt-12 text-center text-[15px] font-semibold text-[var(--text-subtle)]">
           {params.skill && ['reading', 'listening', 'writing'].includes(params.skill)
             ? `Chưa có bộ đề ${params.skill.charAt(0).toUpperCase() + params.skill.slice(1)} — nội dung đang được bổ sung.`
             : 'Không có bộ đề khớp bộ lọc.'}

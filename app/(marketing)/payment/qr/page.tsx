@@ -38,7 +38,7 @@ export default async function TopupQrPage({
   if (!sepayConfigured()) {
     // Không lộ lý do kỹ thuật — phiên tạo được nghĩa là config đổi giữa chừng (hiếm).
     return (
-      <div className="mx-auto max-w-xl px-4 py-16 text-center text-[15px] font-semibold text-[#857F96]">
+      <div className="mx-auto max-w-xl px-4 py-16 text-center text-[15px] font-semibold text-[var(--text-muted)]">
         Kênh chuyển khoản tạm không khả dụng — vui lòng thử lại sau hoặc liên hệ hỗ trợ.
       </div>
     )

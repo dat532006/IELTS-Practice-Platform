@@ -12,11 +12,11 @@ export function LibraryPanel({ library }: { library: LibraryPack[] }) {
     <section className={CARD}>
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <h2 className="text-[18px] font-extrabold tracking-[-0.01em] text-[#2A2740]">Thư viện · đã mua</h2>
-        <span className="text-[12.5px] font-bold text-[#9D96AE]">{library.length} gói sở hữu</span>
+        <span className="text-[12.5px] font-bold text-[var(--text-subtle)]">{library.length} gói sở hữu</span>
       </div>
 
       {library.length === 0 ? (
-        <p className="mt-4 rounded-[14px] border border-[#F1EDF7] bg-[#FBFAFD] px-4 py-8 text-center text-[14px] font-semibold text-[#9D96AE]">
+        <p className="mt-4 rounded-[14px] border border-[#F1EDF7] bg-[#FBFAFD] px-4 py-8 text-center text-[14px] font-semibold text-[var(--text-subtle)]">
           Bạn chưa sở hữu gói đề nào.{' '}
           <Link href="/products" className="font-bold text-[#6A48D6] underline">
             Khám phá bộ đề →
@@ -47,7 +47,7 @@ export function LibraryPanel({ library }: { library: LibraryPack[] }) {
                 </div>
                 <div className="flex flex-1 flex-col p-3.5">
                   <div className="text-[14.5px] font-extrabold tracking-[-0.01em] text-[#2A2740]">{pack.title}</div>
-                  <div className="mt-1 text-[12px] font-semibold text-[#857F96]">
+                  <div className="mt-1 text-[12px] font-semibold text-[var(--text-muted)]">
                     {pack.totalTests} đề · {pack.completedTests} đã xong
                   </div>
                   <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#F0ECFF]">

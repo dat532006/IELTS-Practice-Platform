@@ -99,7 +99,7 @@ export default async function LandingPage() {
   return (
     <div className={`dc-home ${jakarta.variable} ${newsreader.variable}`}>
       {/* ANNOUNCEMENT */}
-      <div className="announcement">
+      <div className="announcement" lang="en">
         <span>100% real past-exam questions</span>
         <span className="ann-sep">·</span>
         <span>Real exam interface</span>
@@ -110,6 +110,9 @@ export default async function LandingPage() {
       {/* NAV — header dùng chung toàn site (2026-07-08): hết remount/khác chrome khi điều hướng / ↔ trang khác */}
       <Header />
 
+      {/* lang="en": landing marketing copy is intentionally English under the site's lang="vi"
+          (UIUX-015) — mark the block so screen readers pronounce it correctly. */}
+      <main id="main-content" tabIndex={-1} lang="en">
       {/* HERO */}
       <section className="hero">
         <div className="hero-copy">
@@ -136,8 +139,9 @@ export default async function LandingPage() {
           </div>
           <form className="hero-search" action="/products" method="get">
             <div className="search-wrap">
-              <span className="search-icon" />
-              <input className="search-input" name="q" placeholder="Search the latest test packs…" />
+              <label htmlFor="landing-search" lang="vi" className="sr-only">Tìm bộ đề luyện thi</label>
+              <span className="search-icon" aria-hidden="true" />
+              <input id="landing-search" className="search-input" name="q" placeholder="Search the latest test packs…" />
             </div>
             <button className="btn-search" type="submit">
               Search
@@ -248,28 +252,28 @@ export default async function LandingPage() {
               <span className="feat-dot" style={{ background: '#7C5CE6' }} />
             </div>
             {/* Owner chốt 2026-07-08: claim = "100% đã ra thi thật" (đồng bộ trang Giới thiệu/Content.txt). */}
-            <h3 className="feat-title">100% real past-exam questions</h3>
+            <h2 className="feat-title">100% real past-exam questions</h2>
             <p className="feat-body">Curated from questions that appeared in real IELTS exams, matched to the latest format.</p>
           </div>
           <div className="feat-card">
             <div className="feat-icon" style={{ background: '#FFEDE6' }}>
               <span className="feat-dot" style={{ background: '#F2724E' }} />
             </div>
-            <h3 className="feat-title">Real exam interface</h3>
+            <h2 className="feat-title">Real exam interface</h2>
             <p className="feat-body">A computer-delivered test experience that stays safe even if you reload.</p>
           </div>
           <div className="feat-card">
             <div className="feat-icon" style={{ background: '#FFF3DC' }}>
               <span className="feat-dot" style={{ background: '#ECA22B' }} />
             </div>
-            <h3 className="feat-title">AI Writing grading</h3>
+            <h2 className="feat-title">AI Writing grading</h2>
             <p className="feat-body">Band-descriptor feedback with specific fixes for each sentence.</p>
           </div>
           <div className="feat-card">
             <div className="feat-icon" style={{ background: '#FFE9F1' }}>
               <span className="feat-dot" style={{ background: '#EE5C92' }} />
             </div>
-            <h3 className="feat-title">Server-side scoring</h3>
+            <h2 className="feat-title">Server-side scoring</h2>
             <p className="feat-body">Answer keys and scoring run on the server — transparent and tamper-proof.</p>
           </div>
         </div>
@@ -527,6 +531,8 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      </main>
 
       {/* FOOTER — dùng chung toàn site (phương án B, 2026-07-08) */}
       <SiteFooter />

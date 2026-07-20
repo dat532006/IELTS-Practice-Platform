@@ -49,7 +49,7 @@ export function SiteFooter() {
               <span className="text-[#7C5CE6]">IELTS</span>Practice
             </span>
           </Link>
-          <p className="mt-3.5 max-w-[24em] text-sm leading-[1.6] text-[#857F96]">
+          <p className="mt-3.5 max-w-[24em] text-sm leading-[1.6] text-[var(--text-muted)]">
             Nền tảng luyện đề IELTS mô phỏng giao diện thi thật, hỗ trợ Reading · Listening · Writing và AI chấm
             Writing.
           </p>
@@ -66,7 +66,7 @@ export function SiteFooter() {
                       {l.label}
                     </Link>
                   ) : (
-                    <span className="cursor-not-allowed text-sm font-semibold text-[#A8A2BA]">{l.label}</span>
+                    <span className="cursor-not-allowed text-sm font-semibold text-[var(--text-subtle)]">{l.label}</span>
                   )}
                 </li>
               ))}
@@ -76,7 +76,7 @@ export function SiteFooter() {
       </div>
 
       <div className="border-t border-[#EBE6F2]">
-        <div className="mx-auto flex w-[min(1200px,93vw)] flex-wrap items-center justify-between gap-x-6 gap-y-2 py-4 text-[13px] font-semibold text-[#9D96AE]">
+        <div className="mx-auto flex w-[min(1200px,93vw)] flex-wrap items-center justify-between gap-x-6 gap-y-2 py-4 text-[13px] font-semibold text-[var(--text-subtle)]">
           <span>© 2026 IELTSPractice. All rights reserved.</span>
           <div className="flex flex-wrap gap-x-5 gap-y-1.5">
             {LEGAL_SLUGS.map((slug) => (

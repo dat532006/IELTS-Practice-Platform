@@ -93,7 +93,7 @@ export function AccountClient({ data }: { data: AccountData }) {
                   onClick={() => setTab('profile')}
                   aria-label="Sửa ảnh đại diện"
                   title="Sửa ảnh đại diện"
-                  className="absolute -bottom-1 -right-1 flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[#EEEAF3] bg-white shadow-[0_4px_10px_rgba(42,39,64,0.12)] transition hover:border-[#CCC3DC]"
+                  className="absolute -bottom-1 -right-1 flex h-11 w-11 items-center justify-center rounded-full border border-[#EEEAF3] bg-white shadow-[0_4px_10px_rgba(42,39,64,0.12)] transition hover:border-[#CCC3DC]"
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7C5CE6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 20h9" />
@@ -102,9 +102,9 @@ export function AccountClient({ data }: { data: AccountData }) {
                 </button>
               </div>
               <div className="mt-3.5 text-[17px] font-extrabold tracking-[-0.01em]">{profile.name || 'Người dùng'}</div>
-              <div className="mt-0.5 truncate text-[12.5px] font-semibold text-[#9D96AE]">{profile.email ?? '—'}</div>
+              <div className="mt-0.5 truncate text-[12.5px] font-semibold text-[var(--text-subtle)]">{profile.email ?? '—'}</div>
               <div className="mt-3.5 inline-flex items-center gap-[7px] rounded-full border border-[#EFEAFF] bg-[#FAF8FF] px-3.5 py-[7px] text-[14px] font-extrabold text-[#2A2740]">
-                <FishBone /> {profile.coins} <span className="text-[12.5px] font-semibold text-[#9D96AE]">xương cá</span>
+                <FishBone /> {profile.coins} <span className="text-[12.5px] font-semibold text-[var(--text-subtle)]">xương cá</span>
               </div>
             </div>
 
@@ -149,7 +149,7 @@ export function AccountClient({ data }: { data: AccountData }) {
             <section className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-[#F3DADA] bg-white px-[26px] py-[22px] shadow-[0_22px_44px_-36px_rgba(90,60,160,0.4)]">
               <div>
                 <div className="text-[15px] font-extrabold text-[#2A2740]">Đăng xuất</div>
-                <div className="mt-[3px] text-[13px] font-semibold text-[#857F96]">Kết thúc phiên trên thiết bị này.</div>
+                <div className="mt-[3px] text-[13px] font-semibold text-[var(--text-muted)]">Kết thúc phiên trên thiết bị này.</div>
               </div>
               <button
                 type="button"

@@ -62,7 +62,7 @@
    phá `hidden md:flex`). Giữ .badge-soon vì SkillTabs còn dùng. */
 .dc-home .badge-soon {
   font-size: 9px; font-weight: 800; text-transform: uppercase;
-  background: #efebf4; color: #9d96ae; border-radius: 5px; padding: 2px 5px;
+  background: #efebf4; color: var(--text-subtle); border-radius: 5px; padding: 2px 5px;
 }
 /* On the active (dark) Speaking tab the SOON pill flips to white-on-panel. */
 .dc-home .skill-tab.active .badge-soon { background: rgba(255, 255, 255, .7); color: #c23a6b; }
@@ -106,6 +106,10 @@
   background: #fff; border: 1px solid #e8e2f0; border-radius: 13px;
   padding: 0 16px; box-shadow: 0 6px 16px rgba(42, 39, 64, .04);
 }
+.dc-home .search-wrap:focus-within {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px rgba(104, 66, 216, 0.24);
+}
 .dc-home .search-icon {
   width: 15px; height: 15px; border: 2px solid #b9b0c8; border-radius: 50%;
   position: relative; display: block; flex: none;
@@ -125,7 +129,7 @@
 .dc-home .btn-search:hover { background: #17152a; }
 .dc-home .hero-stats {
   display: flex; align-items: center; gap: 20px; margin-top: 26px;
-  flex-wrap: wrap; color: #857f96; font-size: 14px; font-weight: 600;
+  flex-wrap: wrap; color: var(--text-muted); font-size: 14px; font-weight: 600;
 }
 .dc-home .stat-num { font-size: 18px; font-weight: 800; color: #2a2740; letter-spacing: -.02em; }
 .dc-home .stat-sep { width: 5px; height: 5px; border-radius: 50%; background: #d2ccdd; }
@@ -150,7 +154,7 @@
   animation: dc-floaty 6.5s ease-in-out infinite;
 }
 .dc-home .dc-header { display: flex; align-items: center; justify-content: space-between; }
-.dc-home .dc-eyebrow { font-size: 11.5px; font-weight: 800; color: #9d96ae; text-transform: uppercase; letter-spacing: .06em; }
+.dc-home .dc-eyebrow { font-size: 11.5px; font-weight: 800; color: var(--text-subtle); text-transform: uppercase; letter-spacing: .06em; }
 .dc-home .dc-title { font-size: 17px; font-weight: 800; margin-top: 3px; color: #2a2740; }
 .dc-home .dc-avatar {
   width: 38px; height: 38px; border-radius: 11px; background: var(--brand-soft);
@@ -168,18 +172,18 @@
   box-shadow: inset 0 0 0 1px #f2eff7;
 }
 .dc-home .ring-band { font-size: 28px; font-weight: 800; color: var(--brand); line-height: 1; }
-.dc-home .ring-lbl { font-size: 9px; font-weight: 800; color: #9d96ae; letter-spacing: .12em; margin-top: 3px; }
+.dc-home .ring-lbl { font-size: 9px; font-weight: 800; color: var(--text-subtle); letter-spacing: .12em; margin-top: 3px; }
 .dc-home .ring-meta { flex: 1; min-width: 0; }
-.dc-home .ring-meta-lbl { font-size: 13px; color: #857f96; font-weight: 600; }
+.dc-home .ring-meta-lbl { font-size: 13px; color: var(--text-muted); font-weight: 600; }
 .dc-home .ring-chip {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 9px;
-  font-size: 12px; font-weight: 800; color: #1e9e63;
+  font-size: 12px; font-weight: 800; color: #137a4a;
   background: #e7f7ee; padding: 6px 11px; border-radius: 999px;
 }
 .dc-home .ring-goal { font-size: 12.5px; color: #564f6b; font-weight: 600; margin-top: 11px; line-height: 1.45; }
 .dc-home .skill-bars { margin-top: 24px; display: flex; flex-direction: column; gap: 14px; }
 .dc-home .sbar-header { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: #4a445e; margin-bottom: 6px; }
-.dc-home .sbar-val { color: #857f96; }
+.dc-home .sbar-val { color: var(--text-muted); }
 .dc-home .sbar-track { height: 8px; border-radius: 99px; background: #f2eff7; overflow: hidden; }
 .dc-home .sbar-fill { height: 100%; border-radius: 99px; }
 .dc-home .chip-float {
@@ -193,7 +197,7 @@
   display: flex; align-items: center; justify-content: center; color: var(--brand); font-size: 16px;
 }
 .dc-home .chip-ai-text { font-size: 12px; font-weight: 700; color: #2a2740; line-height: 1.3; }
-.dc-home .chip-ready { color: #1e9e63; }
+.dc-home .chip-ready { color: #137a4a; }
 .dc-home .chip-streak { bottom: -18px; left: -16px; padding: 10px 15px; animation: dc-floaty 5.6s ease-in-out .8s infinite; }
 .dc-home .chip-streak-num {
   width: 33px; height: 33px; border-radius: 10px; background: #ffe7c2;
@@ -228,7 +232,7 @@
 .dc-home .skill-tab {
   display: inline-flex; align-items: center; gap: 9px;
   padding: 11px 17px; border-radius: 13px; font-weight: 700; font-size: 14.5px;
-  border: 1px solid #e8e2f0; background: #fff; color: #3d3654; transition: all .15s;
+  border: 1px solid #e8e2f0; background: #fff; color: #3d3654; transition: border-color .15s, background-color .15s, color .15s, box-shadow .15s;
 }
 .dc-home .skill-tab:hover { border-color: #ccc3dc; }
 .dc-home .skill-tab.active { background: #2a2740; color: #fff; border-color: #2a2740; box-shadow: 0 10px 22px -10px rgba(42, 39, 64, .5); }
@@ -253,7 +257,7 @@
 .dc-home .skill-desc { font-size: 16px; color: #4a445e; line-height: 1.65; margin-top: 16px; max-width: 32em; }
 .dc-home .skill-stats { display: flex; gap: 24px; margin-top: 22px; flex-wrap: wrap; }
 .dc-home .skill-stat-num { font-size: 21px; font-weight: 800; color: #2a2740; }
-.dc-home .skill-stat-lbl { font-size: 12.5px; font-weight: 600; color: #857f96; }
+.dc-home .skill-stat-lbl { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
 .dc-home .btn-dark {
   display: inline-flex; align-items: center; gap: 8px; margin-top: 26px;
   font-weight: 800; font-size: 14.5px; color: #fff; background: #2a2740;
@@ -263,7 +267,7 @@
 .dc-home .btn-dark:hover { background: #17152a; }
 .dc-home .btn-dark[aria-disabled='true'] { cursor: default; opacity: .82; }
 .dc-home .skill-card { flex: 1 1 340px; min-width: min(300px, 100%); background: #fff; border-radius: 20px; padding: 26px 28px; box-shadow: 0 20px 44px -22px rgba(42, 39, 64, .28); }
-.dc-home .skill-card-eyebrow { font-size: 12px; font-weight: 800; color: #9d96ae; text-transform: uppercase; letter-spacing: .06em; }
+.dc-home .skill-card-eyebrow { font-size: 12px; font-weight: 800; color: var(--text-subtle); text-transform: uppercase; letter-spacing: .06em; }
 .dc-home .skill-sample { font-size: 19px; font-weight: 800; margin-top: 8px; line-height: 1.4; color: #2a2740; }
 .dc-home .skill-bullets { margin-top: 20px; display: flex; flex-direction: column; gap: 13px; }
 .dc-home .skill-bullet { display: flex; align-items: center; gap: 12px; font-size: 14.5px; color: #3d3654; font-weight: 600; }
@@ -314,7 +318,7 @@
 .dc-home .product-badge { font-size: 11.5px; font-weight: 800; padding: 4px 11px; border-radius: 999px; }
 .dc-home .product-badge.is-new { color: #c98a1a; background: #fff3dc; }
 .dc-home .product-title { font-size: 17.5px; font-weight: 800; letter-spacing: -.01em; line-height: 1.3; color: #2a2740; }
-.dc-home .product-meta-row { display: flex; align-items: center; gap: 14px; font-size: 12.5px; font-weight: 600; color: #857f96; flex-wrap: wrap; }
+.dc-home .product-meta-row { display: flex; align-items: center; gap: 14px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); flex-wrap: wrap; }
 .dc-home .product-skill-chip { display: inline-flex; align-items: center; gap: 6px; text-transform: capitalize; }
 .dc-home .product-skill-dot { width: 7px; height: 7px; border-radius: 2px; transform: rotate(45deg); display: block; }
 .dc-home .product-meta-sep { width: 4px; height: 4px; border-radius: 50%; background: #d2ccdd; }
@@ -346,7 +350,7 @@
 .dc-home .ai-pt-dot { width: 9px; height: 9px; border-radius: 3px; background: var(--brand); transform: rotate(45deg); display: block; }
 .dc-home .ai-card { flex: 1 1 340px; min-width: min(300px, 100%); background: #fff; border-radius: 22px; padding: 28px; box-shadow: 0 26px 50px -26px rgba(90, 60, 160, .4); }
 .dc-home .ai-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
-.dc-home .ai-band-lbl { font-size: 12.5px; font-weight: 700; color: #9d96ae; }
+.dc-home .ai-band-lbl { font-size: 12.5px; font-weight: 700; color: var(--text-subtle); }
 .dc-home .ai-band-num { font-size: 36px; font-weight: 800; color: var(--brand); line-height: 1; margin-top: 4px; }
 .dc-home .ai-tag { font-size: 12px; font-weight: 700; color: #c98a1a; background: #fff1dc; padding: 6px 11px; border-radius: 999px; }
 .dc-home .ai-bars { display: flex; flex-direction: column; gap: 15px; margin-top: 24px; }
@@ -378,8 +382,8 @@
 .dc-home .coin-name { font-size: 15px; font-weight: 800; color: #2a2740; }
 .dc-home .coin-amount { display: flex; align-items: baseline; gap: 8px; margin-top: 14px; }
 .dc-home .coin-num { font-size: 34px; font-weight: 800; letter-spacing: -.02em; color: #2a2740; }
-.dc-home .coin-bonus { font-size: 13px; font-weight: 700; color: #1e9e63; background: #e7f7ee; padding: 3px 9px; border-radius: 999px; }
-.dc-home .coin-note { font-size: 14px; color: #857f96; font-weight: 600; margin-top: 8px; }
+.dc-home .coin-bonus { font-size: 13px; font-weight: 700; color: #137a4a; background: #e7f7ee; padding: 3px 9px; border-radius: 999px; }
+.dc-home .coin-note { font-size: 14px; color: var(--text-muted); font-weight: 600; margin-top: 8px; }
 .dc-home .coin-price { font-size: 22px; font-weight: 800; color: #2a2740; margin-top: 18px; }
 .dc-home .coin-btn {
   display: block; text-align: center; margin-top: 20px;
@@ -389,7 +393,7 @@
 .dc-home .coin-btn:hover { background: #eae5f4; }
 .dc-home .coin-btn.popular { background: var(--brand); color: #fff; box-shadow: 0 10px 22px -8px rgba(124, 92, 230, .4); }
 .dc-home .coin-btn.popular:hover { background: var(--brand-deep); }
-.dc-home .pricing-footer { text-align: center; margin-top: 22px; font-size: 14px; color: #857f96; font-weight: 600; }
+.dc-home .pricing-footer { text-align: center; margin-top: 22px; font-size: 14px; color: var(--text-muted); font-weight: 600; }
 .dc-home .pricing-footer a { color: var(--brand-deep); font-weight: 700; transition: color .15s; }
 .dc-home .pricing-footer a:hover { color: var(--brand); }
 
@@ -403,7 +407,7 @@
 .dc-home .test-author { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
 .dc-home .test-avatar { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #2a2740; }
 .dc-home .test-name { font-size: 14.5px; font-weight: 800; color: #2a2740; }
-.dc-home .test-meta { font-size: 12.5px; font-weight: 600; color: #857f96; }
+.dc-home .test-meta { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
 
 /* ── Lead CTA ── */
 .dc-home .lead { width: min(1200px, 93vw); margin: 0 auto; padding: 70px 0 30px; }

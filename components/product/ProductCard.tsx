@@ -7,7 +7,7 @@ import { FishBone } from '@/components/brand/FishBone'
 function CategoryPill({ p, meta }: { p: ProductCardData; meta: ReturnType<typeof skillMeta> }) {
   if (p.state === 'free') {
     return (
-      <span className="rounded-full bg-[#E7F7EE] px-2.5 py-1 text-[11.5px] font-bold text-[#1E9E63]">
+      <span className="rounded-full bg-[#E7F7EE] px-2.5 py-1 text-[11.5px] font-bold text-[var(--text-success)]">
         Miễn phí
       </span>
     )
@@ -32,7 +32,7 @@ function Footer({ p }: { p: ProductCardData }) {
     case 'free':
       return (
         <>
-          <span className="text-[15px] font-extrabold text-[#1E9E63]">Miễn phí</span>
+          <span className="text-[15px] font-extrabold text-[var(--text-success)]">Miễn phí</span>
           <span className="text-[14px] font-bold text-[#6A48D6]">Làm ngay →</span>
         </>
       )
@@ -40,14 +40,14 @@ function Footer({ p }: { p: ProductCardData }) {
     case 'already_owned':
       return (
         <>
-          <span className="text-[13px] font-extrabold text-[#1E9E63]">Đã sở hữu</span>
+          <span className="text-[13px] font-extrabold text-[var(--text-success)]">Đã sở hữu</span>
           <span className="text-[14px] font-bold text-[#6A48D6]">Vào học →</span>
         </>
       )
     case 'coming_soon':
       return (
         <>
-          <span className="flex items-center gap-1.5 text-[14px] font-extrabold text-[#9D96AE]">
+          <span className="flex items-center gap-1.5 text-[14px] font-extrabold text-[var(--text-subtle)]">
             <FishBone /> {p.priceCoins}
           </span>
           <span className="text-[13px] font-bold text-[#B0A9C0]">Sắp ra mắt</span>

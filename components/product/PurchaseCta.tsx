@@ -10,7 +10,7 @@ import { CheckIcon } from '@/components/brand/icons'
 function IncludedItem({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2.5 text-[13.5px] font-semibold text-[#4A445E]">
-      <span className="flex h-5 w-5 flex-none items-center justify-center rounded-[6px] bg-[#E7F7EE] text-[#1E9E63]">
+      <span className="flex h-5 w-5 flex-none items-center justify-center rounded-[6px] bg-[#E7F7EE] text-[var(--text-success)]">
         <CheckIcon size={12} strokeWidth={3.2} />
       </span>
       {children}
@@ -46,10 +46,10 @@ export function PurchaseCta({
   testCount?: number
 }) {
   return (
-    <div className="rounded-[20px] border border-[#EEEAF3] bg-white p-6 text-[#2A2740] shadow-[0_26px_50px_-30px_rgba(90,60,160,0.4)]">
+    <div className="min-w-0 rounded-[20px] border border-[#EEEAF3] bg-white p-6 text-[#2A2740] shadow-[0_26px_50px_-30px_rgba(90,60,160,0.4)]">
       {owned ? (
         <>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#E7F7EE] px-3.5 py-[7px] text-[13px] font-extrabold text-[#1E9E63]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#E7F7EE] px-3.5 py-[7px] text-[13px] font-extrabold text-[var(--text-success)]">
             ✓ Đã sở hữu bộ đề
           </div>
           <p className="mt-3.5 text-[14px] leading-[1.6] text-[#5C5670]">
@@ -65,7 +65,7 @@ export function PurchaseCta({
         </>
       ) : priceCoins === 0 ? (
         <>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#E7F7EE] px-3.5 py-[7px] text-[13px] font-extrabold text-[#1E9E63]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#E7F7EE] px-3.5 py-[7px] text-[13px] font-extrabold text-[var(--text-success)]">
             Miễn phí
           </div>
           <p className="mt-3.5 text-[14px] leading-[1.6] text-[#5C5670]">
@@ -81,13 +81,13 @@ export function PurchaseCta({
         </>
       ) : (
         <>
-          <div className="text-[12.5px] font-bold text-[#9D96AE]">Mở khoá cả bộ đề</div>
+          <div className="text-[12.5px] font-bold text-[var(--text-subtle)]">Mở khoá cả bộ đề</div>
           <div className="mt-2 flex items-baseline gap-2.5">
             <span className="flex items-center gap-2 text-[34px] font-extrabold tracking-[-0.02em] text-[#2A2740]">
               <FishBone /> {priceCoins}
             </span>
           </div>
-          <div className="mt-1 text-[13.5px] font-semibold text-[#857F96]">
+          <div className="mt-1 text-[13.5px] font-semibold text-[var(--text-muted)]">
             ≈ {(priceCoins * 1000).toLocaleString('vi-VN')} ₫ · một lần, không hết hạn
           </div>
           <BuyButtons productId={productId} priceCoins={priceCoins} />

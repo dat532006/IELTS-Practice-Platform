@@ -501,36 +501,47 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
   }
 
   // Kiểm lỗi hiển thị trước khi publish (dựng từ state hiện tại — không cần lưu).
-  function lintIssues(): { level: 'error' | 'warn'; text: string }[] {
-    const out: { level: 'error' | 'warn'; text: string }[] = []
-    if (!title.trim()) out.push({ level: 'error', text: 'Chưa có tiêu đề đề.' })
+  // UIUX-016: mỗi issue mang thêm `anchor` (id của section/câu tương ứng) để "nhảy tới lỗi".
+  type LintIssue = { level: 'error' | 'warn'; text: string; anchor?: string }
+  function lintIssues(): LintIssue[] {
+    const out: LintIssue[] = []
+    if (!title.trim()) out.push({ level: 'error', text: 'Chưa có tiêu đề đề.', anchor: 'sec-meta' })
     if (type === 'writing') {
       // AI-006: writing thì passage CHÍNH LÀ đề bài — trước đây nhánh này bị BỎ QUA hoàn toàn
       //   (if type !== 'writing') → publish được đề với prompt rỗng, AI chấm với task1_prompt=''.
       //   Rỗng ở writing là ERROR, không phải warn.
-      for (const text of lintWritingPrompts(passages)) out.push({ level: 'error', text })
+      for (const text of lintWritingPrompts(passages)) out.push({ level: 'error', text, anchor: 'sec-passages' })
     } else {
-      if (passages.length === 0) out.push({ level: 'warn', text: 'Chưa có passage nào.' })
+      if (passages.length === 0) out.push({ level: 'warn', text: 'Chưa có passage nào.', anchor: 'sec-passages' })
       passages.forEach((p, i) => {
-        if (!p.content.trim()) out.push({ level: 'warn', text: `Passage ${i + 1} ("${p.title || '—'}") đang trống.` })
+        if (!p.content.trim()) out.push({ level: 'warn', text: `Passage ${i + 1} ("${p.title || '—'}") đang trống.`, anchor: `pa-${p.id}` })
       })
     }
     // AI-011: writing không có câu hỏi/đáp án — bỏ toàn bộ lint câu hỏi (payload cũng gửi rỗng).
     if (type === 'writing') return out
-    if (questions.length === 0) out.push({ level: 'warn', text: 'Chưa có câu hỏi nào.' })
+    if (questions.length === 0) out.push({ level: 'warn', text: 'Chưa có câu hỏi nào.', anchor: 'sec-questions' })
     const seen = new Map<number, number>()
     questions.forEach((q, i) => {
       const lbl = `Câu ${q.number || i + 1}`
-      if (!q.prompt.trim()) out.push({ level: 'warn', text: `${lbl}: nội dung câu hỏi trống.` })
-      if (!q.answers.trim()) out.push({ level: 'warn', text: `${lbl}: chưa có đáp án.` })
+      if (!q.prompt.trim()) out.push({ level: 'warn', text: `${lbl}: nội dung câu hỏi trống.`, anchor: `qa-${q.id}` })
+      if (!q.answers.trim()) out.push({ level: 'warn', text: `${lbl}: chưa có đáp án.`, anchor: `qa-${q.id}` })
       if (NEEDS_OPTIONS.has(q.type) && !(q.options ?? []).some((o) => o.text.trim() || o.key.trim()))
-        out.push({ level: 'warn', text: `${lbl}: loại "${q.type}" cần bank lựa chọn (options) — thí sinh sẽ thấy "thiếu lựa chọn".` })
+        out.push({ level: 'warn', text: `${lbl}: loại "${q.type}" cần bank lựa chọn (options) — thí sinh sẽ thấy "thiếu lựa chọn".`, anchor: `qa-${q.id}` })
       const n = Number(q.number)
-      if (!Number.isInteger(n) || n < 1) out.push({ level: 'error', text: `${lbl}: số câu không hợp lệ.` })
+      if (!Number.isInteger(n) || n < 1) out.push({ level: 'error', text: `${lbl}: số câu không hợp lệ.`, anchor: `qa-${q.id}` })
       else seen.set(n, (seen.get(n) ?? 0) + 1)
     })
-    for (const [n, c] of seen) if (c > 1) out.push({ level: 'error', text: `Số câu ${n} bị trùng (${c} lần).` })
+    for (const [n, c] of seen) if (c > 1) out.push({ level: 'error', text: `Số câu ${n} bị trùng (${c} lần).`, anchor: 'sec-questions' })
     return out
+  }
+
+  // Cuộn tới section/câu có lỗi và focus field đầu tiên (không unmount — chỉ điều hướng).
+  function scrollToAnchor(anchor?: string) {
+    if (!anchor || typeof document === 'undefined') return
+    const el = document.getElementById(anchor)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    el.querySelector<HTMLElement>('input, textarea, select, [contenteditable="true"]')?.focus({ preventScroll: true })
   }
 
   async function submit() {
@@ -724,7 +735,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
         {editLoadErr ? (
           <p className="mt-5 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{editLoadErr}</p>
         ) : (
-          <p className="mt-5 text-center text-sm text-[#A8A2BA]">Đang tải đề…</p>
+          <p className="mt-5 text-center text-sm text-[var(--text-subtle)]">Đang tải đề…</p>
         )}
       </div>
     )
@@ -740,12 +751,34 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
             </Link>
             <h1 className="text-[21px] font-extrabold tracking-[-0.02em]">{testId ? 'Sửa đề' : 'Tạo đề mới'}</h1>
           </div>
-          <p className="mt-1 text-[13.5px] font-semibold text-[#857F96]">Đáp án tách sang answer_keys — không bao giờ gửi về client.</p>
+          <p className="mt-1 text-[13.5px] font-semibold text-[var(--text-muted)]">Đáp án tách sang answer_keys — không bao giờ gửi về client.</p>
         </div>
         <span className="rounded-full bg-[#EFEBF2] px-2.5 py-[5px] text-[12px] font-extrabold text-[#8B8398]">
           {created ? created.status : 'chưa lưu'}
         </span>
       </div>
+
+      {/* UIUX-016: mục lục dính + "nhảy tới lỗi" — chỉ điều hướng, KHÔNG thu gọn/unmount field nào. */}
+      <nav aria-label="Mục lục soạn đề" className="sticky top-0 z-10 -mx-6 mt-4 flex flex-wrap items-center gap-1.5 border-y border-[#EEEAF3] bg-white/95 px-6 py-2 backdrop-blur sm:-mx-8 sm:px-8">
+        <span className="text-[11px] font-extrabold uppercase tracking-[0.05em] text-[var(--text-subtle)]">Mục lục</span>
+        <a href="#sec-meta" className="rounded-full px-2.5 py-1 text-[12.5px] font-bold text-[#5B43C7] hover:bg-[#F0ECFF]">Thông tin</a>
+        <a href="#sec-passages" className="rounded-full px-2.5 py-1 text-[12.5px] font-bold text-[#5B43C7] hover:bg-[#F0ECFF]">Đoạn văn</a>
+        {type !== 'writing' && (
+          <a href="#sec-questions" className="rounded-full px-2.5 py-1 text-[12.5px] font-bold text-[#5B43C7] hover:bg-[#F0ECFF]">Câu hỏi &amp; đáp án</a>
+        )}
+        <a href="#sec-preview" className="rounded-full px-2.5 py-1 text-[12.5px] font-bold text-[#5B43C7] hover:bg-[#F0ECFF]">Xem trước</a>
+        {(() => {
+          const issues = lintIssues()
+          if (issues.length === 0)
+            return <span className="ml-auto rounded-full bg-[#E7F7EE] px-3 py-1 text-[12px] font-extrabold text-[var(--text-success)]">✓ Không phát hiện lỗi</span>
+          const target = (issues.find((i) => i.level === 'error') ?? issues[0]).anchor
+          return (
+            <button type="button" onClick={() => scrollToAnchor(target)} className="ml-auto rounded-full bg-[#FFF3DC] px-3 py-1 text-[12px] font-extrabold text-[#A87614] transition hover:bg-[#FCEBCB]">
+              ⚠ {issues.length} cần kiểm tra → tới lỗi đầu
+            </button>
+          )
+        })()}
+      </nav>
 
       {/* Import JSON (từ pipeline scan đề) */}
       <div className="mt-4 rounded-[13px] border border-[#D9CFFF] bg-[#FBFAFF] p-4">
@@ -776,7 +809,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           </div>
         )}
         {importMsg && (
-          <p className={`mt-2 text-[12.5px] font-bold ${importMsg.tone === 'ok' ? 'text-[#1E9E63]' : 'text-[#D24A4A]'}`}>{importMsg.text}</p>
+          <p className={`mt-2 text-[12.5px] font-bold ${importMsg.tone === 'ok' ? 'text-[var(--text-success)]' : 'text-[#D24A4A]'}`}>{importMsg.text}</p>
         )}
         <p className="mt-2 text-[11.5px] font-semibold leading-[1.5] text-[#9088A2]">
           Đổ đầy tiêu đề · passages · câu hỏi. ⚠️ <b>answer_keys từ OCR thường rỗng</b> — bắt buộc gõ tay ở ô 🔒 mỗi câu (key sai = chấm sai).
@@ -784,7 +817,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       </div>
 
       {/* meta row */}
-      <div className="mt-5 grid gap-3.5 sm:grid-cols-[2fr_1fr_1fr]">
+      <div id="sec-meta" className="mt-5 grid scroll-mt-24 gap-3.5 sm:grid-cols-[2fr_1fr_1fr]">
         <div>
           <div className={labelCls}>Tiêu đề đề</div>
           <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Reading Test 03 — Urban farming" />
@@ -798,7 +831,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                 type="button"
                 onClick={() => setType(s.id)}
                 className={`flex-1 rounded-[8px] py-2.5 text-[13px] font-bold transition ${
-                  type === s.id ? 'bg-white text-[#2A2740] shadow-[0_4px_10px_-4px_rgba(42,39,64,0.2)]' : 'text-[#857F96]'
+                  type === s.id ? 'bg-white text-[#2A2740] shadow-[0_4px_10px_-4px_rgba(42,39,64,0.2)]' : 'text-[var(--text-muted)]'
                 }`}
               >
                 {s.label}
@@ -807,8 +840,8 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           </div>
         </div>
         <div>
-          <div className={labelCls}>Thời gian (phút)</div>
-          <input className={inputCls} type="number" value={durationMin} onChange={(e) => setDurationMin(e.target.value)} />
+          <label htmlFor="test-duration" className={labelCls}>Thời gian (phút)</label>
+          <input id="test-duration" name="duration_minutes" className={inputCls} type="number" value={durationMin} onChange={(e) => setDurationMin(e.target.value)} />
         </div>
       </div>
 
@@ -824,7 +857,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       </div>
 
       {/* passages */}
-      <div className="mt-4">
+      <div id="sec-passages" className="mt-4 scroll-mt-24">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[14px] font-extrabold text-[#2A2740]">Passage</div>
           <button
@@ -837,11 +870,11 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
         </div>
         <div className="flex flex-col gap-3">
           {passages.map((p, i) => (
-            <div key={p.id} className="rounded-[13px] border border-[#E4DEEE] bg-white p-4">
+            <div key={p.id} id={`pa-${p.id}`} className="scroll-mt-24 rounded-[13px] border border-[#E4DEEE] bg-white p-4">
               <div className="flex items-center gap-2">
                 <input className={inputCls} value={p.title} onChange={(e) => setP(i, { title: e.target.value })} placeholder="Nhãn passage cho thanh chuyển (VD: Passage 1) — không hiển thị trong bài đọc" />
                 {passages.length > 1 && (
-                  <button type="button" onClick={() => setPassages((ps) => ps.filter((_, j) => j !== i))} className="text-[12.5px] font-bold text-[#D08585]">
+                  <button type="button" onClick={() => setPassages((ps) => ps.filter((_, j) => j !== i))} className="text-[12.5px] font-bold text-[var(--text-danger)]">
                     Xoá
                   </button>
                 )}
@@ -853,7 +886,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={p.image} alt={`Biểu đồ đề Task ${i + 1}`} className="h-16 rounded-[8px] border border-[#E4DEEE]" />
-                      <button type="button" onClick={() => setP(i, { image: undefined })} className="text-[12.5px] font-bold text-[#D08585]">
+                      <button type="button" onClick={() => setP(i, { image: undefined })} className="text-[12.5px] font-bold text-[var(--text-danger)]">
                         Gỡ biểu đồ
                       </button>
                     </>
@@ -883,6 +916,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                     💡 Gợi ý dàn bài cho Task {i + 1} (tuỳ chọn — bỏ trống = không hiện nút)
                   </div>
                   <RichTextEditor
+                    ariaLabel={'Gợi ý dàn bài Task ' + (i + 1)}
                     value={p.hint && looksRich(p.hint) ? p.hint : plainToHtml(p.hint ?? '')}
                     onChange={(html) => setP(i, { hint: html })}
                     placeholder="Mở bài: paraphrase đề… · Overview: … · Body 1: … — đậm/nghiêng/danh sách như soạn passage."
@@ -893,6 +927,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                   nút bấm. Xuất HTML → server sanitize allowlist trước khi tới thí sinh. Dán từ Word được dọn sạch. */}
               <div className="mt-2">
                 <RichTextEditor
+                  ariaLabel={'Nội dung passage ' + (i + 1)}
                   value={p.content}
                   onChange={(html) => setP(i, { content: html })}
                   placeholder="Soạn nội dung bài đọc ở đây. Dùng nút 'Tiêu đề' / 'Phụ đề' cho 2 dòng đầu (căn giữa), rồi gõ hoặc dán các đoạn ở dưới."
@@ -907,7 +942,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           chỉ gây rối + lint than "chưa có câu hỏi"). State questions GIỮ NGUYÊN — đổi type qua lại
           không mất dữ liệu đang soạn; buildPayload tự gửi questions rỗng khi type=writing. */}
       {type !== 'writing' && (
-      <div className="mt-5">
+      <div id="sec-questions" className="mt-5 scroll-mt-24">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-[14px] font-extrabold text-[#2A2740]">Câu hỏi &amp; đáp án</div>
           <div className="flex items-center gap-3.5">
@@ -928,8 +963,8 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
         {showBulkAns && (
           <div className="mb-3 rounded-[13px] border border-[#CDE8D9] bg-[#F4FBF7] p-4">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#1E9E63]">🔒 Đáp án hàng loạt (server)</span>
-              <span className="text-[11.5px] font-semibold text-[#857F96]">{questions.length} câu trên form</span>
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[var(--text-success)]">🔒 Đáp án hàng loạt (server)</span>
+              <span className="text-[11.5px] font-semibold text-[var(--text-muted)]">{questions.length} câu trên form</span>
             </div>
             <p className="mt-1.5 text-[12.5px] font-medium leading-[1.5] text-[#6A6480]">
               Mỗi dòng là đáp án cho 1 câu <b>theo thứ tự trên form</b> (dòng 1 → câu 1). Nhiều đáp án chấp nhận
@@ -956,7 +991,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           {questions.map((q, i) => {
             const chip = TYPE_CHIP[q.type] ?? { bg: '#F0ECFF', color: '#5B43C7' }
             return (
-              <div key={q.id} className="rounded-[13px] border border-[#ECE9F2] bg-white p-4">
+              <div key={q.id} id={`qa-${q.id}`} className="scroll-mt-24 rounded-[13px] border border-[#ECE9F2] bg-white p-4">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <input
                     className="h-[26px] w-[26px] flex-none rounded-[8px] bg-[#2A2740] text-center text-[12.5px] font-extrabold text-white outline-none"
@@ -965,6 +1000,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                     aria-label="Số câu"
                   />
                   <select
+                    aria-label={'Loại câu hỏi ' + (q.number || i + 1)}
                     className="rounded-[7px] px-2.5 py-1 text-[11.5px] font-extrabold outline-none"
                     style={{ background: chip.bg, color: chip.color }}
                     value={q.type}
@@ -977,7 +1013,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                     ))}
                   </select>
                   {questions.length > 1 && (
-                    <button type="button" onClick={() => setQuestions((qs) => qs.filter((_, j) => j !== i))} className="ml-auto text-[12.5px] font-bold text-[#C8C2D2] hover:text-[#D08585]">
+                    <button type="button" onClick={() => setQuestions((qs) => qs.filter((_, j) => j !== i))} className="ml-auto text-[12.5px] font-bold text-[#C8C2D2] hover:text-[var(--text-danger)]">
                       Xoá
                     </button>
                   )}
@@ -993,10 +1029,10 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                 {/* Gom nhóm: passage/section + instruction (câu liên tiếp cùng instruction → 1 block "Questions a–b") */}
                 <div className="mt-2.5 grid gap-2 sm:grid-cols-[minmax(0,170px)_1fr]">
                   <select
+                    aria-label={'Passage hoặc section cho câu ' + (q.number || i + 1)}
                     className={inputCls}
                     value={q.passage_id ?? ''}
                     onChange={(e) => setQ(i, { passage_id: e.target.value || undefined })}
-                    aria-label="Passage / Section của câu"
                     title="Gán câu vào Passage/Section (để chuyển nhóm đúng như đề thật)"
                   >
                     <option value="">— Passage/Section: chưa gán —</option>
@@ -1062,7 +1098,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                           <button
                             type="button"
                             onClick={() => setQ(i, { options: (q.options ?? []).filter((_, j) => j !== oi) })}
-                            className="flex-none px-1 text-[13px] font-bold text-[#C8C2D2] hover:text-[#D08585]"
+                            className="flex-none px-1 text-[13px] font-bold text-[#C8C2D2] hover:text-[var(--text-danger)]"
                             aria-label="Xoá lựa chọn"
                           >
                             ✕
@@ -1129,7 +1165,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                 {/* Đáp án — ô server-only (tách → answer_keys) */}
                 <div className="mt-3 rounded-[10px] border border-[#D6EFE0] bg-[#F2FAF5] p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#1E9E63]">🔒 Đáp án (server)</span>
+                    <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[var(--text-success)]">🔒 Đáp án (server)</span>
                     <input
                       className="w-16 rounded-[7px] border border-[#D6EFE0] bg-white px-2 py-1 text-center text-[12px] font-bold text-[#157A4B] outline-none"
                       value={q.points}
@@ -1200,7 +1236,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       )}
 
       {/* Preview + kiểm lỗi (dựng từ state, không cần lưu) */}
-      <div className="mt-5 flex flex-wrap items-center gap-3">
+      <div id="sec-preview" className="mt-5 flex scroll-mt-24 flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={() => setShowPreview((v) => !v)}
@@ -1221,7 +1257,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
             const n = lintIssues()
             const hasErr = n.some((i) => i.level === 'error')
             return (
-              <span className="text-[12.5px] font-extrabold" style={{ color: hasErr ? '#D24A4A' : n.length ? '#C98A1A' : '#1E9E63' }}>
+              <span className="text-[12.5px] font-extrabold" style={{ color: hasErr ? '#D24A4A' : n.length ? '#C98A1A' : '#137A4A' }}>
                 {n.length ? `${n.length} điểm cần kiểm tra` : '✓ Không phát hiện lỗi'}
               </span>
             )
@@ -1239,8 +1275,16 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                   <div className="text-[12.5px] font-extrabold text-[#A87614]">⚠️ {issues.length} điểm cần kiểm tra trước khi publish</div>
                   <ul className="mt-2 flex flex-col gap-1">
                     {issues.map((it, k) => (
-                      <li key={k} className="text-[12.5px] font-semibold" style={{ color: it.level === 'error' ? '#D24A4A' : '#B5791A' }}>
-                        {it.level === 'error' ? '⛔' : '•'} {it.text}
+                      <li key={k}>
+                        <button
+                          type="button"
+                          onClick={() => scrollToAnchor(it.anchor)}
+                          disabled={!it.anchor}
+                          className="text-left text-[12.5px] font-semibold hover:underline disabled:cursor-default disabled:no-underline"
+                          style={{ color: it.level === 'error' ? '#D24A4A' : '#B5791A' }}
+                        >
+                          {it.level === 'error' ? '⛔' : '•'} {it.text}{it.anchor ? ' →' : ''}
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -1256,7 +1300,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                 <div className="mt-1.5 flex flex-wrap gap-2 text-[11.5px] font-bold">
                   <span className="rounded-full bg-[#F0ECFF] px-2.5 py-1 text-[#5B43C7]">{type}</span>
                   <span className="rounded-full bg-[#EEF0F4] px-2.5 py-1 text-[#5B6270]">{durationMin} phút</span>
-                  <span className="rounded-full px-2.5 py-1" style={{ background: isFree ? '#E7F7EE' : '#FFF3DC', color: isFree ? '#1E9E63' : '#A87614' }}>
+                  <span className="rounded-full px-2.5 py-1" style={{ background: isFree ? '#E7F7EE' : '#FFF3DC', color: isFree ? '#137A4A' : '#A87614' }}>
                     {isFree ? 'Miễn phí' : 'Tính phí'}
                   </span>
                 </div>
@@ -1264,7 +1308,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                 {passages.map((p, i) => (
                   <div key={p.id} className="mt-4">
                     <div className="text-[14px] font-extrabold text-[#2A2740]">{p.title || `Passage ${i + 1}`}</div>
-                    {p.subtitle?.trim() && <div className="text-[12.5px] italic text-[#857F96]">{p.subtitle}</div>}
+                    {p.subtitle?.trim() && <div className="text-[12.5px] italic text-[var(--text-muted)]">{p.subtitle}</div>}
                     {p.content.trim() ? (
                       looksRich(p.content) ? (
                         // SEC-006: sanitize lần nữa ngay tại sink preview (phòng content chưa qua applyDraft).
@@ -1296,7 +1340,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                           {q.prompt.trim() || '— chưa có nội dung câu hỏi —'}
                         </div>
                         <div className="mt-2 flex items-center gap-2 text-[12.5px]">
-                          <span className="font-extrabold text-[#1E9E63]">🔒 Đáp án:</span>
+                          <span className="font-extrabold text-[var(--text-success)]">🔒 Đáp án:</span>
                           {q.answers.trim() ? (
                             <span className="font-mono font-bold text-[#157A4B]">{q.answers}</span>
                           ) : (
@@ -1363,7 +1407,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           {/* Ảnh minh họa đề (cover) — hiện ở trang pre-exam /tests/[id] */}
           <div className="mt-4 rounded-[12px] border border-[#E8E2F2] bg-white p-3.5">
             <p className="text-[13px] font-bold text-[#2A2740]">Ảnh minh họa đề (cover)</p>
-            <p className="mt-0.5 text-[12px] font-medium text-[#857F96]">Hiện trên đầu trang vào đề. PNG/JPG/WebP, ≤ 5MB. Không có ảnh → dùng nền trang trí theo kỹ năng.</p>
+            <p className="mt-0.5 text-[12px] font-medium text-[var(--text-muted)]">Hiện trên đầu trang vào đề. PNG/JPG/WebP, ≤ 5MB. Không có ảnh → dùng nền trang trí theo kỹ năng.</p>
             <div className="mt-3 flex flex-wrap items-center gap-3.5">
               <div className="flex h-[68px] w-[120px] flex-none items-center justify-center overflow-hidden rounded-[10px] border border-[#EEEAF3] bg-[#FAF8FF]">
                 {coverUrl ? (

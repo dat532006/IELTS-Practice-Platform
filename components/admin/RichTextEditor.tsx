@@ -68,10 +68,12 @@ export function RichTextEditor({
   value,
   onChange,
   placeholder,
+  ariaLabel,
 }: {
   value: string
   onChange: (html: string) => void
   placeholder?: string
+  ariaLabel: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const last = useRef<string>('')
@@ -129,6 +131,7 @@ export function RichTextEditor({
             key={i}
             type="button"
             title={b.title}
+            aria-label={b.title}
             onMouseDown={(e) => e.preventDefault()} // giữ vùng chọn trong editor khi bấm nút
             onClick={() => run(b)}
             className="admin-rte-btn"
@@ -144,6 +147,7 @@ export function RichTextEditor({
         suppressContentEditableWarning
         role="textbox"
         aria-multiline="true"
+        aria-label={ariaLabel}
         onInput={emit}
         onBlur={emit}
         onPaste={onPaste}

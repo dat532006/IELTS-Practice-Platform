@@ -322,16 +322,16 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
   }, [phase, preview, result, submit, task1, task2])
 
   // ---- Non-editor states ----
-  if (phase === 'loading') return <Centered>Đang tải bài viết…</Centered>
+  if (phase === 'loading') return <Centered title="Đang tải bài viết…" />
   if (phase === 'locked')
     return (
-      <Centered>
+      <Centered title="Đề thi đang khóa">
         <p style={{ marginBottom: 12 }}>Đề thi này cần được mở khóa trước khi làm bài.</p>
         <Link href="/products" className="dcx-link">Xem các gói đề</Link>
       </Centered>
     )
-  if (phase === 'notfound') return <Centered>Không tìm thấy bài viết.</Centered>
-  if (phase === 'error') return <Centered>{errorMsg || 'Đã có lỗi xảy ra.'}</Centered>
+  if (phase === 'notfound') return <Centered title="Không tìm thấy bài viết" />
+  if (phase === 'error') return <Centered title="Không tải được bài viết"><p>{errorMsg || 'Đã có lỗi xảy ra.'}</p></Centered>
 
   const title = payload?.test?.title ?? 'Writing'
   const activeVal = tab === 1 ? task1 : task2
@@ -348,7 +348,8 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
     return (
       <div className="dc-exam ct-bw ts-regular">
         <Header title={title} />
-        <main style={{ maxWidth: 960, margin: '0 auto', padding: '24px 20px 60px' }}>
+        <main id="main-content" tabIndex={-1} style={{ maxWidth: 960, margin: '0 auto', padding: '24px 20px 60px' }}>
+          <h1 className="sr-only">Kết quả bài viết {title}</h1>
           <WritingResultView result={result} essays={{ task1, task2 }} />
           <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
             <button onClick={rewrite} disabled={restarting} className="dcx-btn-ghost" style={{ padding: '10px 18px', fontSize: 14 }}>
@@ -369,6 +370,9 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
     <div className="dc-exam ct-bw ts-regular">
       <div className="dcx-shell">
         <Header title={title} remaining={result ? null : remaining} />
+
+        <main id="main-content" tabIndex={-1} className="dcx-w-main">
+          <h1 id="writing-main-title" className="sr-only">{title}</h1>
 
         {/* Banner + tabs */}
         <div className="dcx-w-banner">
@@ -429,7 +433,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
                     title="Gợi ý dàn bài"
                     onClick={() => setHintOpen((h) => ({ ...h, [tab]: !h[tab] }))}
                     style={{
-                      height: 34, padding: '0 12px', borderRadius: 8, fontSize: 13.5, fontWeight: 700,
+                      minHeight: 44, padding: '0 12px', borderRadius: 8, fontSize: 13.5, fontWeight: 700,
                       cursor: 'pointer', color: '#5B43C7',
                       border: '1px solid #D9CFF2', background: hintOpen[tab] ? '#F0ECFF' : '#fff',
                     }}
@@ -462,7 +466,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
                     <span
                       className="dcx-w-draft-state"
                       aria-live="polite"
-                      style={{ color: draftState === 'conflict' ? '#C2402F' : '#9d96ae' }}
+                      style={{ color: draftState === 'conflict' ? 'var(--text-error)' : 'var(--text-subtle)' }}
                     >
                       {draftState === 'saving'
                         ? 'Đang lưu nháp…'
@@ -517,6 +521,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
             </div>
           </div>
         </div>
+        </main>
 
         {/* Footer */}
         <div className="dcx-w-footer">
@@ -576,7 +581,7 @@ export function WritingRunner({ testId, preview }: { testId: string; preview?: {
             )}
             <div className="dcx-ai-body">
               {!result.mock && (result.coins_charged ?? 0) > 0 && (
-                <p style={{ margin: '0 0 14px', fontSize: 13, color: '#857f96' }}>
+                <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--text-muted)' }}>
                   Đã dùng <b>{result.coins_charged}</b> coins cho lượt chấm này.
                 </p>
               )}
@@ -690,12 +695,15 @@ function Header({ title, remaining }: { title: string; remaining?: number | null
   )
 }
 
-function Centered({ children }: { children: React.ReactNode }) {
+function Centered({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <div className="dc-exam ct-bw ts-regular">
-      <div className="dcx-center">
-        <div className="dcx-center-card">{children}</div>
-      </div>
+      <main id="main-content" tabIndex={-1} className="dcx-center">
+        <div className="dcx-center-card">
+          <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: children ? 12 : 0 }}>{title}</h1>
+          {children}
+        </div>
+      </main>
     </div>
   )
 }

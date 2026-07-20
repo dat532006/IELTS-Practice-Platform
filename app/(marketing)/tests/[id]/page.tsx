@@ -70,21 +70,21 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
   const badge = locked
     ? { text: '🔒 Khóa', cls: 'bg-[#FFF1DC] text-[#C98A1A]' }
     : state === 'unlocked'
-      ? { text: '✓ Đã mở khóa', cls: 'bg-[#E7F7EE] text-[#1E9E63]' }
-      : { text: 'Miễn phí', cls: 'bg-[#E7F7EE] text-[#1E9E63]' }
+      ? { text: '✓ Đã mở khóa', cls: 'bg-[#E7F7EE] text-[var(--text-success)]' }
+      : { text: 'Miễn phí', cls: 'bg-[#E7F7EE] text-[var(--text-success)]' }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 text-[#2A2740]">
       {/* Breadcrumb (brand) */}
-      <nav className="text-[12.5px] font-semibold text-[#A8A2BA]">
+      <nav className="text-[12.5px] font-semibold text-[var(--text-subtle)]">
         <Link href="/" className="hover:text-[#7C5CE6]">
           Trang chủ
         </Link>
-        <span className="mx-1.5 text-[#D2CCDD]">/</span>
+        <span className="mx-1.5 text-[var(--text-subtle)]">/</span>
         <Link href="/products" className="hover:text-[#7C5CE6]">
           Bộ đề
         </Link>
-        <span className="mx-1.5 text-[#D2CCDD]">/</span>
+        <span className="mx-1.5 text-[var(--text-subtle)]">/</span>
         <span className="text-[#564F6B]">{meta.title}</span>
       </nav>
 
@@ -159,7 +159,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
                 <SkillGlyph skill={meta.skill} size={17} strokeWidth={2.2} />
               </span>
               <span className="whitespace-nowrap">
-                <span className="block text-[11.5px] font-bold text-[#9D96AE]">Kỹ năng</span>
+                <span className="block text-[11.5px] font-bold text-[var(--text-subtle)]">Kỹ năng</span>
                 <span className="block text-[15px] font-extrabold text-[#2A2740]">{sk.label}</span>
               </span>
             </div>
@@ -169,7 +169,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
                 <ClockIcon />
               </span>
               <span className="whitespace-nowrap">
-                <span className="block text-[11.5px] font-bold text-[#9D96AE]">Thời lượng</span>
+                <span className="block text-[11.5px] font-bold text-[var(--text-subtle)]">Thời lượng</span>
                 <span className="block text-[15px] font-extrabold text-[#2A2740]">
                   {formatDurationMin(meta.duration_sec)}
                 </span>
@@ -182,7 +182,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
                   <BarsIcon />
                 </span>
                 <span className="whitespace-nowrap">
-                  <span className="block text-[11.5px] font-bold text-[#9D96AE]">Độ khó</span>
+                  <span className="block text-[11.5px] font-bold text-[var(--text-subtle)]">Độ khó</span>
                   <span className="block text-[15px] font-extrabold text-[#2A2740]">{meta.difficulty}/5</span>
                 </span>
               </div>
@@ -191,7 +191,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
 
           {meta.question_types.length > 0 && (
             <div className="mt-[18px]">
-              <div className="text-[11.5px] font-bold text-[#9D96AE]">Dạng câu hỏi</div>
+              <div className="text-[11.5px] font-bold text-[var(--text-subtle)]">Dạng câu hỏi</div>
               <div className="mt-[9px] flex flex-wrap gap-[7px]">
                 {meta.question_types.map((qt) => (
                   <span
@@ -216,7 +216,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
               >
                 {meta.is_free ? 'Bắt đầu làm bài →' : 'Vào làm bài →'}
               </Link>
-              <p className="mt-3.5 max-w-[34em] text-[13px] font-semibold leading-[1.55] text-[#857F96]">
+              <p className="mt-3.5 max-w-[34em] text-[13px] font-semibold leading-[1.55] text-[var(--text-muted)]">
                 {meta.is_free
                   ? 'Miễn phí · không cần xương cá · kết quả chấm tự động ngay khi nộp bài.'
                   : 'Bạn đã mở khóa đề này — vào làm bài bất cứ lúc nào, kết quả chấm ngay khi nộp bài.'}
@@ -230,7 +230,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
               >
                 Đăng nhập để mở khóa
               </Link>
-              <p className="mt-3.5 inline-flex max-w-[34em] flex-wrap items-center gap-x-1 text-[13px] font-semibold leading-[1.55] text-[#857F96]">
+              <p className="mt-3.5 inline-flex max-w-[34em] flex-wrap items-center gap-x-1 text-[13px] font-semibold leading-[1.55] text-[var(--text-muted)]">
                 Đây là đề trả phí — đăng nhập rồi mua bộ đề bằng <FishBone /> xương cá để mở khóa.
               </p>
             </>
@@ -244,7 +244,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
               >
                 {meta.product ? `Mua bộ đề "${meta.product.title}" →` : 'Xem bộ đề chứa đề này →'}
               </Link>
-              <p className="mt-3.5 max-w-[34em] text-[13px] font-semibold leading-[1.55] text-[#857F96]">
+              <p className="mt-3.5 max-w-[34em] text-[13px] font-semibold leading-[1.55] text-[var(--text-muted)]">
                 <span className="inline-flex flex-wrap items-center gap-x-1">
                   Đề trả phí — mua bộ đề bằng <FishBone /> xương cá, mở khóa ngay sau khi thanh toán.
                 </span>{' '}

@@ -92,7 +92,7 @@ export function WalletPanel({ coins, transactions }: { coins: number; transactio
                 </span>
               )}
               <div className="text-[20px] font-extrabold text-[#2A2740]">{amount / COIN_VND_RATE}</div>
-              <div className="mt-0.5 text-[12px] font-bold text-[#9D96AE]">xương cá · {vnd(amount)} ₫</div>
+              <div className="mt-0.5 text-[12px] font-bold text-[var(--text-subtle)]">xương cá · {vnd(amount)} ₫</div>
             </Link>
           )
         })}
@@ -104,7 +104,7 @@ export function WalletPanel({ coins, transactions }: { coins: number; transactio
       </div>
 
       {transactions.length === 0 ? (
-        <p className="mt-3 rounded-[14px] border border-[#F1EDF7] bg-[#FBFAFD] px-4 py-6 text-center text-[13.5px] font-semibold text-[#9D96AE]">
+        <p className="mt-3 rounded-[14px] border border-[#F1EDF7] bg-[#FBFAFD] px-4 py-6 text-center text-[13.5px] font-semibold text-[var(--text-subtle)]">
           Chưa có giao dịch nào. <Link href="/pricing" className="font-bold text-[#6A48D6] underline">Nạp xương cá →</Link>
         </p>
       ) : (
@@ -140,11 +140,11 @@ export function WalletPanel({ coins, transactions }: { coins: number; transactio
                 <div className="min-w-0 flex-1">
                   <div className="text-[14px] font-bold text-[#2A2740]">
                     {TYPE_LABEL[t.type]}
-                    {note && <span className="font-semibold text-[#9D96AE]"> · {note}</span>}
+                    {note && <span className="font-semibold text-[var(--text-subtle)]"> · {note}</span>}
                   </div>
-                  <div className="mt-0.5 text-[12px] font-semibold text-[#9D96AE]">{sub}</div>
+                  <div className="mt-0.5 text-[12px] font-semibold text-[var(--text-subtle)]">{sub}</div>
                 </div>
-                <span className={`text-[14px] font-extrabold ${credit ? 'text-[#1E9E63]' : 'text-[#D24A4A]'}`}>
+                <span className={`text-[14px] font-extrabold ${credit ? 'text-[var(--text-success)]' : 'text-[#D24A4A]'}`}>
                   {credit ? '+' : '−'}
                   {Math.abs(t.amountCoins)}
                 </span>

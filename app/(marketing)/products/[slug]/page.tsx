@@ -27,27 +27,27 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const cover = SKILL_COVER[primarySkill] ?? SKILL_COVER.reading
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 text-[#2A2740]">
+    <div className="mx-auto min-w-0 max-w-5xl px-4 py-8 text-[#2A2740]">
       <div
-        className="overflow-hidden rounded-[24px] border border-[#EEEAF3] p-6 shadow-[0_30px_60px_-38px_rgba(60,40,90,0.42)] sm:p-9"
+        className="min-w-0 overflow-hidden rounded-[24px] border border-[#EEEAF3] p-6 shadow-[0_30px_60px_-38px_rgba(60,40,90,0.42)] sm:p-9"
         style={{ background: 'radial-gradient(120% 70% at 96% -8%, #FBE6DC 0%, rgba(251,230,220,0) 48%), #FFFFFF' }}
       >
         {/* Breadcrumb */}
-        <nav className="text-[12.5px] font-semibold text-[#A8A2BA]">
+        <nav className="text-[12.5px] font-semibold text-[var(--text-subtle)]">
           <Link href="/" className="hover:text-[#7C5CE6]">
             Trang chủ
           </Link>
-          <span className="mx-1.5 text-[#D2CCDD]">/</span>
+          <span className="mx-1.5 text-[var(--text-subtle)]">/</span>
           <Link href="/products" className="hover:text-[#7C5CE6]">
             Bộ đề
           </Link>
-          <span className="mx-1.5 text-[#D2CCDD]">/</span>
+          <span className="mx-1.5 text-[var(--text-subtle)]">/</span>
           <span className="text-[#564F6B]">{detail.title}</span>
         </nav>
 
-        <div className="mt-5 grid items-start gap-8 lg:grid-cols-[1fr_21rem]">
+        <div className="mt-5 grid min-w-0 items-start gap-8 lg:grid-cols-[1fr_21rem]">
           {/* Main */}
-          <div>
+          <div className="min-w-0">
             {/* Cover */}
             <div
               className="relative flex aspect-[16/7] items-center justify-center overflow-hidden rounded-[18px]"
@@ -72,11 +72,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <h1 className="text-[28px] font-extrabold tracking-[-0.025em]">{detail.title}</h1>
               {detail.owned ? (
-                <span className="rounded-full bg-[#E7F7EE] px-2.5 py-[5px] text-[12px] font-extrabold text-[#1E9E63]">
+                <span className="rounded-full bg-[#E7F7EE] px-2.5 py-[5px] text-[12px] font-extrabold text-[var(--text-success)]">
                   ✓ Đã sở hữu
                 </span>
               ) : detail.price_coins === 0 ? (
-                <span className="rounded-full bg-[#E7F7EE] px-2.5 py-[5px] text-[12px] font-extrabold text-[#1E9E63]">
+                <span className="rounded-full bg-[#E7F7EE] px-2.5 py-[5px] text-[12px] font-extrabold text-[var(--text-success)]">
                   Miễn phí
                 </span>
               ) : (
@@ -86,17 +86,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               )}
             </div>
 
-            <p className="mt-2 text-[14px] font-semibold text-[#857F96]">
+            <p className="mt-2 text-[14px] font-semibold text-[var(--text-muted)]">
               {detail.tests.length} đề
               {freeCount > 0 && (
                 <>
-                  <span className="mx-1 text-[#D2CCDD]">·</span>
+                  <span className="mx-1 text-[var(--text-subtle)]">·</span>
                   {freeCount} đề miễn phí
                 </>
               )}
               {detail.attempts_total > 0 && (
                 <>
-                  <span className="mx-1 text-[#D2CCDD]">·</span>🔥 {detail.attempts_total.toLocaleString('vi-VN')} lượt làm
+                  <span className="mx-1 text-[var(--text-subtle)]">·</span>🔥 {detail.attempts_total.toLocaleString('vi-VN')} lượt làm
                 </>
               )}
             </p>

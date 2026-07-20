@@ -54,7 +54,7 @@ export function SecurityPanel({ email }: { email: string | null }) {
   return (
     <section className={CARD}>
       <h2 className="text-[18px] font-extrabold tracking-[-0.01em] text-[#2A2740]">Đổi mật khẩu</h2>
-      <p className="mt-1.5 text-[13.5px] font-semibold text-[#857F96]">
+      <p className="mt-1.5 text-[13.5px] font-semibold text-[var(--text-muted)]">
         Bạn đang đăng nhập — nhập mật khẩu hiện tại để đặt mật khẩu mới.
       </p>
 
@@ -80,7 +80,7 @@ export function SecurityPanel({ email }: { email: string | null }) {
         </div>
 
         {msg && (
-          <p className={`text-[13px] font-bold ${msg.tone === 'ok' ? 'text-[#1E9E63]' : 'text-[#D24A4A]'}`}>
+          <p className={`text-[13px] font-bold ${msg.tone === 'ok' ? 'text-[var(--text-success)]' : 'text-[#D24A4A]'}`}>
             {msg.text}
           </p>
         )}

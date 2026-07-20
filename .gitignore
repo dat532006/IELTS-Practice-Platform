@@ -21,3 +21,5 @@ supabase/.branches/
 ocr-output/
 scripts/.tesscache/
 scripts/.tessdata_best/
+.vercel
+.env*

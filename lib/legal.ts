@@ -7,6 +7,12 @@ export type LegalBlock = { p: string } | { list: string[] }
 export type LegalSection = { heading: string; blocks: LegalBlock[] }
 export type LegalPageContent = { title: string; summary: string; updated?: string; sections: LegalSection[] }
 
+export const LEGAL_SLUG = {
+  PRIVACY: 'privacy',
+  PAYMENT_POLICY: 'payment-policy',
+  TRANSACTION_TERMS: 'transaction-terms',
+} as const
+
 const CONTACT_BLOCKS: LegalBlock[] = [
   { p: 'Tên đơn vị: IELTS PRACTICE PLATFORM' },
   { p: 'Email: ieltspracticeplatform@gmail.com' },

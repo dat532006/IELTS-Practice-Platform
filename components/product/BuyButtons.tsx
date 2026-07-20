@@ -81,16 +81,16 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
   return (
     <>
       {/* Số dư */}
-      <div className="mt-4 flex items-center justify-between rounded-[12px] border border-[#EEEAF6] bg-[#FBFAFF] px-3.5 py-[11px]">
-        <span className="text-[13px] font-semibold text-[#857F96]">Số dư của bạn</span>
-        <span className={`flex items-center gap-1.5 text-[14.5px] font-extrabold ${enough ? 'text-[#1E9E63]' : 'text-[#C98A1A]'}`}>
+      <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-[12px] border border-[#EEEAF6] bg-[#FBFAFF] px-3.5 py-[11px]">
+        <span className="text-[13px] font-semibold text-[var(--text-muted)]">Số dư của bạn</span>
+        <span className={`flex items-center gap-1.5 text-[14.5px] font-extrabold ${enough ? 'text-[var(--text-success)]' : 'text-[#C98A1A]'}`}>
           <FishBone /> {balance == null ? '…' : balance.toLocaleString('vi-VN')}
         </span>
       </div>
 
       {balance != null && !enough ? (
         <>
-          <div className="mt-4 flex items-center gap-2.5 rounded-[13px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[13px]">
+          <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2.5 rounded-[13px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[13px]">
             <span className="h-[7px] w-[7px] flex-none rounded-full bg-[#E59A1B]" />
             <span className="text-[13px] font-semibold leading-[1.4] text-[#A66A12]">
               Thiếu <b className="inline-flex items-center gap-1"><FishBone />{need.toLocaleString('vi-VN')}</b> để mua bộ đề này.
@@ -102,7 +102,7 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
           >
             Nạp thêm xương cá →
           </Link>
-          <div className="mt-[11px] text-center text-[12.5px] font-semibold text-[#A8A2BA]">
+          <div className="mt-[11px] text-center text-[12.5px] font-semibold text-[var(--text-subtle)]">
             Sau khi nạp, quay lại đây để mua ngay
           </div>
         </>
@@ -123,7 +123,7 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
               </>
             )}
           </button>
-          <div className="mt-[11px] flex items-center justify-center gap-1 text-center text-[12.5px] font-semibold text-[#A8A2BA]">
+          <div className="mt-[11px] flex items-center justify-center gap-1 text-center text-[12.5px] font-semibold text-[var(--text-subtle)]">
             Trừ <FishBone />
             {priceCoins} — sở hữu vĩnh viễn, làm lại không giới hạn
           </div>

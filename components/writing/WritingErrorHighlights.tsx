@@ -96,7 +96,7 @@ export function WritingErrorHighlights({
     <div>
       <div className="mb-3">
         <h4 className="text-sm font-extrabold text-[#2A2740]">Lỗi &amp; gợi ý sửa</h4>
-        <p className="mt-1 text-xs font-medium text-[#9D96AE]">
+        <p className="mt-1 text-xs font-medium text-[var(--text-subtle)]">
           Từng lỗi trong bài: chỗ sai <span className="font-semibold text-rose-600 line-through">gạch đỏ</span>, phần sửa{' '}
           <span className="rounded-sm bg-emerald-600 px-1 font-semibold text-white">tô xanh</span>, kèm giải thích vì sao.
         </p>
@@ -157,7 +157,7 @@ export function WritingErrorHighlights({
               {useful ? (
                 <div className="space-y-1.5">
                   <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
-                    <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-[#9D96AE]">Trong bài</span>
+                    <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-[var(--text-subtle)]">Trong bài</span>
                     <BeforeLine quote={h.quote} fix={fix} />
                   </div>
                   <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
@@ -165,7 +165,7 @@ export function WritingErrorHighlights({
                     <AfterLine quote={h.quote} fix={fix} />
                   </div>
                   <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
-                    <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-[#9D96AE]">Vì sao</span>
+                    <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-[var(--text-subtle)]">Vì sao</span>
                     <span className="leading-relaxed text-[#655E75]">{reason}</span>
                   </div>
                 </div>
@@ -176,7 +176,7 @@ export function WritingErrorHighlights({
                 //   Trong bài / Gợi ý (thay vì "Sửa thành") / Vì sao.
                 <div className="space-y-1.5">
                   <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
-                    <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-[#9D96AE]">Trong bài</span>
+                    <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-[var(--text-subtle)]">Trong bài</span>
                     <span className="italic leading-relaxed text-slate-600">“{h.quote}”</span>
                   </div>
                   <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
@@ -185,7 +185,7 @@ export function WritingErrorHighlights({
                   </div>
                   {h.reason_vi?.trim() && (
                     <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
-                      <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-[#9D96AE]">Vì sao</span>
+                      <span className="pt-px text-[11px] font-bold uppercase tracking-wide text-[var(--text-subtle)]">Vì sao</span>
                       <span className="leading-relaxed text-[#655E75]">{h.reason_vi}</span>
                     </div>
                   )}

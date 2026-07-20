@@ -26,7 +26,7 @@ const inputCls =
   'mt-1.5 w-full rounded-[11px] border border-[#E4DEEE] bg-white px-3.5 py-3 text-sm text-[#2A2740] focus:border-[#7C5CE6] focus:outline-none'
 
 function statusStyle(status: string) {
-  if (status === 'published') return 'bg-[#E7F7EE] text-[#1E9E63]'
+  if (status === 'published') return 'bg-[#E7F7EE] text-[var(--text-success)]'
   if (status === 'draft') return 'bg-[#FFF1DC] text-[#C98A1A]'
   return 'bg-[#EFEBF2] text-[#8B8398]'
 }
@@ -246,7 +246,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
     return (
       <div>
         {backLink}
-        <p className="mt-6 text-center text-sm text-[#857F96]">Không tìm thấy sản phẩm.</p>
+        <p className="mt-6 text-center text-sm text-[var(--text-muted)]">Không tìm thấy sản phẩm.</p>
       </div>
     )
   }
@@ -262,7 +262,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
     return (
       <div>
         {backLink}
-        <p className="mt-6 text-center text-sm text-[#A8A2BA]">Đang tải…</p>
+        <p className="mt-6 text-center text-sm text-[var(--text-subtle)]">Đang tải…</p>
       </div>
     )
   }
@@ -275,7 +275,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-[21px] font-extrabold tracking-[-0.02em]">{product.title || '(chưa có tiêu đề)'}</h1>
         <StatusBadge status={product.status} />
-        <span className="font-mono text-[12px] font-semibold text-[#A8A2BA]">{product.slug}</span>
+        <span className="font-mono text-[12px] font-semibold text-[var(--text-subtle)]">{product.slug}</span>
       </div>
 
       <div className="mt-5 grid items-start gap-6 lg:grid-cols-[1fr_22rem]">
@@ -311,7 +311,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-[12.5px] font-extrabold text-[#6A6480]">
-                Đề trong sản phẩm <span className="font-semibold text-[#A8A2BA]">· dùng ↑/↓ để sắp xếp</span>
+                Đề trong sản phẩm <span className="font-semibold text-[var(--text-subtle)]">· dùng ↑/↓ để sắp xếp</span>
               </div>
             </div>
 
@@ -350,19 +350,19 @@ export function AdminProductDetail({ productId }: { productId: string }) {
                   {busy === 'bind' ? 'Đang gắn…' : '+ Gắn đề'}
                 </button>
               </div>
-              <p className="mt-1 text-[11px] text-[#A8A2BA]">Đề draft trong bundle sẽ KHÔNG hiện công khai cho tới khi đề đó được publish.</p>
+              <p className="mt-1 text-[11px] text-[var(--text-subtle)]">Đề draft trong bundle sẽ KHÔNG hiện công khai cho tới khi đề đó được publish.</p>
             </div>
 
             {bindErr && <p aria-live="assertive" className="mt-3 rounded-[10px] border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{bindErr}</p>}
             {bindMsg && <p aria-live="polite" className="mt-3 rounded-[10px] border border-[#D9CFFF] bg-[#FBFAFF] px-3 py-2 text-[13px] font-semibold text-[#5B43C7]">{bindMsg}</p>}
 
             {sorted.length === 0 ? (
-              <p className="mt-3 py-4 text-center text-sm text-[#A8A2BA]">Chưa có đề nào trong bundle.</p>
+              <p className="mt-3 py-4 text-center text-sm text-[var(--text-subtle)]">Chưa có đề nào trong bundle.</p>
             ) : (
               <div className="mt-3 flex flex-col gap-2">
                 {sorted.map((t, i) => (
                   <div key={t.test_id} className="flex items-center gap-3 rounded-[11px] border border-[#ECE9F2] bg-white px-3.5 py-3">
-                    <span className="flex h-6 w-6 flex-none items-center justify-center rounded-[7px] bg-[#F4F1FB] text-[12px] font-extrabold text-[#857F96]">
+                    <span className="flex h-6 w-6 flex-none items-center justify-center rounded-[7px] bg-[#F4F1FB] text-[12px] font-extrabold text-[var(--text-muted)]">
                       {t.position}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -370,7 +370,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
                         <span className="truncate text-[14px] font-semibold text-[#2A2740]">{t.title || '(đề draft / ẩn)'}</span>
                         {t.status && <StatusBadge status={t.status} />}
                       </div>
-                      <div className="truncate text-[11px] text-[#A8A2BA]">
+                      <div className="truncate text-[11px] text-[var(--text-subtle)]">
                         {t.type ?? '—'} · <span className="font-mono">{t.test_id.slice(0, 8)}…</span>
                       </div>
                     </div>
@@ -436,7 +436,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
                 className="w-full border-none bg-transparent font-mono text-[22px] font-extrabold text-[#2A2740] outline-none"
               />
             </div>
-            <p className="mt-2.5 text-[11.5px] font-semibold leading-[1.45] text-[#A8A2BA]">
+            <p className="mt-2.5 text-[11.5px] font-semibold leading-[1.45] text-[var(--text-subtle)]">
               Giá là server-authoritative. Đặt 0 để bộ đề miễn phí.
             </p>
           </div>
@@ -466,7 +466,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
             >
               {busy === 'save' ? 'Đang lưu…' : 'Lưu thay đổi'}
             </button>
-            <p className="mt-2 text-[11px] text-[#A8A2BA]">Giá là dữ liệu admin nhập — server quyết định khi thanh toán. Publish làm mới catalog công khai.</p>
+            <p className="mt-2 text-[11px] text-[var(--text-subtle)]">Giá là dữ liệu admin nhập — server quyết định khi thanh toán. Publish làm mới catalog công khai.</p>
           </div>
         </aside>
       </div>

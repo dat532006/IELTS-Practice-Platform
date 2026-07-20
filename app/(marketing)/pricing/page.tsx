@@ -11,7 +11,7 @@ const QUICK_VND = [60_000, 100_000, 200_000, 500_000]
 const ALL_PROVIDERS = [
   { id: 'vnpay', label: 'VNPay', mono: 'V', tint: '#E4EEFF', fg: '#2A63C7' },
   { id: 'momo', label: 'MoMo', mono: 'M', tint: '#FBE3F0', fg: '#C2186A' },
-  { id: 'bank', label: 'Bank', mono: 'B', tint: '#E5F4EC', fg: '#1E9E63' },
+  { id: 'bank', label: 'Bank', mono: 'B', tint: '#E5F4EC', fg: '#137A4A' },
 ] as const
 type ProviderId = (typeof ALL_PROVIDERS)[number]['id']
 
@@ -89,7 +89,7 @@ export default function PricingPage() {
           <h1 className="mt-4 text-[32px] font-extrabold leading-[1.06] tracking-[-0.025em]">Nạp xương cá</h1>
 
           {/* Quick select */}
-          <div className="mt-7 text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[#9088A2]">Chọn nhanh</div>
+          <h2 className="mt-7 text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[var(--text-muted)]">Chọn nhanh</h2>
           <div className="mt-3 grid grid-cols-4 gap-3">
             {QUICK_VND.map((q) => {
               const sel = amount === q
@@ -105,32 +105,38 @@ export default function PricingPage() {
                   }`}
                 >
                   <div className="flex items-center gap-1.5 text-[20px] font-extrabold tracking-[-0.02em] text-[#6A48D6]"><FishBone /> {q / COIN_VND_RATE}</div>
-                  <div className="mt-1 text-[12.5px] font-semibold text-[#857F96]">{vnd(q)} ₫</div>
+                  <div className="mt-1 text-[12.5px] font-semibold text-[var(--text-muted)]">{vnd(q)} ₫</div>
                 </button>
               )
             })}
           </div>
 
           {/* Custom amount */}
-          <div className="mt-6 text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[#9088A2]">
+          <label htmlFor="topup-amount" className="mt-6 block text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[var(--text-muted)]">
             Hoặc nhập số tiền (VND)
-          </div>
+          </label>
           <div className="mt-2.5 flex items-center gap-3 rounded-[14px] border border-[#E4DEEE] bg-white px-[18px] shadow-[0_6px_16px_rgba(42,39,64,0.04)] focus-within:border-[#7C5CE6]">
             <input
+              id="topup-amount"
+              name="amount_vnd"
               type="number"
               inputMode="numeric"
               step={COIN_VND_RATE}
               min={MIN_TOPUP_VND}
               max={MAX_TOPUP_VND}
+              aria-invalid={!valid || undefined}
+              aria-describedby="topup-amount-help"
               value={Number.isNaN(amount) ? '' : amount}
               onChange={(e) => setAmount(Number(e.target.value))}
               className="flex-1 border-none bg-transparent py-4 font-mono text-[22px] font-extrabold text-[#2A2740] outline-none"
             />
-            <span className="text-[14px] font-bold text-[#A8A2BA]">VND</span>
+            <span className="text-[14px] font-bold text-[var(--text-subtle)]">VND</span>
           </div>
 
+          <p id="topup-amount-help" className="sr-only">Số tiền từ {vnd(MIN_TOPUP_VND)} đến {vnd(MAX_TOPUP_VND)} VND và phải chia hết cho {vnd(COIN_VND_RATE)} VND.</p>
+
           {/* Providers */}
-          <div className="mt-6 text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[#9088A2]">Cổng thanh toán</div>
+          <h2 className="mt-6 text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[var(--text-muted)]">Cổng thanh toán</h2>
           <div className="mt-2.5 flex flex-wrap gap-[11px]">
             {PROVIDER_LIST.map((p) => {
               const sel = provider === p.id
@@ -158,14 +164,14 @@ export default function PricingPage() {
           {/* Preview */}
           <div className="mt-6 rounded-[16px] border border-[#E8E2F0] bg-[#FBFAFF] px-[22px] py-5">
             <div className="flex items-baseline justify-between">
-              <span className="text-[14px] font-semibold text-[#857F96]">Bạn sẽ nhận</span>
+              <span className="text-[14px] font-semibold text-[var(--text-muted)]">Bạn sẽ nhận</span>
               <span className="inline-flex items-center gap-2 text-[26px] font-extrabold tracking-[-0.02em] text-[#2A2740]">
                 <FishBone /> {valid ? previewCoins : '—'}{' '}
-                <span className="text-[15px] font-bold text-[#857F96]">xương cá</span>
+                <span className="text-[15px] font-bold text-[var(--text-muted)]">xương cá</span>
               </span>
             </div>
             {valid && (
-              <div className="mt-1.5 text-right font-mono text-[12.5px] font-semibold text-[#A8A2BA]">
+              <div className="mt-1.5 text-right font-mono text-[12.5px] font-semibold text-[var(--text-subtle)]">
                 {vnd(amount)} VND = {previewCoins} xương cá
               </div>
             )}
@@ -173,7 +179,7 @@ export default function PricingPage() {
 
           {/* Validation */}
           {!valid && (
-            <div className="mt-3 flex items-center gap-2.5 rounded-[12px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[11px] text-[13.5px] font-semibold text-[#A66A12]">
+            <div id="topup-validation" role="alert" className="mt-3 flex items-center gap-2.5 rounded-[12px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[11px] text-[13.5px] font-semibold text-[#A66A12]">
               <span className="h-[7px] w-[7px] flex-none rounded-full bg-[#E59A1B]" />
               {validationMsg}
             </div>
@@ -192,10 +198,10 @@ export default function PricingPage() {
           >
             {loading ? 'Đang chuyển đến cổng thanh toán…' : valid ? `Nạp ${vnd(amount)} VND →` : 'Nạp xương cá'}
           </button>
-          <div className="mt-3.5 text-center text-[12.5px] font-semibold text-[#A8A2BA]">
+          <div className="mt-3.5 text-center text-[12.5px] font-semibold text-[var(--text-subtle)]">
             🔒 Chuyển hướng tới cổng thanh toán an toàn
           </div>
-          {error && <p className="mt-3 text-center text-[13.5px] font-semibold text-rose-600">{error}</p>}
+          {error && <p role="alert" className="mt-3 text-center text-[13.5px] font-semibold text-[var(--text-error)]">{error}</p>}
 
           <PaymentDisclaimer className="mt-5" />
         </div>

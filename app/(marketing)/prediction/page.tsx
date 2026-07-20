@@ -54,7 +54,7 @@ export default function PredictionPage() {
         ))}
       </div>
 
-      <p className="mt-6 text-center text-[13px] font-semibold text-[#9D96AE]">
+      <p className="mt-6 text-center text-[13px] font-semibold text-[var(--text-subtle)]">
         Đề Prediction được mở khoá bằng xương cá khi ra mắt — chưa có dữ liệu lượt làm cho tới lúc đó.
       </p>
     </div>
