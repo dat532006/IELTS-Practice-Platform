@@ -68,13 +68,13 @@ export function CatalogFilters() {
           />
         </form>
 
-        <label className="relative flex items-center gap-2 rounded-[13px] border border-[#E8E2F0] bg-white pl-4 pr-9 text-[14px] font-bold text-[#2A2740] shadow-[0_6px_16px_rgba(42,39,64,0.04)]">
-          <span className="font-semibold text-[var(--text-subtle)]">Sắp xếp:</span>
+        <label className="relative flex items-center gap-1.5 rounded-[13px] border border-[#E8E2F0] bg-white pl-4 text-[14px] font-bold text-[#2A2740] shadow-[0_6px_16px_rgba(42,39,64,0.04)] transition focus-within:border-[#7C5CE6]">
+          <span className="pointer-events-none font-semibold text-[var(--text-subtle)]">Sắp xếp:</span>
           <select
             aria-label="Sắp xếp bộ đề"
             value={sp.get('sort') ?? 'new'}
             onChange={(e) => push({ sort: e.target.value })}
-            className="cursor-pointer appearance-none bg-transparent py-3 pr-1 font-bold text-[#2A2740] outline-none"
+            className="dcx-select h-11 cursor-pointer appearance-none rounded-[13px] bg-transparent pr-9 font-bold text-[#2A2740] outline-none"
           >
             {SORTS.map((s) => (
               <option key={s.v} value={s.v}>
@@ -120,12 +120,12 @@ export function CatalogFilters() {
 
         <span className="mx-1 h-[22px] w-px bg-[#E4DEEE]" />
 
-        <label className="relative inline-flex items-center gap-1.5 rounded-[11px] border border-[#E8E2F0] bg-white pl-3.5 pr-8 text-[13.5px] font-bold text-[#3D3654]">
+        <label className="relative inline-flex items-center rounded-[11px] border border-[#E8E2F0] bg-white text-[13.5px] font-bold text-[#3D3654] transition focus-within:border-[#7C5CE6]">
           <select
             aria-label="Lọc theo độ khó"
             value={sp.get('difficulty') ?? ''}
             onChange={(e) => push({ difficulty: e.target.value || undefined })}
-            className="cursor-pointer appearance-none bg-transparent py-[9px] pr-1 font-bold text-[#3D3654] outline-none"
+            className="dcx-select h-11 cursor-pointer appearance-none rounded-[11px] bg-transparent pl-3.5 pr-9 font-bold text-[#3D3654] outline-none"
           >
             {DIFFICULTIES.map((d) => (
               <option key={d.v} value={d.v}>
@@ -139,8 +139,15 @@ export function CatalogFilters() {
         </label>
 
         <button
+          type="button"
+          role="switch"
+          aria-checked={freeOnly}
           onClick={() => push({ free: freeOnly ? undefined : '1' })}
-          className="inline-flex items-center gap-2 min-h-[44px] rounded-[11px] border border-[#E8E2F0] bg-white px-3.5 py-2 text-[13.5px] font-bold text-[#3D3654]"
+          className={`inline-flex items-center gap-2 min-h-[44px] rounded-[11px] border px-3.5 py-2 text-[13.5px] font-bold transition ${
+            freeOnly
+              ? 'border-[#7C5CE6] bg-[#F3EFFE] text-[#5B43C7]'
+              : 'border-[#E8E2F0] bg-white text-[#3D3654] hover:border-[#D9D2E6]'
+          }`}
         >
           Chỉ đề free
           <span
