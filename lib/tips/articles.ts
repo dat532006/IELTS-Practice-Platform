@@ -1,9 +1,10 @@
-// Tips blog — dữ liệu tĩnh (8 bài mẫu từ thiết kế "Tips.dc.html"). NỘI DUNG THÂN BÀI là placeholder,
-// Owner thay bằng bài thật sau (giống pipeline nạp đề). Slug = id, dùng cho route /tips/[slug].
+// Tips blog — kiểu dữ liệu + meta trình bày + mapper từ hàng DB sang view model.
+// Bài viết lưu ở bảng public.tip_articles (migration 20260722000100); truy vấn ở lib/tips/queries.ts.
 
 export type TipSkill = 'reading' | 'listening' | 'writing' | 'speaking'
 export type TipType = 'strategy' | 'qtype'
 
+// View model dùng cho UI (đã suy ra initials/date/read để component chỉ hiển thị).
 export type TipArticle = {
   slug: string
   skill: TipSkill
@@ -13,8 +14,26 @@ export type TipArticle = {
   author: string
   band: string
   initials: string
-  date: string
-  read: string
+  date: string // ví dụ "18 Th7, 2026"
+  read: string // ví dụ "8 phút đọc"
+}
+
+// Hàng thô từ DB (admin đọc cả draft).
+export type TipRow = {
+  id?: string
+  slug: string
+  skill: string
+  type: string
+  title: string
+  excerpt: string | null
+  body_html?: string | null
+  author: string | null
+  band: string | null
+  read_minutes: number | null
+  status?: string
+  sort_order?: number
+  published_at: string | null
+  created_at?: string | null
 }
 
 export const TIP_TYPE_LABEL: Record<TipType, string> = {
@@ -33,21 +52,46 @@ export const TIP_SKILL: Record<
   speaking: { label: 'Speaking', color: '#EE5C92', text: '#C13067', cover: 'linear-gradient(140deg,#F79BBB,#EE5C92)' },
 }
 
-export const TIP_ARTICLES: TipArticle[] = [
-  { slug: 'tfng', skill: 'reading', type: 'strategy', title: '7 bước xử lý dạng True/False/Not Given không bao giờ sai', excerpt: 'Nhận diện bẫy “Not Given” trong 20 giây với quy trình 7 bước kèm ví dụ đề Cambridge.', author: 'Minh Trang', band: 'IELTS 8.5', initials: 'MT', date: '18 Th7, 2026', read: '8 phút đọc' },
-  { slug: 'map', skill: 'listening', type: 'qtype', title: 'Nghe map/plan labelling: đừng bao giờ rời mắt khỏi bản đồ', excerpt: 'Chiến thuật theo dõi hướng di chuyển và từ chỉ vị trí để không lạc câu.', author: 'Đức Anh', band: 'IELTS 8.0', initials: 'ĐA', date: '15 Th7, 2026', read: '6 phút đọc' },
-  { slug: 'task2', skill: 'writing', type: 'strategy', title: 'Dàn ý Writing Task 2 trong 5 phút cho mọi đề', excerpt: 'Khung 4 đoạn linh hoạt áp dụng cho opinion, discussion và problem–solution.', author: 'Hải Yến', band: 'IELTS 8.0', initials: 'HY', date: '12 Th7, 2026', read: '9 phút đọc' },
-  { slug: 'part2', skill: 'speaking', type: 'strategy', title: 'Speaking Part 2: kể chuyện tự nhiên với công thức PEEL', excerpt: 'Biến cue card thành câu chuyện mạch lạc, đủ ý mà không học thuộc lòng.', author: 'Quốc Bảo', band: 'IELTS 8.5', initials: 'QB', date: '10 Th7, 2026', read: '7 phút đọc' },
-  { slug: 'match', skill: 'reading', type: 'qtype', title: 'Matching Headings: chọn tiêu đề đúng bằng câu chủ đề', excerpt: 'Tại sao đọc câu đầu và câu cuối đoạn lại chưa đủ — và nên đọc gì thay thế.', author: 'Minh Trang', band: 'IELTS 8.5', initials: 'MT', date: '8 Th7, 2026', read: '6 phút đọc' },
-  { slug: 'mcq', skill: 'listening', type: 'strategy', title: 'Nghe multiple choice: xử lý câu gây nhiễu (distractor)', excerpt: 'Vì sao đáp án nghe được đầu tiên thường sai, và cách chờ tín hiệu chốt.', author: 'Đức Anh', band: 'IELTS 8.0', initials: 'ĐA', date: '5 Th7, 2026', read: '5 phút đọc' },
-  { slug: 'task1', skill: 'writing', type: 'qtype', title: 'Writing Task 1: mô tả biểu đồ đường không lặp từ', excerpt: 'Bộ từ vựng xu hướng và cấu trúc so sánh giúp câu văn đa dạng, tự nhiên.', author: 'Hải Yến', band: 'IELTS 8.0', initials: 'HY', date: '2 Th7, 2026', read: '8 phút đọc' },
-  { slug: 'fluency', skill: 'speaking', type: 'strategy', title: 'Tăng độ trôi chảy khi bí ý: cụm từ câu giờ tự nhiên', excerpt: 'Những filler được giám khảo chấp nhận, giúp bạn có thời gian suy nghĩ.', author: 'Quốc Bảo', band: 'IELTS 8.5', initials: 'QB', date: '29 Th6, 2026', read: '5 phút đọc' },
-]
-
-export function getTip(slug: string): TipArticle | undefined {
-  return TIP_ARTICLES.find((a) => a.slug === slug)
+// Slug từ tiêu đề: bỏ dấu tiếng Việt, thường hoá, chỉ giữ a-z0-9 và gạch ngang.
+export function slugify(input: string): string {
+  return input
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // bỏ dấu thanh/dấu phụ
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
 }
 
-export function relatedTips(article: TipArticle, limit = 2): TipArticle[] {
-  return TIP_ARTICLES.filter((a) => a.skill === article.skill && a.slug !== article.slug).slice(0, limit)
+function initialsOf(author: string): string {
+  const parts = author.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '•'
+  const first = parts[0][0] ?? ''
+  const last = parts.length > 1 ? parts[parts.length - 1][0] ?? '' : ''
+  return (first + last).toUpperCase()
+}
+
+// "18 Th7, 2026" (định dạng Việt gọn) từ ISO date. Không có ngày → chuỗi rỗng.
+function formatTipDate(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getDate()} Th${d.getMonth() + 1}, ${d.getFullYear()}`
+}
+
+export function toTipArticle(row: TipRow): TipArticle {
+  const author = row.author?.trim() || 'IELTS Practice'
+  return {
+    slug: row.slug,
+    skill: row.skill as TipSkill,
+    type: row.type as TipType,
+    title: row.title,
+    excerpt: row.excerpt ?? '',
+    author,
+    band: row.band?.trim() || '',
+    initials: initialsOf(author),
+    date: formatTipDate(row.published_at ?? row.created_at ?? null),
+    read: `${row.read_minutes ?? 5} phút đọc`,
+  }
 }
