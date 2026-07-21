@@ -69,14 +69,22 @@ export function RichTextEditor({
   onChange,
   placeholder,
   ariaLabel,
+  sanitize = sanitizePassageHtmlClient,
+  onImageUpload,
 }: {
   value: string
   onChange: (html: string) => void
   placeholder?: string
   ariaLabel: string
+  // Bộ dọn client dùng khi nạp value vào DOM (mặc định = passage, KHÔNG ảnh). Tips truyền bản cho phép <img>.
+  sanitize?: (html: unknown) => string
+  // Có → bật chèn/paste ảnh: nhận File, upload, trả public_url (hoặc null nếu lỗi).
+  onImageUpload?: (file: File) => Promise<string | null>
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const last = useRef<string>('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const savedRange = useRef<Range | null>(null)
 
   // Đồng bộ value NGOÀI (import/nạp draft) vào DOM — KHÔNG ghi đè khi đang gõ (giữ vị trí con trỏ).
   useEffect(() => {
@@ -89,8 +97,50 @@ export function RichTextEditor({
       /* execCommand không hỗ trợ → bỏ qua */
     }
     // SEC-006: value từ import/nạp draft có thể chứa HTML độc → sanitize allowlist TRƯỚC khi vào innerHTML.
-    if (value !== last.current && value !== el.innerHTML) el.innerHTML = sanitizePassageHtmlClient(value)
-  }, [value])
+    if (value !== last.current && value !== el.innerHTML) el.innerHTML = sanitize(value)
+  }, [value, sanitize])
+
+  // Lưu vùng chọn hiện tại (trong editor) để khôi phục sau khi hộp thoại file / upload async làm mất focus.
+  const saveRange = useCallback(() => {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount && ref.current?.contains(sel.anchorNode)) {
+      savedRange.current = sel.getRangeAt(0).cloneRange()
+    }
+  }, [])
+
+  const insertImageUrl = useCallback(
+    (url: string) => {
+      const el = ref.current
+      if (!el) return
+      el.focus()
+      const sel = window.getSelection()
+      if (savedRange.current && sel) {
+        sel.removeAllRanges()
+        sel.addRange(savedRange.current)
+      }
+      try {
+        document.execCommand('insertImage', false, url)
+      } catch {
+        /* no-op */
+      }
+      const html = el.innerHTML
+      last.current = html
+      onChange(html)
+    },
+    [onChange],
+  )
+
+  const uploadAndInsert = useCallback(
+    async (files: FileList | File[]) => {
+      if (!onImageUpload) return
+      for (const f of Array.from(files)) {
+        if (!f.type.startsWith('image/')) continue
+        const url = await onImageUpload(f)
+        if (url) insertImageUrl(url)
+      }
+    },
+    [onImageUpload, insertImageUrl],
+  )
 
   const emit = useCallback(() => {
     const el = ref.current
@@ -111,6 +161,14 @@ export function RichTextEditor({
   }
 
   const onPaste = (e: ClipboardEvent<HTMLDivElement>) => {
+    // Dán ẢNH (từ ảnh chụp màn hình / copy ảnh) → upload rồi chèn, thay vì dán HTML.
+    const imageFiles = Array.from(e.clipboardData.files ?? []).filter((f) => f.type.startsWith('image/'))
+    if (onImageUpload && imageFiles.length > 0) {
+      e.preventDefault()
+      saveRange()
+      void uploadAndInsert(imageFiles)
+      return
+    }
     e.preventDefault()
     const html = e.clipboardData.getData('text/html')
     const text = e.clipboardData.getData('text/plain')
@@ -140,7 +198,35 @@ export function RichTextEditor({
             {b.label}
           </button>
         ))}
+        {onImageUpload && (
+          <button
+            type="button"
+            title="Chèn ảnh (hoặc dán ảnh trực tiếp vào bài)"
+            aria-label="Chèn ảnh"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              saveRange() // giữ vị trí con trỏ trước khi mở hộp thoại chọn file
+            }}
+            onClick={() => fileRef.current?.click()}
+            className="admin-rte-btn"
+          >
+            🖼 Ảnh
+          </button>
+        )}
       </div>
+      {onImageUpload && (
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length) void uploadAndInsert(e.target.files)
+            e.target.value = '' // cho phép chọn lại cùng file
+          }}
+        />
+      )}
       <div
         ref={ref}
         contentEditable

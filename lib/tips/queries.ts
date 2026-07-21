@@ -1,6 +1,6 @@
 import 'server-only'
 import { createClient } from '@/lib/supabase/server'
-import { sanitizePassageHtml } from '@/lib/sanitize/passage-html'
+import { sanitizeTipHtml } from '@/lib/sanitize/tip-html'
 import { toTipArticle, type TipArticle, type TipRow } from '@/lib/tips/articles'
 
 // Cột public (KHÔNG body) cho danh sách/lưới.
@@ -32,7 +32,7 @@ export async function getPublishedTip(
     .maybeSingle()
   if (error || !data) return null
   const row = data as TipRow
-  return { article: toTipArticle(row), bodyHtml: sanitizePassageHtml(row.body_html) }
+  return { article: toTipArticle(row), bodyHtml: sanitizeTipHtml(row.body_html) }
 }
 
 // Bài liên quan (cùng kỹ năng, khác bài hiện tại).

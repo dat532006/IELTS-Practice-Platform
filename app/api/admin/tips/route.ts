@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminApi } from '@/lib/admin/guard'
-import { sanitizePassageHtml } from '@/lib/sanitize/passage-html'
+import { sanitizeTipHtml } from '@/lib/sanitize/tip-html'
 import { ok, fail } from '@/lib/api/response'
 import { TipBody } from '@/lib/tips/schema'
 
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       type: v.type,
       title: v.title,
       excerpt: v.excerpt,
-      body_html: sanitizePassageHtml(v.body_html),
+      body_html: sanitizeTipHtml(v.body_html),
       author: v.author,
       band: v.band,
       read_minutes: v.read_minutes,

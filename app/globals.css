@@ -183,6 +183,12 @@ body {
 .admin-rte-area li {
   margin: 2px 0;
 }
+.admin-rte-area img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  margin: 8px 0;
+}
 
 @media (max-width: 767px) {
   .admin-rte-btn {
@@ -241,4 +247,11 @@ body {
 }
 .tip-prose u {
   text-decoration: underline;
+}
+.tip-prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 14px;
+  margin: 20px auto;
 }
