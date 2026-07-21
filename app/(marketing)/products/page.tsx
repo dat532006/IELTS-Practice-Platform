@@ -63,7 +63,7 @@ export default async function ProductsPage({
 
       <div className="mt-[22px]">
         <Suspense fallback={null}>
-          <CatalogFilters />
+          <CatalogFilters total={total} />
         </Suspense>
       </div>
 
