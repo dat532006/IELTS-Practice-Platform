@@ -122,7 +122,7 @@ export function Header() {
                   <FishBone /> {coins ?? '—'}
                 </span>
                 <button onClick={logout} className="min-h-[44px] px-1 text-[14px] font-bold text-[#2A2740] transition-colors hover:text-[#5B43C7]">
-                  Đăng xuất
+                  Log out
                 </button>
                 <RouteNavLink
                   href="/account"
@@ -143,7 +143,7 @@ export function Header() {
                   inactiveClassName="text-[#2A2740] hover:text-[#5B43C7]"
                   match="exact"
                 >
-                  Đăng nhập
+                  Log in
                 </RouteNavLink>
                 <RouteNavLink
                   href="/register"
@@ -151,7 +151,7 @@ export function Header() {
                   activeClassName="ring-2 ring-[#6842D8] ring-offset-2"
                   match="exact"
                 >
-                  Bắt đầu miễn phí
+                  Start free
                 </RouteNavLink>
               </>
             )}
@@ -190,16 +190,16 @@ export function Header() {
                       <FishBone /> {coins ?? '—'} xương cá
                     </span>
                     <button onClick={logout} className="min-h-[44px] rounded-[10px] px-3 text-left text-[15px] font-bold text-[var(--text-danger)] hover:bg-[#FFF0F0]">
-                      Đăng xuất
+                      Log out
                     </button>
                   </div>
                 ) : (
                   <div className="grid gap-1 sm:grid-cols-2">
                     <RouteNavLink href="/login" onClick={() => setMenuOpen(false)} match="exact" className="flex min-h-[44px] items-center rounded-[10px] px-3 text-[15px] font-bold" activeClassName="bg-[#F0ECFF] text-[#5B43C7]" inactiveClassName="text-[#2A2740] hover:bg-[#F0ECFF]">
-                      Đăng nhập
+                      Log in
                     </RouteNavLink>
                     <RouteNavLink href="/register" onClick={() => setMenuOpen(false)} match="exact" className="flex min-h-[44px] items-center rounded-[10px] bg-[#7C5CE6] px-3 text-[15px] font-bold text-white hover:bg-[#6A48D6]">
-                      Bắt đầu miễn phí
+                      Start free
                     </RouteNavLink>
                   </div>
                 )}
