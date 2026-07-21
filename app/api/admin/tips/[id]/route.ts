@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminApi } from '@/lib/admin/guard'
-import { sanitizePassageHtml } from '@/lib/sanitize/passage-html'
+import { sanitizeTipHtml } from '@/lib/sanitize/tip-html'
 import { ok, fail } from '@/lib/api/response'
 import { TipBody } from '@/lib/tips/schema'
 
@@ -42,7 +42,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   for (const k of ['slug', 'skill', 'type', 'title', 'excerpt', 'author', 'band', 'read_minutes', 'sort_order'] as const) {
     if (v[k] !== undefined) patch[k] = v[k]
   }
-  if (v.body_html !== undefined) patch.body_html = sanitizePassageHtml(v.body_html)
+  if (v.body_html !== undefined) patch.body_html = sanitizeTipHtml(v.body_html)
   if (v.status !== undefined) {
     patch.status = v.status
     if (v.status === 'published' && cur.published_at == null) patch.published_at = new Date().toISOString()

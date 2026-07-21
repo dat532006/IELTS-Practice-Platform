@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useState } from 'react'
 import { RichTextEditor } from '@/components/admin/RichTextEditor'
+import { createClient } from '@/lib/supabase/client'
+import { sanitizeTipHtmlClient } from '@/lib/sanitize/passage-html-client'
 import { slugify, type TipSkill, type TipType } from '@/lib/tips/articles'
 
 // Form soạn/sửa bài Tips. Guard THẬT ở server (admin layout + /api/admin/tips requireAdmin); client chỉ gọi API.
@@ -56,10 +58,49 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
 
   const [phase, setPhase] = useState<'idle' | 'saving'>('idle')
   const [error, setError] = useState('')
+  const [imgMsg, setImgMsg] = useState('')
 
   function onTitle(v: string) {
     setTitle(v)
     if (!slugTouched) setSlug(slugify(v))
+  }
+
+  // Upload 1 ảnh qua /api/admin/media (bucket 'media' public) → trả public_url để chèn vào bài.
+  //   Cùng pipeline ảnh minh hoạ đề (AdminTestForm). Thiếu Storage → báo, không crash.
+  async function uploadImage(file: File): Promise<string | null> {
+    setImgMsg('Đang tải ảnh…')
+    try {
+      const r = await fetch('/api/admin/media', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'image', filename: file.name }),
+      })
+      const j = await r.json().catch(() => null)
+      if (!r.ok || !j?.data?.upload_url) {
+        setImgMsg(
+          j?.meta?.error_code === 'STORAGE_NOT_CONFIGURED'
+            ? '⚠️ Supabase Storage (bucket media) chưa cấu hình — chưa chèn được ảnh.'
+            : 'Không tạo được URL tải ảnh.',
+        )
+        return null
+      }
+      const { path, token, bucket, public_url } = j.data as {
+        path: string
+        token: string
+        bucket: string
+        public_url: string
+      }
+      const { error: upErr } = await createClient().storage.from(bucket).uploadToSignedUrl(path, token, file)
+      if (upErr) {
+        setImgMsg(`Tải ảnh thất bại: ${upErr.message}`)
+        return null
+      }
+      setImgMsg('✓ Đã chèn ảnh vào bài.')
+      return public_url
+    } catch {
+      setImgMsg('Lỗi kết nối khi tải ảnh.')
+      return null
+    }
   }
 
   async function save() {
@@ -187,9 +228,20 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
 
       <div className="mt-5">
         <span className={labelCls}>Nội dung bài viết</span>
+        <p className="mt-0.5 text-[12px] text-[var(--text-subtle)]">
+          Chèn ảnh bằng nút <b>🖼 Ảnh</b> hoặc dán ảnh trực tiếp (Ctrl+V) vào bài — như soạn Word.
+        </p>
         <div className="mt-1.5">
-          <RichTextEditor value={body} onChange={setBody} ariaLabel="Nội dung bài Tips" placeholder="Soạn nội dung bài viết…" />
+          <RichTextEditor
+            value={body}
+            onChange={setBody}
+            ariaLabel="Nội dung bài Tips"
+            placeholder="Soạn nội dung bài viết…"
+            sanitize={sanitizeTipHtmlClient}
+            onImageUpload={uploadImage}
+          />
         </div>
+        {imgMsg && <p className="mt-1.5 text-[12.5px] font-semibold text-[#5B43C7]">{imgMsg}</p>}
       </div>
 
       {error && (
