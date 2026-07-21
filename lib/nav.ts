@@ -9,6 +9,7 @@ export const MAIN_NAV: NavItem[] = [
   { label: 'Writing', href: '/products?skill=writing' },
   { label: 'Free tests', href: '/free' },
   { label: 'Prediction', href: '/prediction' },
+  { label: 'Tips', href: '/tips' },
   { label: 'Pricing', href: '/pricing' },
   { label: 'Speaking', href: '#', comingSoon: true },
 ]

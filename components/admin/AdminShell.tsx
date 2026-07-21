@@ -9,6 +9,7 @@ const ADMIN_NAV: ReadonlyArray<{ href: string; label: string; match?: 'exact' | 
   { href: '/admin', label: 'Dashboard', match: 'exact' },
   { href: '/admin/products', label: 'Sản phẩm' },
   { href: '/admin/tests', label: 'Đề thi' },
+  { href: '/admin/tips', label: 'Tips' },
   { href: '/admin/users', label: 'Người dùng' },
   { href: '/admin/activation-codes', label: 'Mã kích hoạt' },
   { href: '/admin/grants', label: 'Cấp quyền' },

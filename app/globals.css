@@ -190,3 +190,55 @@ body {
     height: 44px;
   }
 }
+
+/* Tips — thân bài (HTML admin soạn, đã sanitize) render qua dangerouslySetInnerHTML. */
+.tip-prose {
+  font-size: 17px;
+  line-height: 1.75;
+  color: #3a3550;
+}
+.tip-prose > :first-child {
+  margin-top: 0;
+}
+.tip-prose p {
+  margin: 0 0 20px;
+}
+.tip-prose h2 {
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #2a2740;
+  margin: 34px 0 14px;
+}
+.tip-prose h3 {
+  font-size: 19px;
+  font-weight: 800;
+  color: #2a2740;
+  margin: 26px 0 10px;
+}
+.tip-prose ul,
+.tip-prose ol {
+  margin: 0 0 20px;
+  padding-left: 22px;
+}
+.tip-prose ul {
+  list-style: disc;
+}
+.tip-prose ol {
+  list-style: decimal;
+}
+.tip-prose li {
+  margin: 0 0 10px;
+}
+.tip-prose strong,
+.tip-prose b {
+  font-weight: 800;
+  color: #2a2740;
+}
+.tip-prose em,
+.tip-prose i {
+  font-style: italic;
+}
+.tip-prose u {
+  text-decoration: underline;
+}

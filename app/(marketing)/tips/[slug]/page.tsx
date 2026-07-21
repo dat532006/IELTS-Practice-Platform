@@ -1,11 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { TIP_ARTICLES, TIP_SKILL, TIP_TYPE_LABEL, getTip, relatedTips } from '@/lib/tips/articles'
-
-export function generateStaticParams() {
-  return TIP_ARTICLES.map((a) => ({ slug: a.slug }))
-}
+import { TIP_SKILL, TIP_TYPE_LABEL } from '@/lib/tips/articles'
+import { getPublishedTip, relatedPublishedTips } from '@/lib/tips/queries'
 
 export async function generateMetadata({
   params,
@@ -13,18 +10,19 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>
 }): Promise<Metadata> {
   const { slug } = await params
-  const article = getTip(slug)
-  if (!article) return { title: 'Không tìm thấy bài viết' }
-  return { title: article.title, description: article.excerpt }
+  const found = await getPublishedTip(slug)
+  if (!found) return { title: 'Không tìm thấy bài viết' }
+  return { title: found.article.title, description: found.article.excerpt }
 }
 
 export default async function TipArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const article = getTip(slug)
-  if (!article) notFound()
+  const found = await getPublishedTip(slug)
+  if (!found) notFound()
+  const { article, bodyHtml } = found
 
   const sk = TIP_SKILL[article.skill]
-  const related = relatedTips(article)
+  const related = await relatedPublishedTips(article)
 
   return (
     <div className="mx-auto max-w-[760px] px-4 pb-20 text-[#2A2740]">
@@ -55,10 +53,13 @@ export default async function TipArticlePage({ params }: { params: Promise<{ slu
           </span>
           <div>
             <div className="text-[14.5px] font-extrabold">
-              {article.author} · {article.band}
+              {article.author}
+              {article.band && ` · ${article.band}`}
             </div>
             <div className="text-[12.5px] font-semibold text-[var(--text-subtle)]">
-              {article.date} · {article.read}
+              {article.date}
+              {article.date && ' · '}
+              {article.read}
             </div>
           </div>
         </div>
@@ -67,44 +68,16 @@ export default async function TipArticlePage({ params }: { params: Promise<{ slu
       {/* Ảnh minh hoạ (placeholder gradient) */}
       <div
         aria-hidden="true"
-        className="mt-[26px] flex aspect-[16/8] items-center justify-center rounded-[22px]"
+        className="mt-[26px] aspect-[16/8] rounded-[22px]"
         style={{ backgroundImage: sk.cover }}
       />
 
-      {/* Thân bài — NỘI DUNG MẪU (placeholder), Owner thay bài thật sau */}
-      <article className="mt-[30px] text-[17px] leading-[1.75] text-[#3A3550]">
-        <p className="mb-5 text-[18.5px] font-semibold leading-[1.7] text-[#2A2740]">{article.excerpt}</p>
-        <p className="mb-5">
-          Trước khi vào chi tiết, hãy nhớ nguyên tắc cốt lõi: giám khảo chấm theo{' '}
-          <em className="font-serif text-[#6A48D6] italic">tiêu chí</em>, không chấm theo cảm tính. Vì vậy mọi chiến
-          thuật dưới đây đều xoay quanh việc bám sát band descriptors và luyện tập có mục tiêu.
-        </p>
-        <h2 className="mb-3.5 mt-[34px] text-[23px] font-extrabold tracking-[-0.02em]">
-          Vì sao dạng này khiến nhiều bạn mất điểm
-        </h2>
-        <p className="mb-5">
-          Phần lớn lỗi sai không đến từ vốn từ mà đến từ cách đọc lướt sai chỗ, hiểu sai yêu cầu đề và quản lý thời gian
-          kém. Khi bạn hệ thống lại quy trình, tỉ lệ đúng tăng rõ rệt chỉ sau vài buổi luyện.
-        </p>
-        <div className="my-[26px] rounded-[16px] border border-dashed border-[#DDD3F2] bg-[#FAF8FF] p-[20px_22px]">
-          <div className="text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[#6A48D6]">Mẹo nhanh</div>
-          <p className="mt-2 text-[15.5px] leading-[1.6] text-[#4A445E]">
-            Gạch chân từ khoá định vị (tên riêng, số, năm) trước — chúng là “mỏ neo” giúp bạn quét đúng đoạn chứa đáp án
-            mà không phải đọc lại toàn bài.
-          </p>
-        </div>
-        <h2 className="mb-3.5 mt-[34px] text-[23px] font-extrabold tracking-[-0.02em]">Quy trình từng bước</h2>
-        <ol className="mb-5 list-decimal pl-[22px]">
-          <li className="mb-2.5">Đọc câu hỏi và xác định từ khoá không thể thay thế.</li>
-          <li className="mb-2.5">Quét (scan) đoạn văn để định vị vùng chứa thông tin.</li>
-          <li className="mb-2.5">Đọc kỹ (read closely) đúng vùng đó, đối chiếu nghĩa — không đối chiếu từ.</li>
-          <li className="mb-2.5">Quyết định dựa trên bằng chứng trong bài, không dựa vào kiến thức nền.</li>
-        </ol>
-        <p className="mb-5">
-          Luyện đúng quy trình này trên các bộ đề thi thật, mỗi ngày 1 passage, band của bạn sẽ ổn định hơn hẳn chỉ sau
-          2 tuần.
-        </p>
-      </article>
+      {/* Thân bài — HTML admin soạn (đã sanitize allowlist ở server). */}
+      {bodyHtml ? (
+        <article className="tip-prose mt-[30px]" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+      ) : (
+        <p className="mt-[30px] text-[15px] text-[var(--text-subtle)]">Nội dung bài viết đang được cập nhật.</p>
+      )}
 
       {/* Bài liên quan */}
       {related.length > 0 && (
