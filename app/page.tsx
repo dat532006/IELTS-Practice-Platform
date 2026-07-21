@@ -39,6 +39,7 @@ export const metadata: Metadata = {
 const PREDICTION: LandingProduct[] = [
   { title: 'Prediction 2026 Q3', skills: ['reading', 'listening'], attempts: 0, state: 'coming_soon', price: 120 },
   { title: 'Prediction 2026 Q4', skills: ['writing'], attempts: 0, state: 'coming_soon', price: 120 },
+  { title: 'Prediction 2026 Q5', skills: ['reading'], attempts: 0, state: 'coming_soon', price: 120 },
 ]
 
 // Mỗi hàng landing (Hot / Free / Prediction) LUÔN hiện đúng 3 card: lấy tối đa 3 item thật
@@ -67,14 +68,14 @@ const COIN_PACKS = [
 ]
 const vnd = (n: number) => n.toLocaleString('vi-VN')
 
-// FE-F04: HOT/FREE lấy từ catalog thật (RLS published-only) thay cho sample tĩnh + seed UUID.
-//   Thứ tự publish sớm nhất (created_at asc) — chỉ lấy tối đa 3; DB lỗi/trống → mảng rỗng
-//   rồi fillTo3() chèn card coming soon để hàng luôn đủ 3. Landing không 500.
+// FE-F04: HOT/FREE lấy từ catalog thật (RLS published-only). HOT = nhiều lượt làm nhất (sort='hot');
+//   FREE = đề free publish sớm nhất (created_at asc). Mỗi hàng tối đa 3; thiếu thì fillTo3() chèn
+//   card coming soon để luôn đủ 3. DB lỗi/trống → mảng rỗng, landing không 500.
 async function getLandingData(): Promise<{ hot: LandingProduct[]; free: LandingProduct[] }> {
   try {
     const supabase = await createClient()
     const [catalog, freeRes] = await Promise.all([
-      getProductCatalog(supabase, { sort: 'oldest', page_size: '3' }),
+      getProductCatalog(supabase, { sort: 'hot', page_size: '3' }),
       supabase
         .from('tests')
         .select('id, title, type, is_free, attempts_count, cover_image')
@@ -312,7 +313,7 @@ export default async function LandingPage() {
         <div className="row-header">
           <div>
             <h2 className="row-h2">Hot collections</h2>
-            <p className="row-sub">Explore our test packs</p>
+            <p className="row-sub">The most-attempted test packs</p>
           </div>
           <Link href="/products" className="row-link">
             View all →
@@ -440,7 +441,7 @@ export default async function LandingPage() {
           </Link>
         </div>
         <div className="cards-grid">
-          {fillTo3(PREDICTION, 30).map((p) => (
+          {PREDICTION.map((p) => (
             <LandingProductCard key={p.title} p={p} />
           ))}
         </div>

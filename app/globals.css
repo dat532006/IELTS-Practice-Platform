@@ -58,6 +58,13 @@ body {
   outline-offset: 3px;
 }
 
+/* Catalog filter select: focus ring chuyển sang wrapper (.focus-within) cho khớp design pill —
+   bỏ outline vuông tím lệch trên native select. Đặt SAU rule :focus-visible ở trên để thắng tie
+   (cùng specificity, cùng lớp unlayered → rule sau thắng). */
+.dcx-select:focus-visible {
+  outline: none;
+}
+
 .skip-link {
   position: fixed;
   top: 8px;
