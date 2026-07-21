@@ -41,6 +41,24 @@ const PREDICTION: LandingProduct[] = [
   { title: 'Prediction 2026 Q4', skills: ['writing'], attempts: 0, state: 'coming_soon', price: 120 },
 ]
 
+// Mỗi hàng landing (Hot / Free / Prediction) LUÔN hiện đúng 3 card: lấy tối đa 3 item thật
+// (đã sort publish sớm nhất), thiếu thì chèn card "coming soon" (VOL N) giống hàng Prediction.
+// startVol lệch nhau giữa các hàng để không trùng tên card giả trên cùng trang.
+const FILL_SKILLS = ['reading', 'listening', 'writing'] as const
+function fillTo3(items: LandingProduct[], startVol: number): LandingProduct[] {
+  const out = items.slice(0, 3)
+  for (let i = 0; out.length < 3; i++) {
+    out.push({
+      title: `VOL ${startVol + i}`,
+      skills: [FILL_SKILLS[i % FILL_SKILLS.length]],
+      attempts: 0,
+      state: 'coming_soon',
+      price: 0,
+    })
+  }
+  return out
+}
+
 // FE-F03: gói nạp coin khớp fixed-rate thật (1.000 VND = 1 coin, không bonus) — giá tính từ constant.
 const COIN_PACKS = [
   { name: 'Starter', coins: 60, note: 'Enough for one pack', popular: false },
@@ -50,17 +68,18 @@ const COIN_PACKS = [
 const vnd = (n: number) => n.toLocaleString('vi-VN')
 
 // FE-F04: HOT/FREE lấy từ catalog thật (RLS published-only) thay cho sample tĩnh + seed UUID.
-//   DB lỗi/trống → mảng rỗng, section tự ẩn — landing không 500.
+//   Thứ tự publish sớm nhất (created_at asc) — chỉ lấy tối đa 3; DB lỗi/trống → mảng rỗng
+//   rồi fillTo3() chèn card coming soon để hàng luôn đủ 3. Landing không 500.
 async function getLandingData(): Promise<{ hot: LandingProduct[]; free: LandingProduct[] }> {
   try {
     const supabase = await createClient()
     const [catalog, freeRes] = await Promise.all([
-      getProductCatalog(supabase, { sort: 'hot', page_size: '3' }),
+      getProductCatalog(supabase, { sort: 'oldest', page_size: '3' }),
       supabase
         .from('tests')
         .select('id, title, type, is_free, attempts_count, cover_image')
         .eq('is_free', true)
-        .order('attempts_count', { ascending: false })
+        .order('created_at', { ascending: true })
         .limit(3),
     ])
     const hot: LandingProduct[] = catalog.data.items.map((p) => ({
@@ -288,45 +307,41 @@ export default async function LandingPage() {
         <SkillTabs />
       </section>
 
-      {/* HOT COLLECTIONS — dữ liệu thật từ catalog (FE-F04); trống → ẩn section */}
-      {hot.length > 0 && (
-        <section className="section-row" style={{ padding: '70px 0 10px' }} id="hot">
-          <div className="row-header">
-            <div>
-              <h2 className="row-h2">Hot collections</h2>
-              <p className="row-sub">The most-attempted test packs</p>
-            </div>
-            <Link href="/products" className="row-link">
-              View all →
-            </Link>
+      {/* HOT COLLECTIONS — luôn đủ 3 card: 3 pack publish sớm nhất; thiếu thì chèn coming soon (VOL N) */}
+      <section className="section-row" style={{ padding: '70px 0 10px' }} id="hot">
+        <div className="row-header">
+          <div>
+            <h2 className="row-h2">Hot collections</h2>
+            <p className="row-sub">Explore our test packs</p>
           </div>
-          <div className="cards-grid">
-            {hot.map((p) => (
-              <LandingProductCard key={p.href ?? p.title} p={p} />
-            ))}
-          </div>
-        </section>
-      )}
+          <Link href="/products" className="row-link">
+            View all →
+          </Link>
+        </div>
+        <div className="cards-grid">
+          {fillTo3(hot, 10).map((p) => (
+            <LandingProductCard key={p.href ?? p.title} p={p} />
+          ))}
+        </div>
+      </section>
 
-      {/* FREE TESTS — đề free published thật (FE-F04); trống → ẩn section */}
-      {free.length > 0 && (
-        <section className="section-row" style={{ padding: '54px 0 10px' }} id="free">
-          <div className="row-header">
-            <div>
-              <h2 className="row-h2">Free tests</h2>
-              <p className="row-sub">Try them free — no purchase needed</p>
-            </div>
-            <Link href="/free" className="row-link">
-              All free tests →
-            </Link>
+      {/* FREE TESTS — luôn đủ 3 card: đề free publish sớm nhất; thiếu thì chèn coming soon (VOL N) */}
+      <section className="section-row" style={{ padding: '54px 0 10px' }} id="free">
+        <div className="row-header">
+          <div>
+            <h2 className="row-h2">Free tests</h2>
+            <p className="row-sub">Try them free — no purchase needed</p>
           </div>
-          <div className="cards-grid">
-            {free.map((p) => (
-              <LandingProductCard key={p.href ?? p.title} p={p} />
-            ))}
-          </div>
-        </section>
-      )}
+          <Link href="/free" className="row-link">
+            All free tests →
+          </Link>
+        </div>
+        <div className="cards-grid">
+          {fillTo3(free, 20).map((p) => (
+            <LandingProductCard key={p.href ?? p.title} p={p} />
+          ))}
+        </div>
+      </section>
 
       {/* AI WRITING */}
       <section className="ai-section">
@@ -425,7 +440,7 @@ export default async function LandingPage() {
           </Link>
         </div>
         <div className="cards-grid">
-          {PREDICTION.map((p) => (
+          {fillTo3(PREDICTION, 30).map((p) => (
             <LandingProductCard key={p.title} p={p} />
           ))}
         </div>
