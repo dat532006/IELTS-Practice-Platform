@@ -88,7 +88,9 @@ export async function getProductCatalog(
     const ordered =
       params.sort === 'hot'
         ? query.order('attempts_total', { ascending: false })
-        : query.order('created_at', { ascending: false })
+        : params.sort === 'oldest'
+          ? query.order('created_at', { ascending: true }) // publish sớm nhất trước (landing rows)
+          : query.order('created_at', { ascending: false })
     return ordered
       .order('sort_order', { ascending: true })
       .order('product_id', { ascending: true })
