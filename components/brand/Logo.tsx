@@ -23,7 +23,8 @@ export function Logo({
         <Mascot size={size} />
       </span>
       <span className={`font-extrabold tracking-[-0.02em] ${textClassName}`}>
-        <span className="text-[#7C5CE6]">IELTS</span>Practice
+        {/* #6A48D6 (deep) thay #7C5CE6 để chữ "IELTS" 17px đạt WCAG AA trên nền header. */}
+        <span className="text-[#6A48D6]">IELTS</span>Practice
       </span>
     </>
   )

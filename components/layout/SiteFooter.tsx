@@ -21,6 +21,7 @@ const COLS: { title: string; links: { label: string; href?: string }[] }[] = [
       { label: 'Free tests', href: '/free' },
       { label: 'Prediction', href: '/prediction' },
       { label: 'Hot collections', href: '/products' },
+      { label: 'Tips & Chiến thuật', href: '/tips' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'Giới thiệu', href: '/about' },
     ],
@@ -46,7 +47,7 @@ export function SiteFooter() {
           >
             <Mascot size={30} />
             <span>
-              <span className="text-[#7C5CE6]">IELTS</span>Practice
+              <span className="text-[#6A48D6]">IELTS</span>Practice
             </span>
           </Link>
           <p className="mt-3.5 max-w-[24em] text-sm leading-[1.6] text-[var(--text-muted)]">
