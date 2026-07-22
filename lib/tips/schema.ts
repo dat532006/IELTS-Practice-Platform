@@ -20,3 +20,8 @@ export const TipBody = z.object({
   status: z.enum(['draft', 'published']).default('draft'),
   sort_order: z.coerce.number().int().min(0).max(100000).default(0),
 })
+
+// Xoá hàng loạt: nhận mảng id (đã chọn ở bảng admin). Chặn body rỗng / quá cỡ.
+export const TipBulkDelete = z.object({
+  ids: z.array(z.string().uuid('id không hợp lệ')).min(1, 'Chọn ít nhất 1 bài').max(1000),
+})
