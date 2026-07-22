@@ -53,9 +53,23 @@ body {
   font-family: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-:is(a, button, input, select, textarea, [role='button'], [role='textbox'], [tabindex]):focus-visible {
+/* Focus ring — link / nút / phần tử tabindex: giữ hộp outline offset (chuẩn a11y, hợp nút bo góc). */
+:is(a, button, [role='button'], [tabindex]):focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
+}
+
+/* Ô nhập (input/select/textarea): focus ÔM sát viền (ring mềm bo theo border-radius) thay vì HỘP TÍM
+   lệch ra ngoài. Rule global unlayered nên thắng `outline-none` của Tailwind — trước đây vẽ hộp offset. */
+:is(input, select, textarea, [role='textbox']):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(124, 92, 230, 0.32);
+}
+
+/* Ô nhập TRONG SUỐT đặt trong khung icon (khung ngoài đã đổi màu viền khi focus-within): tắt ring trên
+   chính input để không vẽ vòng bên trong pill — chỉ khung ngoài báo focus. Khớp mọi field auth/search/… */
+:is(input, textarea).bg-transparent:focus-visible {
+  box-shadow: none;
 }
 
 .skip-link {
