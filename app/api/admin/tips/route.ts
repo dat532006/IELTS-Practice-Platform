@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminApi } from '@/lib/admin/guard'
 import { sanitizeTipHtml } from '@/lib/sanitize/tip-html'
 import { ok, fail } from '@/lib/api/response'
-import { TipBody } from '@/lib/tips/schema'
+import { TipBody, TipBulkDelete } from '@/lib/tips/schema'
 
 // POST /api/admin/tips — tạo bài Tips mới. LUẬT THÉP: requireAdmin TRƯỚC; body_html sanitize allowlist
 //   trước khi lưu; ghi qua service_role (bypass RLS). slug trùng → 409.
@@ -47,4 +47,29 @@ export async function POST(request: Request) {
     return fail('INTERNAL', 'Không tạo được bài viết', { status: 500 })
   }
   return ok({ id: (data as { id: string }).id, slug: (data as { slug: string }).slug })
+}
+
+// DELETE /api/admin/tips — xoá HÀNG LOẠT theo { ids: string[] }. requireAdmin + service_role, một câu .in().
+export async function DELETE(request: Request) {
+  const g = await requireAdminApi()
+  if (!g.ok) return g.res
+
+  let raw: unknown
+  try {
+    raw = await request.json()
+  } catch {
+    return fail('VALIDATION_ERROR', 'Body JSON không hợp lệ', { status: 400 })
+  }
+  const parsed = TipBulkDelete.safeParse(raw)
+  if (!parsed.success) {
+    return fail('VALIDATION_ERROR', parsed.error.issues[0]?.message ?? 'Dữ liệu không hợp lệ', { status: 400 })
+  }
+
+  const admin = createAdminClient()
+  const { error, count } = await admin
+    .from('tip_articles')
+    .delete({ count: 'exact' })
+    .in('id', parsed.data.ids)
+  if (error) return fail('INTERNAL', 'Không xoá được bài viết', { status: 500 })
+  return ok({ deleted: count ?? parsed.data.ids.length })
 }
