@@ -9,3 +9,8 @@ alter table public.tip_articles
 create index if not exists tip_articles_featured_idx
   on public.tip_articles (featured)
   where featured;
+
+-- Ảnh bìa/minh hoạ bài viết: URL ảnh công khai (bucket media). Rỗng/null → UI lùi về gradient theo kỹ năng.
+-- API validate URL qua isAllowedPublicMediaUrl (origin storage public) trước khi lưu — chống URL lạ/độc hại.
+alter table public.tip_articles
+  add column if not exists cover_image text;

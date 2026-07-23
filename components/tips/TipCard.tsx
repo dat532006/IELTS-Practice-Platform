@@ -10,11 +10,14 @@ export function TipCard({ article }: { article: TipArticle }) {
       className="group flex flex-col overflow-hidden rounded-[20px] border border-[#EEEAF3] bg-white shadow-[0_16px_34px_-24px_rgba(60,40,90,0.36)] transition hover:-translate-y-1 hover:shadow-[0_26px_50px_-26px_rgba(60,40,90,0.42)]"
     >
       <div
-        aria-hidden="true"
-        className="flex aspect-[16/9] items-end p-[15px]"
+        className="relative flex aspect-[16/9] items-end p-[15px]"
         style={{ backgroundImage: sk.cover }}
       >
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-black/45 px-[11px] py-[5px] text-[11px] font-extrabold uppercase tracking-[0.07em] text-white">
+        {article.coverImage && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={article.coverImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+        )}
+        <span className="relative inline-flex items-center gap-1.5 rounded-full bg-black/45 px-[11px] py-[5px] text-[11px] font-extrabold uppercase tracking-[0.07em] text-white">
           {sk.label} · {TIP_TYPE_LABEL[article.type]}
         </span>
       </div>

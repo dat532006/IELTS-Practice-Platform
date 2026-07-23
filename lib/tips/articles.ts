@@ -1,6 +1,8 @@
 // Tips blog — kiểu dữ liệu + meta trình bày + mapper từ hàng DB sang view model.
 // Bài viết lưu ở bảng public.tip_articles (migration 20260722000100); truy vấn ở lib/tips/queries.ts.
 
+import { isAllowedPublicMediaUrl } from '@/lib/storage/media-url'
+
 export type TipSkill = 'reading' | 'listening' | 'writing' | 'speaking'
 export type TipType = 'strategy' | 'qtype'
 
@@ -14,6 +16,7 @@ export type TipArticle = {
   author: string
   band: string
   featured: boolean
+  coverImage: string // URL ảnh bìa đã validate; '' nếu không có → UI dùng gradient
   initials: string
   date: string // ví dụ "18 Th7, 2026"
   read: string // ví dụ "8 phút đọc"
@@ -34,6 +37,7 @@ export type TipRow = {
   status?: string
   sort_order?: number
   featured?: boolean | null
+  cover_image?: string | null
   published_at: string | null
   created_at?: string | null
 }
@@ -93,6 +97,8 @@ export function toTipArticle(row: TipRow): TipArticle {
     author,
     band: row.band?.trim() || '',
     featured: row.featured ?? false,
+    // Defense-in-depth: chỉ lộ ảnh bìa nếu là URL storage public hợp lệ (đã validate lúc lưu, chặn lại lúc đọc).
+    coverImage: isAllowedPublicMediaUrl(row.cover_image) ? (row.cover_image as string) : '',
     initials: initialsOf(author),
     date: formatTipDate(row.published_at ?? row.created_at ?? null),
     read: `${row.read_minutes ?? 5} phút đọc`,

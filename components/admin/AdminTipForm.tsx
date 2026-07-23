@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { RichTextEditor } from '@/components/admin/RichTextEditor'
 import { createClient } from '@/lib/supabase/client'
 import { sanitizeTipHtmlClient } from '@/lib/sanitize/passage-html-client'
@@ -23,6 +23,7 @@ export type TipFormInitial = {
   status: 'draft' | 'published'
   sort_order: number
   featured: boolean
+  cover_image: string
 }
 
 const labelCls = 'block text-[12.5px] font-extrabold text-[#6A6480]'
@@ -56,52 +57,68 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
   const [status, setStatus] = useState<'draft' | 'published'>(initial?.status ?? 'draft')
   const [sortOrder, setSortOrder] = useState(String(initial?.sort_order ?? 0))
   const [featured, setFeatured] = useState(initial?.featured ?? false)
+  const [coverImage, setCoverImage] = useState(initial?.cover_image ?? '')
   const [body, setBody] = useState(initial?.body_html ?? '')
 
   const [phase, setPhase] = useState<'idle' | 'saving'>('idle')
   const [error, setError] = useState('')
   const [imgMsg, setImgMsg] = useState('')
+  const [coverMsg, setCoverMsg] = useState('')
+  const coverRef = useRef<HTMLInputElement>(null)
 
   function onTitle(v: string) {
     setTitle(v)
     if (!slugTouched) setSlug(slugify(v))
   }
 
-  // Upload 1 ảnh qua /api/admin/media (bucket 'media' public) → trả public_url để chèn vào bài.
-  //   Cùng pipeline ảnh minh hoạ đề (AdminTestForm). Thiếu Storage → báo, không crash.
+  // Upload lõi qua /api/admin/media (bucket 'media' public) → trả public_url. Cùng pipeline ảnh minh hoạ đề
+  //   (AdminTestForm). Thiếu Storage → throw thông điệp cụ thể để nơi gọi hiển thị.
+  async function uploadToMedia(file: File): Promise<string> {
+    const r = await fetch('/api/admin/media', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'image', filename: file.name }),
+    })
+    const j = await r.json().catch(() => null)
+    if (!r.ok || !j?.data?.upload_url) {
+      throw new Error(
+        j?.meta?.error_code === 'STORAGE_NOT_CONFIGURED'
+          ? '⚠️ Supabase Storage (bucket media) chưa cấu hình.'
+          : 'Không tạo được URL tải ảnh.',
+      )
+    }
+    const { path, token, bucket, public_url } = j.data as { path: string; token: string; bucket: string; public_url: string }
+    const { error: upErr } = await createClient().storage.from(bucket).uploadToSignedUrl(path, token, file)
+    if (upErr) throw new Error(`Tải ảnh thất bại: ${upErr.message}`)
+    return public_url
+  }
+
+  // Chèn ảnh INLINE trong bài (RichTextEditor gọi). Báo trạng thái qua imgMsg.
   async function uploadImage(file: File): Promise<string | null> {
     setImgMsg('Đang tải ảnh…')
     try {
-      const r = await fetch('/api/admin/media', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ kind: 'image', filename: file.name }),
-      })
-      const j = await r.json().catch(() => null)
-      if (!r.ok || !j?.data?.upload_url) {
-        setImgMsg(
-          j?.meta?.error_code === 'STORAGE_NOT_CONFIGURED'
-            ? '⚠️ Supabase Storage (bucket media) chưa cấu hình — chưa chèn được ảnh.'
-            : 'Không tạo được URL tải ảnh.',
-        )
-        return null
-      }
-      const { path, token, bucket, public_url } = j.data as {
-        path: string
-        token: string
-        bucket: string
-        public_url: string
-      }
-      const { error: upErr } = await createClient().storage.from(bucket).uploadToSignedUrl(path, token, file)
-      if (upErr) {
-        setImgMsg(`Tải ảnh thất bại: ${upErr.message}`)
-        return null
-      }
+      const url = await uploadToMedia(file)
       setImgMsg('✓ Đã chèn ảnh vào bài.')
-      return public_url
-    } catch {
-      setImgMsg('Lỗi kết nối khi tải ảnh.')
+      return url
+    } catch (e) {
+      setImgMsg(e instanceof Error ? e.message : 'Lỗi kết nối khi tải ảnh.')
       return null
+    }
+  }
+
+  // Ảnh bìa: chọn tệp → upload qua cùng pipeline → lưu URL vào state (payload gửi kèm khi Lưu).
+  async function onPickCover(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) return setCoverMsg('Vui lòng chọn tệp ảnh.')
+    setCoverMsg('Đang tải ảnh bìa…')
+    try {
+      const url = await uploadToMedia(file)
+      setCoverImage(url)
+      setCoverMsg('✓ Đã cập nhật ảnh bìa.')
+    } catch (err) {
+      setCoverMsg(err instanceof Error ? err.message : 'Lỗi khi tải ảnh bìa.')
     }
   }
 
@@ -123,6 +140,7 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
       status,
       sort_order: Number(sortOrder) || 0,
       featured,
+      cover_image: coverImage,
     }
     try {
       const r = await fetch(editing ? `/api/admin/tips/${initial!.id}` : '/api/admin/tips', {
@@ -242,6 +260,44 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
             </span>
           </span>
         </label>
+
+        <div className="md:col-span-2">
+          <span className={labelCls}>Ảnh bìa (minh hoạ)</span>
+          <p className="mt-0.5 text-[12px] text-[var(--text-subtle)]">
+            Hiện ở thẻ bài và ô nổi bật. Bỏ trống → dùng nền gradient theo kỹ năng.
+          </p>
+          <input ref={coverRef} type="file" accept="image/*" hidden onChange={onPickCover} />
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <div className="flex h-[68px] w-[120px] flex-none items-center justify-center overflow-hidden rounded-[10px] border border-[#E4DEEE] bg-[#FBFAFF]">
+              {coverImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={coverImage} alt="Xem trước ảnh bìa" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-[11px] font-semibold text-[var(--text-subtle)]">Chưa có ảnh</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => coverRef.current?.click()}
+              className="rounded-[10px] border border-[#E4DEEE] bg-white px-3.5 py-2 text-[13px] font-bold text-[#3D3654] transition hover:border-[#CCC3DC]"
+            >
+              {coverImage ? 'Đổi ảnh bìa' : 'Tải ảnh bìa'}
+            </button>
+            {coverImage && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCoverImage('')
+                  setCoverMsg('Đã gỡ ảnh bìa (sẽ dùng gradient).')
+                }}
+                className="rounded-[10px] border border-rose-200 bg-white px-3.5 py-2 text-[13px] font-bold text-rose-600 transition hover:bg-rose-50"
+              >
+                Gỡ
+              </button>
+            )}
+          </div>
+          {coverMsg && <p className="mt-1.5 text-[12.5px] font-semibold text-[#5B43C7]">{coverMsg}</p>}
+        </div>
       </div>
 
       <div className="mt-5">

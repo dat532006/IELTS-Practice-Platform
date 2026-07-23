@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminApi } from '@/lib/admin/guard'
 import { sanitizeTipHtml } from '@/lib/sanitize/tip-html'
+import { isAllowedPublicMediaUrl } from '@/lib/storage/media-url'
 import { ok, fail } from '@/lib/api/response'
 import { TipBody, TipBulkDelete } from '@/lib/tips/schema'
 
@@ -22,6 +23,10 @@ export async function POST(request: Request) {
   }
   const v = parsed.data
 
+  // Ảnh bìa: rỗng → null; có giá trị nhưng không phải URL storage public hợp lệ → chặn (chống URL lạ/độc hại).
+  const cover = v.cover_image ? (isAllowedPublicMediaUrl(v.cover_image) ? v.cover_image : null) : null
+  if (v.cover_image && cover === null) return fail('VALIDATION_ERROR', 'Ảnh bìa không hợp lệ', { status: 400 })
+
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('tip_articles')
@@ -38,6 +43,7 @@ export async function POST(request: Request) {
       status: v.status,
       sort_order: v.sort_order,
       featured: v.featured,
+      cover_image: cover,
       published_at: v.status === 'published' ? new Date().toISOString() : null,
     })
     .select('id, slug')
