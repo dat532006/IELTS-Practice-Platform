@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useRef, useState } from 'react'
 import { TipRichEditor } from '@/components/admin/TipRichEditor'
+import { TipPreviewModal } from '@/components/admin/TipPreviewModal'
 import { createClient } from '@/lib/supabase/client'
 import { slugify, type TipSkill, type TipType } from '@/lib/tips/articles'
 
@@ -65,6 +66,7 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
   const [error, setError] = useState('')
   const [imgMsg, setImgMsg] = useState('')
   const [coverMsg, setCoverMsg] = useState('')
+  const [previewOpen, setPreviewOpen] = useState(false)
   const coverRef = useRef<HTMLInputElement>(null)
 
   function onTitle(v: string) {
@@ -340,7 +342,7 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
         </p>
       )}
 
-      <div className="mt-5 flex items-center gap-3">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={save}
@@ -349,10 +351,30 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
         >
           {phase === 'saving' ? 'Đang lưu…' : coverBusy ? 'Đang tải ảnh…' : editing ? 'Lưu thay đổi' : 'Tạo bài viết'}
         </button>
+        <button
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+          className="rounded-[11px] border border-[#E4DEEE] bg-white px-5 py-3 text-[14px] font-bold text-[#3D3654] transition hover:border-[#CCC3DC]"
+        >
+          👁 Xem trước
+        </button>
         <Link href="/admin/tips" className="text-sm font-semibold text-[var(--text-muted)] underline">
           Huỷ
         </Link>
       </div>
+
+      <TipPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title={title}
+        skill={skill}
+        type={type}
+        author={author}
+        band={band}
+        readMinutes={Number(readMinutes) || 5}
+        coverImage={coverPreview || coverImage}
+        body={body}
+      />
     </div>
   )
 }
