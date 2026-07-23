@@ -15,6 +15,14 @@ import { TableCell } from '@tiptap/extension-table-cell'
 //   Passage đề thi vẫn dùng RichTextEditor cũ (không đổi). Xuất HTML → server sanitizeTipHtml (chốt bảo mật)
 //   dọn lại lúc lưu + lúc render public. Ảnh upload qua onImageUpload (bucket 'media', src storage public).
 
+// Gộp các danh sách cùng loại LIỀN KỀ (</ol><ol> → nối). Nguồn Word/PDF hay tách mỗi mục thành 1 <ol>
+//   → mỗi list đánh số lại từ 1. Chỉ gộp khi thực sự sát nhau (không có nội dung ở giữa) nên an toàn.
+export function mergeAdjacentLists(html: string): string {
+  return html
+    .replace(/<\/ol>\s*<ol(?:\s[^>]*)?>/gi, '')
+    .replace(/<\/ul>\s*<ul(?:\s[^>]*)?>/gi, '')
+}
+
 // Ảnh có thuộc tính width (%/px) để chỉnh cỡ như Word — render thành style="width:…".
 const SizableImage = Image.extend({
   addAttributes() {
@@ -65,6 +73,9 @@ export function TipRichEditor({ value, onChange, ariaLabel, placeholder, onImage
     content: value || '',
     editorProps: {
       attributes: { role: 'textbox', 'aria-multiline': 'true', 'aria-label': ariaLabel },
+      // Gộp các <ol>/<ul> LIỀN KỀ khi dán: Word/PDF hay xuất mỗi mục thành 1 <ol> riêng → nếu để nguyên thì
+      //   mỗi list tự đánh lại từ 1 (toàn "1."). Gộp lại → 1 danh sách đánh số 1,2,3 đúng.
+      transformPastedHTML: (html) => mergeAdjacentLists(html),
       // Dán/kéo-thả ẢNH → upload rồi chèn (thay vì nhúng base64).
       handlePaste: (_view, event) => handleImageEvent(event.clipboardData?.files),
       handleDrop: (_view, event) => handleImageEvent((event as DragEvent).dataTransfer?.files),
