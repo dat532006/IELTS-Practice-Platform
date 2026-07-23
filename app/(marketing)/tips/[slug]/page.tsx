@@ -65,12 +65,22 @@ export default async function TipArticlePage({ params }: { params: Promise<{ slu
         </div>
       </div>
 
-      {/* Ảnh minh hoạ (placeholder gradient) */}
-      <div
-        aria-hidden="true"
-        className="mt-[26px] aspect-[16/8] rounded-[22px]"
-        style={{ backgroundImage: sk.cover }}
-      />
+      {/* Ảnh minh hoạ: ảnh bìa admin đặt (nếu có) — không thì lùi về gradient theo kỹ năng. */}
+      {article.coverImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={article.coverImage}
+          alt=""
+          aria-hidden="true"
+          className="mt-[26px] aspect-[16/8] w-full rounded-[22px] object-cover"
+        />
+      ) : (
+        <div
+          aria-hidden="true"
+          className="mt-[26px] aspect-[16/8] rounded-[22px]"
+          style={{ backgroundImage: sk.cover }}
+        />
+      )}
 
       {/* Thân bài — HTML admin soạn (đã sanitize allowlist ở server). */}
       {bodyHtml ? (
