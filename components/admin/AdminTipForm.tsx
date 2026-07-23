@@ -58,6 +58,8 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
   const [sortOrder, setSortOrder] = useState(String(initial?.sort_order ?? 0))
   const [featured, setFeatured] = useState(initial?.featured ?? false)
   const [coverImage, setCoverImage] = useState(initial?.cover_image ?? '')
+  const [coverPreview, setCoverPreview] = useState('') // objectURL local hiện NGAY trước khi upload xong
+  const [coverBusy, setCoverBusy] = useState(false)
   const [body, setBody] = useState(initial?.body_html ?? '')
 
   const [phase, setPhase] = useState<'idle' | 'saving'>('idle')
@@ -106,12 +108,15 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
     }
   }
 
-  // Ảnh bìa: chọn tệp → upload qua cùng pipeline → lưu URL vào state (payload gửi kèm khi Lưu).
+  // Ảnh bìa: chọn tệp → PREVIEW cục bộ ngay (trước khi upload) → upload nền → lưu URL thật vào state.
   async function onPickCover(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
     if (!file.type.startsWith('image/')) return setCoverMsg('Vui lòng chọn tệp ảnh.')
+    const localUrl = URL.createObjectURL(file) // xem trước ngay lập tức, không chờ mạng
+    setCoverPreview(localUrl)
+    setCoverBusy(true)
     setCoverMsg('Đang tải ảnh bìa…')
     try {
       const url = await uploadToMedia(file)
@@ -119,6 +124,10 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
       setCoverMsg('✓ Đã cập nhật ảnh bìa.')
     } catch (err) {
       setCoverMsg(err instanceof Error ? err.message : 'Lỗi khi tải ảnh bìa.')
+    } finally {
+      URL.revokeObjectURL(localUrl)
+      setCoverPreview('')
+      setCoverBusy(false)
     }
   }
 
@@ -268,29 +277,37 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
           </p>
           <input ref={coverRef} type="file" accept="image/*" hidden onChange={onPickCover} />
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <div className="flex h-[68px] w-[120px] flex-none items-center justify-center overflow-hidden rounded-[10px] border border-[#E4DEEE] bg-[#FBFAFF]">
-              {coverImage ? (
+            <div className="relative flex h-[68px] w-[120px] flex-none items-center justify-center overflow-hidden rounded-[10px] border border-[#E4DEEE] bg-[#FBFAFF]">
+              {coverPreview || coverImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={coverImage} alt="Xem trước ảnh bìa" className="h-full w-full object-cover" />
+                <img src={coverPreview || coverImage} alt="Xem trước ảnh bìa" className="h-full w-full object-cover" />
               ) : (
                 <span className="text-[11px] font-semibold text-[var(--text-subtle)]">Chưa có ảnh</span>
+              )}
+              {coverBusy && (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[11px] font-bold text-white">
+                  Đang tải…
+                </span>
               )}
             </div>
             <button
               type="button"
+              disabled={coverBusy}
               onClick={() => coverRef.current?.click()}
-              className="rounded-[10px] border border-[#E4DEEE] bg-white px-3.5 py-2 text-[13px] font-bold text-[#3D3654] transition hover:border-[#CCC3DC]"
+              className="rounded-[10px] border border-[#E4DEEE] bg-white px-3.5 py-2 text-[13px] font-bold text-[#3D3654] transition hover:border-[#CCC3DC] disabled:opacity-50"
             >
               {coverImage ? 'Đổi ảnh bìa' : 'Tải ảnh bìa'}
             </button>
-            {coverImage && (
+            {(coverImage || coverPreview) && (
               <button
                 type="button"
+                disabled={coverBusy}
                 onClick={() => {
                   setCoverImage('')
+                  setCoverPreview('')
                   setCoverMsg('Đã gỡ ảnh bìa (sẽ dùng gradient).')
                 }}
-                className="rounded-[10px] border border-rose-200 bg-white px-3.5 py-2 text-[13px] font-bold text-rose-600 transition hover:bg-rose-50"
+                className="rounded-[10px] border border-rose-200 bg-white px-3.5 py-2 text-[13px] font-bold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
               >
                 Gỡ
               </button>
@@ -328,10 +345,10 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
         <button
           type="button"
           onClick={save}
-          disabled={phase === 'saving'}
+          disabled={phase === 'saving' || coverBusy}
           className="rounded-[11px] bg-[#7C5CE6] px-5 py-3 text-[14.5px] font-bold text-white shadow-[0_12px_24px_-10px_rgba(124,92,230,0.45)] transition hover:bg-[#6A48D6] disabled:cursor-not-allowed disabled:bg-[#D8D2E4]"
         >
-          {phase === 'saving' ? 'Đang lưu…' : editing ? 'Lưu thay đổi' : 'Tạo bài viết'}
+          {phase === 'saving' ? 'Đang lưu…' : coverBusy ? 'Đang tải ảnh…' : editing ? 'Lưu thay đổi' : 'Tạo bài viết'}
         </button>
         <Link href="/admin/tips" className="text-sm font-semibold text-[var(--text-muted)] underline">
           Huỷ
