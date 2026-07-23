@@ -3,9 +3,8 @@
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useRef, useState } from 'react'
-import { RichTextEditor } from '@/components/admin/RichTextEditor'
+import { TipRichEditor } from '@/components/admin/TipRichEditor'
 import { createClient } from '@/lib/supabase/client'
-import { sanitizeTipHtmlClient } from '@/lib/sanitize/passage-html-client'
 import { slugify, type TipSkill, type TipType } from '@/lib/tips/articles'
 
 // Form soạn/sửa bài Tips. Guard THẬT ở server (admin layout + /api/admin/tips requireAdmin); client chỉ gọi API.
@@ -320,15 +319,15 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
       <div className="mt-5">
         <span className={labelCls}>Nội dung bài viết</span>
         <p className="mt-0.5 text-[12px] text-[var(--text-subtle)]">
-          Chèn ảnh bằng nút <b>🖼 Ảnh</b> hoặc dán ảnh trực tiếp (Ctrl+V) vào bài — như soạn Word.
+          Soạn như Word: định dạng, <b>bảng</b>, <b>liên kết</b>, chèn ảnh (nút <b>🖼 Ảnh</b> hoặc dán/kéo-thả ảnh),
+          chỉnh cỡ ảnh, hoàn tác (Ctrl+Z).
         </p>
         <div className="mt-1.5">
-          <RichTextEditor
+          <TipRichEditor
             value={body}
             onChange={setBody}
             ariaLabel="Nội dung bài Tips"
             placeholder="Soạn nội dung bài viết…"
-            sanitize={sanitizeTipHtmlClient}
             onImageUpload={uploadImage}
           />
         </div>
