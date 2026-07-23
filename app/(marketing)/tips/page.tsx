@@ -12,7 +12,8 @@ export const metadata: Metadata = {
 
 export default async function TipsPage() {
   const articles = await listPublishedTips()
-  const featured = articles[0]
+  // listPublishedTips xếp featured lên đầu → bài đầu là "Bài nổi bật"; phần còn lại vào lưới (không trùng).
+  const [featured, ...rest] = articles
   const fsk = featured ? TIP_SKILL[featured.skill] : null
 
   return (
@@ -85,8 +86,8 @@ export default async function TipsPage() {
             </Link>
           )}
 
-          {/* Lọc + lưới bài viết */}
-          <TipsExplorer articles={articles} />
+          {/* Lọc + lưới bài viết (đã trừ bài nổi bật để không hiện trùng) */}
+          {rest.length > 0 && <TipsExplorer articles={rest} />}
         </>
       )}
     </div>

@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       read_minutes: v.read_minutes,
       status: v.status,
       sort_order: v.sort_order,
+      featured: v.featured,
       published_at: v.status === 'published' ? new Date().toISOString() : null,
     })
     .select('id, slug')
@@ -46,7 +47,10 @@ export async function POST(request: Request) {
     if (error.code === '23505') return fail('VALIDATION_ERROR', 'slug đã tồn tại — chọn slug khác', { status: 409 })
     return fail('INTERNAL', 'Không tạo được bài viết', { status: 500 })
   }
-  return ok({ id: (data as { id: string }).id, slug: (data as { slug: string }).slug })
+  const created = data as { id: string; slug: string }
+  // Chỉ 1 bài nổi bật: nếu bài mới featured → bỏ featured ở tất cả bài khác.
+  if (v.featured) await admin.from('tip_articles').update({ featured: false }).eq('featured', true).neq('id', created.id)
+  return ok({ id: created.id, slug: created.slug })
 }
 
 // DELETE /api/admin/tips — xoá HÀNG LOẠT theo { ids: string[] }. requireAdmin + service_role, một câu .in().

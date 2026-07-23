@@ -13,6 +13,7 @@ export type TipArticle = {
   excerpt: string
   author: string
   band: string
+  featured: boolean
   initials: string
   date: string // ví dụ "18 Th7, 2026"
   read: string // ví dụ "8 phút đọc"
@@ -32,6 +33,7 @@ export type TipRow = {
   read_minutes: number | null
   status?: string
   sort_order?: number
+  featured?: boolean | null
   published_at: string | null
   created_at?: string | null
 }
@@ -90,6 +92,7 @@ export function toTipArticle(row: TipRow): TipArticle {
     excerpt: row.excerpt ?? '',
     author,
     band: row.band?.trim() || '',
+    featured: row.featured ?? false,
     initials: initialsOf(author),
     date: formatTipDate(row.published_at ?? row.created_at ?? null),
     read: `${row.read_minutes ?? 5} phút đọc`,

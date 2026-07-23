@@ -4,15 +4,17 @@ import { sanitizeTipHtml } from '@/lib/sanitize/tip-html'
 import { toTipArticle, type TipArticle, type TipRow } from '@/lib/tips/articles'
 
 // Cột public (KHÔNG body) cho danh sách/lưới.
-const LIST_COLS = 'slug, skill, type, title, excerpt, author, band, read_minutes, published_at, created_at'
+const LIST_COLS = 'slug, skill, type, title, excerpt, author, band, featured, read_minutes, published_at, created_at'
 
 // Danh sách bài Tips đã published. RLS (anon/authenticated) đã giới hạn published; vẫn lọc tường minh.
+// Xếp featured (nổi bật) LÊN ĐẦU → trang /tips lấy articles[0] làm hero, phần còn lại vào lưới.
 export async function listPublishedTips(): Promise<TipArticle[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('tip_articles')
     .select(LIST_COLS)
     .eq('status', 'published')
+    .order('featured', { ascending: false })
     .order('sort_order', { ascending: true })
     .order('published_at', { ascending: false, nullsFirst: false })
   if (error || !data) return [] // bảng chưa migrate / lỗi tạm → trang vẫn render (rỗng), không 500

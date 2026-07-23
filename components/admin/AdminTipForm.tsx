@@ -22,6 +22,7 @@ export type TipFormInitial = {
   read_minutes: number
   status: 'draft' | 'published'
   sort_order: number
+  featured: boolean
 }
 
 const labelCls = 'block text-[12.5px] font-extrabold text-[#6A6480]'
@@ -54,6 +55,7 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
   const [readMinutes, setReadMinutes] = useState(String(initial?.read_minutes ?? 5))
   const [status, setStatus] = useState<'draft' | 'published'>(initial?.status ?? 'draft')
   const [sortOrder, setSortOrder] = useState(String(initial?.sort_order ?? 0))
+  const [featured, setFeatured] = useState(initial?.featured ?? false)
   const [body, setBody] = useState(initial?.body_html ?? '')
 
   const [phase, setPhase] = useState<'idle' | 'saving'>('idle')
@@ -120,6 +122,7 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
       read_minutes: Number(readMinutes) || 5,
       status,
       sort_order: Number(sortOrder) || 0,
+      featured,
     }
     try {
       const r = await fetch(editing ? `/api/admin/tips/${initial!.id}` : '/api/admin/tips', {
@@ -223,6 +226,21 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
             <option value="draft">Nháp (chưa hiện)</option>
             <option value="published">Đã đăng (public)</option>
           </select>
+        </label>
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-[12px] border border-[#E4DEEE] bg-[#FBFAFF] p-3.5 md:col-span-2">
+          <input
+            type="checkbox"
+            checked={featured}
+            onChange={(e) => setFeatured(e.target.checked)}
+            className="mt-0.5 h-[18px] w-[18px] flex-none cursor-pointer accent-[#7C5CE6]"
+          />
+          <span>
+            <span className="block text-[13px] font-extrabold text-[#2A2740]">★ Đặt làm Bài nổi bật</span>
+            <span className="mt-0.5 block text-[12px] font-semibold text-[var(--text-subtle)]">
+              Hiện ở ô lớn đầu trang /tips. Chỉ 1 bài nổi bật — chọn bài này sẽ tự bỏ nổi bật ở bài khác. (Bài phải ở trạng thái “Đã đăng”.)
+            </span>
+          </span>
         </label>
       </div>
 
