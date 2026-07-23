@@ -13,6 +13,7 @@ export type AdminTipRow = {
   title: string
   status: 'draft' | 'published'
   sort_order: number
+  featured: boolean
 }
 
 export function AdminTipsList({ rows }: { rows: AdminTipRow[] }) {
@@ -200,9 +201,14 @@ export function AdminTipsList({ rows }: { rows: AdminTipRow[] }) {
                       />
                     </td>
                     <td className="py-3 pr-3">
-                      <Link href={`/admin/tips/${row.id}`} className="font-bold text-[#2A2740] hover:text-[#6A48D6]">
-                        {row.title}
-                      </Link>
+                      <span className="flex items-center gap-2">
+                        <Link href={`/admin/tips/${row.id}`} className="font-bold text-[#2A2740] hover:text-[#6A48D6]">
+                          {row.title}
+                        </Link>
+                        {row.featured && (
+                          <span className="rounded-full bg-[#F0ECFF] px-2 py-0.5 text-[11px] font-extrabold text-[#6A48D6]">★ Nổi bật</span>
+                        )}
+                      </span>
                       <div className="text-[12px] font-semibold text-[var(--text-subtle)]">/tips/{row.slug}</div>
                     </td>
                     <td className="py-3 pr-3">

@@ -12,7 +12,8 @@ export const metadata: Metadata = {
 
 export default async function TipsPage() {
   const articles = await listPublishedTips()
-  const featured = articles[0]
+  // listPublishedTips xếp featured lên đầu → bài đầu là "Bài nổi bật"; phần còn lại vào lưới (không trùng).
+  const [featured, ...rest] = articles
   const fsk = featured ? TIP_SKILL[featured.skill] : null
 
   return (
@@ -45,14 +46,21 @@ export default async function TipsPage() {
               className="group mt-8 grid overflow-hidden rounded-[26px] border border-[#EEEAF3] bg-white shadow-[0_26px_60px_-34px_rgba(60,40,90,0.5)] transition hover:shadow-[0_30px_64px_-32px_rgba(60,40,90,0.55)] md:grid-cols-[1.05fr_0.95fr]"
             >
               <div
-                aria-hidden="true"
-                className="relative flex min-h-[240px] items-end p-[30px]"
+                className="relative flex min-h-[240px] items-end overflow-hidden p-[30px]"
                 style={{ backgroundImage: 'linear-gradient(140deg,#8A6BF0 0%,#6A48D6 60%,#F2724E 130%)' }}
               >
-                <span className="absolute left-[26px] top-6 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-white backdrop-blur-[4px]">
+                {featured.coverImage && (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={featured.coverImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+                    {/* Lớp phủ tối để nhãn/chữ trắng luôn đọc được trên ảnh bất kỳ */}
+                    <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(140deg,rgba(42,39,64,0.55),rgba(42,39,64,0.2))]" />
+                  </>
+                )}
+                <span className="absolute left-[26px] top-6 z-10 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-white backdrop-blur-[4px]">
                   ★ Bài nổi bật
                 </span>
-                <span className="inline-flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-[0.06em] text-white/90">
+                <span className="relative z-10 inline-flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-[0.06em] text-white/90">
                   <span className="inline-block h-[9px] w-[9px] rotate-45 rounded-[3px] bg-[#FFD9C7]" />
                   {fsk.label} · {TIP_TYPE_LABEL[featured.type]}
                 </span>
@@ -85,8 +93,8 @@ export default async function TipsPage() {
             </Link>
           )}
 
-          {/* Lọc + lưới bài viết */}
-          <TipsExplorer articles={articles} />
+          {/* Lọc + lưới bài viết (đã trừ bài nổi bật để không hiện trùng) */}
+          {rest.length > 0 && <TipsExplorer articles={rest} />}
         </>
       )}
     </div>

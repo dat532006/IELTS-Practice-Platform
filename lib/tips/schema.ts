@@ -19,6 +19,8 @@ export const TipBody = z.object({
   read_minutes: z.coerce.number().int().min(1).max(120).default(5),
   status: z.enum(['draft', 'published']).default('draft'),
   sort_order: z.coerce.number().int().min(0).max(100000).default(0),
+  featured: z.boolean().default(false),
+  cover_image: z.string().trim().max(600).default(''), // URL ảnh bìa; API validate qua isAllowedPublicMediaUrl
 })
 
 // Xoá hàng loạt: nhận mảng id (đã chọn ở bảng admin). Chặn body rỗng / quá cỡ.

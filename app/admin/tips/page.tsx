@@ -8,7 +8,8 @@ export default async function AdminTipsPage() {
   const admin = createAdminClient()
   const { data } = await admin
     .from('tip_articles')
-    .select('id, slug, skill, type, title, status, sort_order')
+    .select('id, slug, skill, type, title, status, sort_order, featured')
+    .order('featured', { ascending: false })
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
 

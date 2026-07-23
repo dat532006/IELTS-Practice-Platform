@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminApi } from '@/lib/admin/guard'
 import { sanitizeTipHtml } from '@/lib/sanitize/tip-html'
+import { isAllowedPublicMediaUrl } from '@/lib/storage/media-url'
 import { ok, fail } from '@/lib/api/response'
 import { TipBody } from '@/lib/tips/schema'
 
@@ -39,10 +40,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const cur = current as { status: string; published_at: string | null }
   const patch: Record<string, unknown> = {}
-  for (const k of ['slug', 'skill', 'type', 'title', 'excerpt', 'author', 'band', 'read_minutes', 'sort_order'] as const) {
+  for (const k of ['slug', 'skill', 'type', 'title', 'excerpt', 'author', 'band', 'read_minutes', 'sort_order', 'featured'] as const) {
     if (v[k] !== undefined) patch[k] = v[k]
   }
   if (v.body_html !== undefined) patch.body_html = sanitizeTipHtml(v.body_html)
+  if (v.cover_image !== undefined) {
+    // '' → gỡ ảnh bìa (null). Có giá trị nhưng URL không hợp lệ → chặn.
+    if (v.cover_image === '') patch.cover_image = null
+    else if (isAllowedPublicMediaUrl(v.cover_image)) patch.cover_image = v.cover_image
+    else return fail('VALIDATION_ERROR', 'Ảnh bìa không hợp lệ', { status: 400 })
+  }
   if (v.status !== undefined) {
     patch.status = v.status
     if (v.status === 'published' && cur.published_at == null) patch.published_at = new Date().toISOString()
@@ -54,6 +61,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (error.code === '23505') return fail('VALIDATION_ERROR', 'slug đã tồn tại — chọn slug khác', { status: 409 })
     return fail('INTERNAL', 'Không cập nhật được bài viết', { status: 500 })
   }
+  // Chỉ 1 bài nổi bật: nếu bài này set featured=true → bỏ featured ở tất cả bài khác.
+  if (v.featured === true) await admin.from('tip_articles').update({ featured: false }).eq('featured', true).neq('id', id)
   return ok({ id: (data as { id: string }).id, slug: (data as { slug: string }).slug })
 }
 
