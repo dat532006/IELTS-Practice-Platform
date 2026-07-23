@@ -47,5 +47,9 @@ const OPTIONS: sanitizeHtml.IOptions = {
 
 export function sanitizeTipHtml(html: unknown): string {
   if (typeof html !== 'string' || html.trim() === '') return ''
-  return sanitizeHtml(html, OPTIONS)
+  const clean = sanitizeHtml(html, OPTIONS)
+  // Gộp <ol>/<ul> LIỀN KỀ: nội dung dán từ Word/PDF hay tách mỗi mục thành 1 <ol> riêng → mỗi list tự đánh
+  //   lại số từ 1 (hiển thị toàn "1."). Nối các list sát nhau → đánh số liên tục 1,2,3. Chạy cả lúc lưu lẫn
+  //   lúc render public nên bài đã lưu sai trước đó cũng tự sửa.
+  return clean.replace(/<\/ol>\s*<ol(?:\s[^>]*)?>/gi, '').replace(/<\/ul>\s*<ul(?:\s[^>]*)?>/gi, '')
 }
