@@ -30,7 +30,7 @@ const OPTIONS: sanitizeHtml.IOptions = {
     '*': {
       'text-align': [/^(left|right|center|justify)$/],
       'text-indent': [/^-?\d+(\.\d+)?(px|em|rem|%)$/],
-      width: [/^\d{1,3}(\.\d+)?(px|%|em|rem)$/],
+      width: [/^\d{1,4}(\.\d+)?(px|%|em|rem)$/],
       'min-width': [/^\d{1,4}(\.\d+)?px$/],
     },
   },

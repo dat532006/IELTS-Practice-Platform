@@ -1,7 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useRef } from 'react'
-import { useEditor, useEditorState, EditorContent, type Editor } from '@tiptap/react'
+import {
+  useEditor,
+  useEditorState,
+  EditorContent,
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
+  type Editor,
+  type NodeViewProps,
+} from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import TextAlign from '@tiptap/extension-text-align'
@@ -23,6 +31,53 @@ export function mergeAdjacentLists(html: string): string {
     .replace(/<\/ul>\s*<ul(?:\s[^>]*)?>/gi, '')
 }
 
+// NodeView ảnh: KÉO GÓC để co giãn như Word. Lưu width theo % chiều rộng cột → responsive trên mobile.
+//   Chỉ là giao diện trong editor; HTML xuất ra vẫn là <img style="width:…"> (renderHTML bên dưới).
+function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps) {
+  const startResize = (e: React.MouseEvent<HTMLSpanElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const wrap = e.currentTarget.parentElement // = NodeViewWrapper
+    const img = wrap?.querySelector('img')
+    const col = wrap?.parentElement
+    if (!img || !col) return
+    // Bề rộng CỘT SOẠN THẢO (trừ padding) → % tính ra khớp với lúc hiển thị trên trang thật.
+    const cs = getComputedStyle(col)
+    const parentW = col.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0')
+    if (parentW <= 0) return
+    const startX = e.clientX
+    const startW = img.getBoundingClientRect().width
+
+    const onMove = (ev: MouseEvent) => {
+      const next = startW + (ev.clientX - startX)
+      const pct = Math.max(10, Math.min(100, Math.round((next / parentW) * 100)))
+      updateAttributes({ width: `${pct}%` })
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  // Width đặt trên VỎ (% của cột) và ảnh lấp đầy vỏ — nếu đặt % thẳng lên ảnh thì % lại tính theo vỏ
+  //   co-theo-nội-dung (vòng lặp) khiến khung chọn không thu nhỏ theo ảnh.
+  const width = (node.attrs.width as string | null) ?? undefined
+  return (
+    <NodeViewWrapper className="tip-img-wrap" data-selected={selected || undefined} style={width ? { width } : undefined}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={node.attrs.src as string}
+        alt={(node.attrs.alt as string) ?? ''}
+        draggable={false}
+        style={width ? { width: '100%' } : undefined}
+      />
+      <span className="tip-img-handle" role="presentation" title="Kéo để chỉnh cỡ ảnh" onMouseDown={startResize} />
+    </NodeViewWrapper>
+  )
+}
+
 // Ảnh có thuộc tính width (%/px) để chỉnh cỡ như Word — render thành style="width:…".
 const SizableImage = Image.extend({
   addAttributes() {
@@ -34,6 +89,9 @@ const SizableImage = Image.extend({
         renderHTML: (attrs) => (attrs.width ? { style: `width: ${attrs.width}` } : {}),
       },
     }
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageView)
   },
 })
 
