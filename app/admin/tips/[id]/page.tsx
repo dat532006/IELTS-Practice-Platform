@@ -10,7 +10,7 @@ export default async function AdminEditTipPage({ params }: { params: Promise<{ i
   const admin = createAdminClient()
   const { data } = await admin
     .from('tip_articles')
-    .select('id, slug, skill, type, title, excerpt, body_html, author, band, read_minutes, status, sort_order, featured, cover_image')
+    .select('id, slug, skill, type, title, excerpt, body_html, author, band, read_minutes, status, sort_order, featured, cover_image, cover_fit, cover_height')
     .eq('id', id)
     .maybeSingle()
 
@@ -32,6 +32,8 @@ export default async function AdminEditTipPage({ params }: { params: Promise<{ i
     sort_order: (row.sort_order as number | null) ?? 0,
     featured: (row.featured as boolean | null) ?? false,
     cover_image: (row.cover_image as string | null) ?? '',
+    cover_fit: (row.cover_fit as 'cover' | 'contain' | null) ?? 'cover',
+    cover_height: (row.cover_height as number | null) ?? 280,
   }
 
   return <AdminTipForm initial={initial} />

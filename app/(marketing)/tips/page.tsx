@@ -52,7 +52,7 @@ export default async function TipsPage() {
                 {featured.coverImage && (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={featured.coverImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+                    <img src={featured.coverImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full" style={{ objectFit: featured.coverFit }} />
                     {/* Lớp phủ tối để nhãn/chữ trắng luôn đọc được trên ảnh bất kỳ */}
                     <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(140deg,rgba(42,39,64,0.55),rgba(42,39,64,0.2))]" />
                   </>

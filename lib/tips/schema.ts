@@ -21,6 +21,8 @@ export const TipBody = z.object({
   sort_order: z.coerce.number().int().min(0).max(100000).default(0),
   featured: z.boolean().default(false),
   cover_image: z.string().trim().max(600).default(''), // URL ảnh bìa; API validate qua isAllowedPublicMediaUrl
+  cover_fit: z.enum(['cover', 'contain']).default('cover'), // cắt lấp đầy | hiện đủ ảnh
+  cover_height: z.coerce.number().int().min(100).max(800).default(280), // chiều cao khung ảnh bìa (px)
 })
 
 // Xoá hàng loạt: nhận mảng id (đã chọn ở bảng admin). Chặn body rỗng / quá cỡ.
