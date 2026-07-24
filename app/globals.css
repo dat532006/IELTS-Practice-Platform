@@ -313,6 +313,7 @@ body {
 }
 .tip-prose table {
   width: 100%;
+  table-layout: fixed; /* KHÔNG để bảng phình rộng hơn cột nội dung rồi bị cắt — ép vừa khung, chữ tự xuống dòng */
   border-collapse: collapse;
   margin: 0 0 22px;
   font-size: 15px;
@@ -323,6 +324,8 @@ body {
   padding: 9px 12px;
   vertical-align: top;
   text-align: left;
+  overflow-wrap: break-word; /* từ dài (URL/từ ghép) tự ngắt để không tràn ô */
+  word-break: break-word;
 }
 .tip-prose th {
   background: #f6f2ff;
