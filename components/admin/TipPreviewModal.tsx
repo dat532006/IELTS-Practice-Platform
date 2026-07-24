@@ -16,6 +16,8 @@ type Props = {
   band: string
   readMinutes: number
   coverImage: string
+  coverFit: 'cover' | 'contain'
+  coverHeight: number
   body: string
 }
 
@@ -27,7 +29,7 @@ function initialsOf(author: string): string {
   return (first + last).toUpperCase()
 }
 
-export function TipPreviewModal({ open, onClose, title, skill, type, author, band, readMinutes, coverImage, body }: Props) {
+export function TipPreviewModal({ open, onClose, title, skill, type, author, band, readMinutes, coverImage, coverFit, coverHeight, body }: Props) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -99,8 +101,10 @@ export function TipPreviewModal({ open, onClose, title, skill, type, author, ban
             </div>
 
             {coverImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={coverImage} alt="" aria-hidden="true" className="mt-[26px] aspect-[16/8] w-full rounded-[22px] object-cover" />
+              <div className="mt-[26px] overflow-hidden rounded-[22px] bg-[#F1EEF9]" style={{ height: coverHeight }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={coverImage} alt="" aria-hidden="true" className="h-full w-full" style={{ objectFit: coverFit }} />
+              </div>
             ) : (
               <div aria-hidden="true" className="mt-[26px] aspect-[16/8] rounded-[22px]" style={{ backgroundImage: sk.cover }} />
             )}

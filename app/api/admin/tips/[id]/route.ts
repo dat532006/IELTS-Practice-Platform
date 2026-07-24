@@ -40,7 +40,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const cur = current as { status: string; published_at: string | null }
   const patch: Record<string, unknown> = {}
-  for (const k of ['slug', 'skill', 'type', 'title', 'excerpt', 'author', 'band', 'read_minutes', 'sort_order', 'featured'] as const) {
+  for (const k of ['slug', 'skill', 'type', 'title', 'excerpt', 'author', 'band', 'read_minutes', 'sort_order', 'featured', 'cover_fit', 'cover_height'] as const) {
     if (v[k] !== undefined) patch[k] = v[k]
   }
   if (v.body_html !== undefined) patch.body_html = sanitizeTipHtml(v.body_html)

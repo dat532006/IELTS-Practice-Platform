@@ -4,7 +4,7 @@ import { sanitizeTipHtml } from '@/lib/sanitize/tip-html'
 import { toTipArticle, type TipArticle, type TipRow } from '@/lib/tips/articles'
 
 // Cột public (KHÔNG body) cho danh sách/lưới.
-const LIST_COLS = 'slug, skill, type, title, excerpt, author, band, featured, cover_image, read_minutes, published_at, created_at'
+const LIST_COLS = 'slug, skill, type, title, excerpt, author, band, featured, cover_image, cover_fit, cover_height, read_minutes, published_at, created_at'
 
 // Danh sách bài Tips đã published. RLS (anon/authenticated) đã giới hạn published; vẫn lọc tường minh.
 // Xếp featured (nổi bật) LÊN ĐẦU → trang /tips lấy articles[0] làm hero, phần còn lại vào lưới.

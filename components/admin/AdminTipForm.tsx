@@ -24,6 +24,8 @@ export type TipFormInitial = {
   sort_order: number
   featured: boolean
   cover_image: string
+  cover_fit: 'cover' | 'contain'
+  cover_height: number
 }
 
 const labelCls = 'block text-[12.5px] font-extrabold text-[#6A6480]'
@@ -60,6 +62,8 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
   const [coverImage, setCoverImage] = useState(initial?.cover_image ?? '')
   const [coverPreview, setCoverPreview] = useState('') // objectURL local hiện NGAY trước khi upload xong
   const [coverBusy, setCoverBusy] = useState(false)
+  const [coverFit, setCoverFit] = useState<'cover' | 'contain'>(initial?.cover_fit ?? 'cover')
+  const [coverHeight, setCoverHeight] = useState(initial?.cover_height ?? 280)
   const [body, setBody] = useState(initial?.body_html ?? '')
 
   const [phase, setPhase] = useState<'idle' | 'saving'>('idle')
@@ -151,6 +155,8 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
       sort_order: Number(sortOrder) || 0,
       featured,
       cover_image: coverImage,
+      cover_fit: coverFit,
+      cover_height: coverHeight,
     }
     try {
       const r = await fetch(editing ? `/api/admin/tips/${initial!.id}` : '/api/admin/tips', {
@@ -315,6 +321,54 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
             )}
           </div>
           {coverMsg && <p className="mt-1.5 text-[12.5px] font-semibold text-[#5B43C7]">{coverMsg}</p>}
+
+          {/* Tuỳ chỉnh hiển thị ảnh bìa — chỉ hiện khi đã có ảnh. */}
+          {(coverImage || coverPreview) && (
+            <div className="mt-3 rounded-[12px] border border-[#EEE9F5] bg-[#FBFAFF] p-3.5">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[12px] font-bold text-[#6A6480]">Kiểu:</span>
+                  {(['cover', 'contain'] as const).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setCoverFit(f)}
+                      className={`rounded-[9px] border px-2.5 py-1.5 text-[12.5px] font-bold transition ${
+                        coverFit === f
+                          ? 'border-[#7C5CE6] bg-[#6A48D6] text-white'
+                          : 'border-[#E4DEEE] bg-white text-[#3D3654] hover:border-[#CCC3DC]'
+                      }`}
+                    >
+                      {f === 'cover' ? 'Cắt lấp đầy' : 'Hiện đủ ảnh'}
+                    </button>
+                  ))}
+                </div>
+                <label className="flex flex-1 items-center gap-2.5 text-[12px] font-bold text-[#6A6480]">
+                  Cao: {coverHeight}px
+                  <input
+                    type="range"
+                    min={120}
+                    max={520}
+                    step={10}
+                    value={coverHeight}
+                    onChange={(e) => setCoverHeight(Number(e.target.value))}
+                    className="h-1.5 min-w-[140px] flex-1 accent-[#7C5CE6]"
+                  />
+                </label>
+              </div>
+              {/* Xem trước sống theo đúng kiểu + chiều cao (khớp trang bài). */}
+              <div
+                className="mt-3 overflow-hidden rounded-[12px] border border-[#E4DEEE] bg-[#F1EEF9]"
+                style={{ height: Math.min(coverHeight, 260) }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={coverPreview || coverImage} alt="Xem trước ảnh bìa" className="h-full w-full" style={{ objectFit: coverFit }} />
+              </div>
+              <p className="mt-1.5 text-[11.5px] font-semibold text-[var(--text-subtle)]">
+                “Cắt lấp đầy” = phủ kín khung (có thể cắt mép). “Hiện đủ ảnh” = thấy toàn bộ ảnh (hợp ảnh chụp bảng/biểu đồ).
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -373,6 +427,8 @@ export function AdminTipForm({ initial }: { initial?: TipFormInitial }) {
         band={band}
         readMinutes={Number(readMinutes) || 5}
         coverImage={coverPreview || coverImage}
+        coverFit={coverFit}
+        coverHeight={coverHeight}
         body={body}
       />
     </div>

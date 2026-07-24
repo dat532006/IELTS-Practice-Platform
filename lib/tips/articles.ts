@@ -17,6 +17,8 @@ export type TipArticle = {
   band: string
   featured: boolean
   coverImage: string // URL ảnh bìa đã validate; '' nếu không có → UI dùng gradient
+  coverFit: 'cover' | 'contain' // cắt lấp đầy | hiện đủ ảnh
+  coverHeight: number // chiều cao khung ảnh bìa (px) ở trang bài + xem trước
   initials: string
   date: string // ví dụ "18 Th7, 2026"
   read: string // ví dụ "8 phút đọc"
@@ -38,6 +40,8 @@ export type TipRow = {
   sort_order?: number
   featured?: boolean | null
   cover_image?: string | null
+  cover_fit?: string | null
+  cover_height?: number | null
   published_at: string | null
   created_at?: string | null
 }
@@ -99,6 +103,8 @@ export function toTipArticle(row: TipRow): TipArticle {
     featured: row.featured ?? false,
     // Defense-in-depth: chỉ lộ ảnh bìa nếu là URL storage public hợp lệ (đã validate lúc lưu, chặn lại lúc đọc).
     coverImage: isAllowedPublicMediaUrl(row.cover_image) ? (row.cover_image as string) : '',
+    coverFit: row.cover_fit === 'contain' ? 'contain' : 'cover',
+    coverHeight: typeof row.cover_height === 'number' && row.cover_height >= 100 ? row.cover_height : 280,
     initials: initialsOf(author),
     date: formatTipDate(row.published_at ?? row.created_at ?? null),
     read: `${row.read_minutes ?? 5} phút đọc`,

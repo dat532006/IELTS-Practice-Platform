@@ -65,15 +65,12 @@ export default async function TipArticlePage({ params }: { params: Promise<{ slu
         </div>
       </div>
 
-      {/* Ảnh minh hoạ: ảnh bìa admin đặt (nếu có) — không thì lùi về gradient theo kỹ năng. */}
+      {/* Ảnh minh hoạ: ảnh bìa admin đặt (nếu có) theo kiểu + chiều cao đã chọn — không thì gradient theo kỹ năng. */}
       {article.coverImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={article.coverImage}
-          alt=""
-          aria-hidden="true"
-          className="mt-[26px] aspect-[16/8] w-full rounded-[22px] object-cover"
-        />
+        <div className="mt-[26px] overflow-hidden rounded-[22px] bg-[#F1EEF9]" style={{ height: article.coverHeight }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={article.coverImage} alt="" aria-hidden="true" className="h-full w-full" style={{ objectFit: article.coverFit }} />
+        </div>
       ) : (
         <div
           aria-hidden="true"

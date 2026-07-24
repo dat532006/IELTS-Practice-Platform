@@ -15,7 +15,7 @@ export function TipCard({ article }: { article: TipArticle }) {
       >
         {article.coverImage && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={article.coverImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={article.coverImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full" style={{ objectFit: article.coverFit }} />
         )}
         <span className="relative inline-flex items-center gap-1.5 rounded-full bg-black/45 px-[11px] py-[5px] text-[11px] font-extrabold uppercase tracking-[0.07em] text-white">
           {sk.label} · {TIP_TYPE_LABEL[article.type]}

@@ -44,6 +44,8 @@ export async function POST(request: Request) {
       sort_order: v.sort_order,
       featured: v.featured,
       cover_image: cover,
+      cover_fit: v.cover_fit,
+      cover_height: v.cover_height,
       published_at: v.status === 'published' ? new Date().toISOString() : null,
     })
     .select('id, slug')
