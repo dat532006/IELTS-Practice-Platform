@@ -69,34 +69,8 @@ export function ReviewList({ review }: { review: ReviewItem[] }) {
         </div>
       )}
 
-      {/* P3 — Giải thích chi tiết (evidence): chỉ hiện câu có explanation (admin author ở answer_keys).
-          Đáp án của bạn (gạch nếu sai) → đáp án đúng, kèm câu evidence + dịch như xem_chi_tiet.png. */}
-      {open && review.some((r) => r.explanation) && (
-        <div className="mt-5 border-t border-slate-100 pt-4">
-          <h4 className="mb-3 font-extrabold uppercase text-slate-700">Giải thích chi tiết</h4>
-          <div className="flex flex-col gap-3">
-            {review
-              .filter((r) => r.explanation)
-              .map((r) => {
-                const user = fmtAnswer(r.user_answer)
-                const skipped = user.trim() === ''
-                return (
-                  <div key={r.question_id} className="rounded-xl border border-[#F1E4C8] bg-[#FFFBF2] p-4">
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="font-extrabold text-slate-800">Câu {r.number ?? '•'}</span>
-                      {!skipped && (
-                        <span className={r.is_correct ? 'font-semibold text-[#1E7A48]' : 'text-[#D93025] line-through'}>{user}</span>
-                      )}
-                      <span aria-hidden className="text-slate-400">→</span>
-                      <span className="font-bold text-[#1E7A48]">{r.correct_answers.join(', ')}</span>
-                    </div>
-                    <p className="mt-2 whitespace-pre-line text-[13.5px] leading-relaxed text-[#3B364A]">{r.explanation}</p>
-                  </div>
-                )
-              })}
-          </div>
-        </div>
-      )}
+      {/* 2026-07-26 (Owner): trang kết quả CHỈ hiện đáp án. Giải thích chuyển hẳn sang trang
+          "Xem chi tiết" (/result/[attemptId]/review) — nút 💡 dưới từng câu, xem `ExplainToggle`. */}
     </section>
   )
 }

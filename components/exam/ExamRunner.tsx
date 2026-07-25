@@ -8,6 +8,7 @@ import { QuestionRenderer } from '@/components/exam/questions/QuestionRenderer'
 import { MatchingMatrixQuestion } from '@/components/exam/questions/MatchingMatrixQuestion'
 import { SummaryQuestion } from '@/components/exam/questions/SummaryQuestion'
 import { MatchingBankQuestion } from '@/components/exam/questions/MatchingBankQuestion'
+import { ExplainToggle } from '@/components/exam/ExplainToggle'
 import { ListeningAudioPlayer } from '@/components/exam/ListeningAudioPlayer'
 import { Mascot } from '@/components/brand/Mascot'
 import {
@@ -984,12 +985,14 @@ export function ExamRunner({
                                 onActivate={setActiveQid}
                                 readOnly={!!review}
                               />
+                              {review && <ExplainToggle qs={item.qs} reviewByQid={reviewByQid} />}
                             </div>
                           )
                         if (item.kind === 'summary')
                           return (
                             <div key={`summary-${item.qs[0].id}`}>
                               <SummaryQuestion questions={item.qs} template={item.template} options={item.options} answers={answers} onAnswer={onAnswerChange} readOnly={!!review} />
+                              {review && <ExplainToggle qs={item.qs} reviewByQid={reviewByQid} />}
                             </div>
                           )
                         if (item.kind === 'matchbank')
@@ -1006,6 +1009,7 @@ export function ExamRunner({
                                 onActivate={setActiveQid}
                                 readOnly={!!review}
                               />
+                              {review && <ExplainToggle qs={item.qs} reviewByQid={reviewByQid} />}
                             </div>
                           )
                         return (() => {
@@ -1045,6 +1049,7 @@ export function ExamRunner({
                                       onChange={(v) => onAnswerChange(item.q.id, v)}
                                       disabled={!!review}
                                     />
+                                    {review && <ExplainToggle qs={[item.q]} reviewByQid={reviewByQid} />}
                                   </div>
                                 </div>
                               )
@@ -1064,6 +1069,7 @@ export function ExamRunner({
                                     hideStatement={statement != null}
                                     disabled={!!review}
                                   />
+                                  {review && <ExplainToggle qs={[item.q]} reviewByQid={reviewByQid} />}
                                 </div>
                               </div>
                             )
