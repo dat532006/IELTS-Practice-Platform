@@ -407,6 +407,59 @@
   line-height: 1.5;
 }
 .dc-exam .dcx-qbody { margin-top: 10px; margin-left: 38px; }
+
+/* ── Giải thích (review mode): nút 💡 thu gọn dưới mỗi câu / mỗi khối ── */
+.dc-exam .dcx-explain { margin-top: 10px; }
+.dc-exam .dcx-explain-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #f0dfb4;
+  background: #fffaef;
+  color: #8a5d0a;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.dc-exam .dcx-explain-btn:hover { background: #fff4dc; border-color: #e6cf98; }
+.dc-exam .dcx-explain-btn.on { background: #fff4dc; border-color: #e6cf98; }
+.dc-exam .dcx-explain-bulb { width: 16px; height: 16px; flex: none; }
+.dc-exam .dcx-explain-caret { font-size: 10px; transition: transform 0.15s; }
+.dc-exam .dcx-explain-caret.on { transform: rotate(180deg); }
+.dc-exam .dcx-explain-panel {
+  margin-top: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dc-exam .dcx-explain-item {
+  border: 1px solid #f1e4c8;
+  background: #fffbf2;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.dc-exam .dcx-explain-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+}
+.dc-exam .dcx-explain-num { font-weight: 800; color: var(--ink); }
+.dc-exam .dcx-explain-ok { font-weight: 700; color: #0e7a43; }
+.dc-exam .dcx-explain-bad { color: #c22f2f; text-decoration: line-through; }
+.dc-exam .dcx-explain-skip { color: #6a6480; font-style: italic; }
+.dc-exam .dcx-explain-arrow { color: #9a93ad; }
+.dc-exam .dcx-explain-text {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: #3b364a;
+  white-space: pre-line;
+}
 /* bookmark flag button */
 .dc-exam .dcx-flag {
   flex: none;
@@ -1585,6 +1638,36 @@
 .dc-exam.ct-yb .themed .dcx-para-letter { color: #ffd60a; }
 .dc-exam.ct-yb .themed .dcx-qinstr b { color: #ffd60a; }
 .dc-exam.ct-yb .themed .dcx-lform { background: #111; border-color: #5a5220; }
+
+/* Giải thích (review) trong 2 chế độ tương phản cao */
+.dc-exam.ct-wb .themed .dcx-explain-btn {
+  background: #251f14;
+  border-color: #6b5a2f;
+  color: #f0cf7d;
+}
+.dc-exam.ct-wb .themed .dcx-explain-btn:hover,
+.dc-exam.ct-wb .themed .dcx-explain-btn.on { background: #322a1a; }
+.dc-exam.ct-wb .themed .dcx-explain-item { background: #201c14; border-color: #5b4d2a; }
+.dc-exam.ct-wb .themed .dcx-explain-num { color: #f4f2fb; }
+.dc-exam.ct-wb .themed .dcx-explain-text { color: #ece7f7; }
+.dc-exam.ct-wb .themed .dcx-explain-ok { color: #6fd79b; }
+.dc-exam.ct-wb .themed .dcx-explain-bad { color: #ff9b9b; }
+.dc-exam.ct-wb .themed .dcx-explain-skip { color: #b9b3cc; }
+
+.dc-exam.ct-yb .themed .dcx-explain-btn {
+  background: #161616;
+  border-color: #5a5220;
+  color: #ffd60a;
+}
+.dc-exam.ct-yb .themed .dcx-explain-btn:hover,
+.dc-exam.ct-yb .themed .dcx-explain-btn.on { background: #201d05; border-color: #ffd60a; }
+.dc-exam.ct-yb .themed .dcx-explain-item { background: #111; border-color: #5a5220; }
+.dc-exam.ct-yb .themed .dcx-explain-num,
+.dc-exam.ct-yb .themed .dcx-explain-text,
+.dc-exam.ct-yb .themed .dcx-explain-ok { color: #ffd60a; }
+.dc-exam.ct-yb .themed .dcx-explain-bad { color: #ffab6b; }
+.dc-exam.ct-yb .themed .dcx-explain-skip,
+.dc-exam.ct-yb .themed .dcx-explain-arrow { color: #e8c33a; }
 
 @media (max-width: 639px) {
   .dc-exam .dcx-header-inner {
