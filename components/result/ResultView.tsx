@@ -182,14 +182,14 @@ export function ResultView({ attemptId }: { attemptId: string }) {
     return (
       <Shell>
         <h1 className="text-xl font-bold">Không tìm thấy kết quả</h1>
-        <Link href="/products" className="mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white">Xem bộ đề</Link>
+        <Link href="/products" className="dcx-btn-text-light mt-4 inline-block rounded-md bg-teal-700 px-4 py-2 text-sm font-medium">Xem bộ đề</Link>
       </Shell>
     )
   if (phase === 'error' || !data)
     return (
       <Shell>
         <h1 className="text-xl font-bold">Có lỗi khi tải kết quả</h1>
-        <button onClick={() => location.reload()} className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white">Thử lại</button>
+        <button onClick={() => location.reload()} className="dcx-btn-text-light mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-medium">Thử lại</button>
       </Shell>
     )
 
@@ -250,15 +250,17 @@ export function ResultView({ attemptId }: { attemptId: string }) {
         </div>
         <div className="mt-2 flex flex-wrap gap-2.5">
           {/* Review-in-exam (2026-07-12): mở lại giao diện thi — đáp án đúng điền sẵn + evidence highlight */}
+          {/* Màu chữ đi qua .dcx-btn-text-* chứ KHÔNG dùng text-white: xem ghi chú "BẪY" trong
+              app/exam.css — `.dc-exam a { color: inherit }` (không layer) đè mọi utility Tailwind. */}
           <Link
             href={`/result/${attemptId}/review`}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#0E7A43] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b6437]"
+            className="dcx-btn-text-light inline-flex items-center gap-2 rounded-lg bg-[#0E7A43] px-4 py-2 text-sm font-semibold shadow-[0_12px_24px_-14px_rgba(14,122,67,0.9)] hover:bg-[#0b6437]"
           >
             Xem lại trong bài (đáp án + evidence) <span aria-hidden>→</span>
           </Link>
           <Link
             href={testEntryPath(data.test.skill, data.test.id)}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+            className="dcx-btn-text-dark inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
           >
             Thử lại bài kiểm tra <span aria-hidden>→</span>
           </Link>
@@ -311,7 +313,8 @@ export function ResultView({ attemptId }: { attemptId: string }) {
 
       {/* Thanh đáy (capture Result01): "Tiếp tục" cam bên phải */}
       <div className="mt-8 flex items-center justify-end border-t border-slate-200 pt-4">
-        <Link href="/products" className="rounded-lg bg-[#E8A33D] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#d6932f]">
+        {/* Nền hổ phách sáng → giữ chữ ink (6.6:1); chữ trắng ở đây chỉ 2.6:1, không đạt AA. */}
+        <Link href="/products" className="dcx-btn-text-dark rounded-lg bg-[#E8A33D] px-6 py-2.5 text-sm font-bold hover:bg-[#d6932f]">
           Tiếp tục
         </Link>
       </div>

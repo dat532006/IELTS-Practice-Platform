@@ -1575,6 +1575,16 @@
   align-items: center;
 }
 
+/* ── Màu chữ của link-nút bên trong .dc-exam (2026-07-26) ──
+   BẪY: `.dc-exam a` và `.dc-exam button` ở đầu file đặt `color: inherit` với specificity (0,1,1),
+   CAO HƠN utility màu chữ của Tailwind như `.text-white` (0,1,0). Hệ quả: `text-white` VÔ HIỆU với
+   mọi <a>/<button> trong vùng .dc-exam — chữ rơi về ink #2a2740. Đo thật trên CSS đã build: nút
+   `bg-[#0E7A43] text-white` ra 2.66:1, chìm hẳn vào nền (AA cần 4.5:1).
+   Vì vậy nút nền đậm ở đây phải lấy màu chữ từ 2 lớp dưới (0,2,0 → thắng), KHÔNG dùng `text-*`. */
+.dc-exam .dcx-btn-text-light { color: #fff; }
+/* Nền sáng (hổ phách, trắng) thì ngược lại: chữ trắng trên #e8a33d chỉ 2.6:1 → phải giữ chữ ink. */
+.dc-exam .dcx-btn-text-dark { color: var(--ink); }
+
 /* ─────────────────────────── Instructions / centered states ─────────────────────────── */
 .dc-exam .dcx-center {
   min-height: 100vh;
