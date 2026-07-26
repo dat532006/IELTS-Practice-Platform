@@ -31,6 +31,9 @@ export function SummaryQuestion({
   const [picked, setPicked] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
 
+  // Ô LƯU chữ cái (BE chấm theo key), nhưng HIỆN từ trong bank — thả "B" thì đọc thấy "agriculture".
+  const textOfKey = new Map((options ?? []).map((o) => [o.key, o.text || o.key]))
+
   const allowReuse = /more than once/i.test(questions[0]?.instruction ?? '')
   const used = new Set(questions.map((q) => answers[q.id]).filter((v): v is string => typeof v === 'string' && v !== ''))
 
@@ -58,14 +61,25 @@ export function SummaryQuestion({
         const q = byNum.get(n)
         if (!q) return <span key={i}>{seg}</span> // marker không khớp câu → giữ literal
         const v = typeof answers[q.id] === 'string' ? (answers[q.id] as string) : ''
+        // Bank: hiện TỪ, không hiện chữ cái. Không có bank: gõ tự do → hiện đúng cái đã gõ.
+        const shown = hasBank ? (v ? textOfKey.get(v) ?? v : '') : v
         return (
           <span key={i} id={`q-${q.id}`} style={{ scrollMarginTop: 96 }}>
             <input
               type="text"
               autoComplete="off"
-              value={v}
-              readOnly={readOnly}
-              onChange={(e) => place(q.id, e.target.value)}
+              value={shown}
+              // Bank: ô chỉ nhận kéo-thả/chọn-rồi-bấm; gõ chữ cái xử lý ở onKeyDown (xem dưới).
+              readOnly={readOnly || hasBank}
+              onChange={hasBank ? undefined : (e) => place(q.id, e.target.value)}
+              onKeyDown={readOnly || !hasBank ? undefined : (e) => {
+                if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); place(q.id, ''); return }
+                if (!/^[a-zA-Z]$/.test(e.key)) return
+                const k = e.key.toUpperCase()
+                if (!textOfKey.has(k)) return // chữ cái không có trong bank → bỏ qua
+                e.preventDefault()
+                place(q.id, k)
+              }}
               onClick={() => { if (!readOnly && picked) place(q.id, picked) }}
               onDragOver={readOnly ? undefined : (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setOverId(q.id) }}
               onDragLeave={readOnly ? undefined : () => setOverId((o) => (o === q.id ? null : o))}
@@ -76,9 +90,16 @@ export function SummaryQuestion({
                 if (key) place(q.id, key)
               }}
               placeholder={String(n)}
-              aria-label={`Câu ${n}`}
+              aria-label={hasBank ? `Câu ${n} — kéo thẻ vào hoặc gõ chữ cái` : `Câu ${n}`}
+              title={hasBank && v ? `${v} — ${shown}` : undefined}
               className={`dcx-gap-input${hasBank ? ' dcx-mbank-box' : ''}${overId === q.id ? ' drop-over' : ''}${hasBank && picked ? ' droppable' : ''}`}
-              style={{ margin: '0 6px', ...(hasBank ? { width: 56, textAlign: 'center' as const } : {}) }}
+              style={{
+                margin: '0 6px',
+                // Ô phải giãn theo độ dài TỪ, nếu không "agriculture" bị cắt trong khung 56px.
+                ...(hasBank
+                  ? { width: `calc(${Math.max(3, shown.length)}ch + 22px)`, maxWidth: '100%', textAlign: 'center' as const }
+                  : {}),
+              }}
             />
           </span>
         )

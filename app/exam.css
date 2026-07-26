@@ -616,6 +616,9 @@
   border: 2px dashed #c9bff0; border-radius: 8px; padding: 8px 6px;
   width: 90px; min-width: 0; max-width: 90px; flex: none;
 }
+/* Ô word-bank là readOnly (chỉ nhận kéo-thả / chọn-rồi-bấm / gõ chữ cái) → đừng hiện con trỏ nhập chữ. */
+.dc-exam .dcx-gap-input.dcx-mbank-box[readonly] { cursor: pointer; }
+.dc-exam .dcx-gap-input.dcx-mbank-box[readonly]:disabled { cursor: default; }
 
 /* ── Kéo-thả (drag-drop) cho matching bank + summary word-list ── */
 .dc-exam .dcx-chip { cursor: grab; user-select: none; transition: border-color .12s, box-shadow .12s, background .12s; }
