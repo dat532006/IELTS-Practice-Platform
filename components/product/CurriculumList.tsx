@@ -32,6 +32,28 @@ function StateChip({ state }: { state: TestUiState }) {
   )
 }
 
+// Ô 38×38 đầu mỗi dòng: có ảnh riêng của đề thì hiện ảnh (áp đúng khung Owner đã căn trong admin),
+//   KHÔNG có thì rơi về ô icon theo kỹ năng như trước. Đề khóa vẫn dùng ổ khóa, không lộ ảnh.
+function TestThumb({ t }: { t: ProductDetailTest }) {
+  if (!t.cover_image) return <SkillTile skill={t.skill as SkillKey} tileSize={38} radius={11} glyphSize={20} />
+  return (
+    <span className="flex h-[38px] w-[38px] flex-none overflow-hidden rounded-[11px] border border-[#EEEAF3]">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={t.cover_image}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        className="h-full w-full object-cover"
+        style={{
+          objectPosition: `${t.cover_pos_x}% ${t.cover_pos_y}%`,
+          ...(t.cover_zoom !== 100 ? { transform: `scale(${t.cover_zoom / 100})` } : {}),
+        }}
+      />
+    </span>
+  )
+}
+
 // Mục lục bundle — đề sắp theo `position`. Đề mở (free/unlocked) link tới pre-exam /tests/[id];
 // đề khóa = row mờ, KHÔNG click (đúng design: locked rows non-clickable & dimmed).
 export function CurriculumList({
@@ -72,7 +94,7 @@ export function CurriculumList({
 
         return (
           <Link key={t.id} href={`/tests/${t.id}`} className={`${ROW} bg-white transition hover:bg-[#FBFAFF]`}>
-            <SkillTile skill={t.skill as SkillKey} tileSize={38} radius={11} glyphSize={20} />
+            <TestThumb t={t} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-extrabold text-[#2A2740]">{t.title}</p>
               {meta}
