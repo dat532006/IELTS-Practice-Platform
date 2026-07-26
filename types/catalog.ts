@@ -36,6 +36,12 @@ export type ProductDetailTest = {
   is_free: boolean
   locked: boolean
   position: number
+  // Ảnh minh họa riêng của đề (tests.cover_image, đã column-grant từ 20260712000200).
+  //   null → mục lục rơi về ô icon theo kỹ năng như cũ.
+  cover_image: string | null
+  cover_pos_x: number
+  cover_pos_y: number
+  cover_zoom: number
 }
 
 export type ProductDetail = {

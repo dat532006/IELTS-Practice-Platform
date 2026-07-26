@@ -29,6 +29,10 @@ type TestMetaRow = {
   is_free: boolean
   duration_sec: number | null
   attempts_count: number | null
+  cover_image: string | null
+  cover_pos_x: number | null
+  cover_pos_y: number | null
+  cover_zoom: number | null
 }
 
 export async function getProductDetail(
@@ -61,7 +65,7 @@ export async function getProductDetail(
   if (testIds.length > 0) {
     const { data: testData, error: tErr } = await supabase
       .from('tests')
-      .select('id, title, type, is_free, duration_sec, attempts_count')
+      .select('id, title, type, is_free, duration_sec, attempts_count, cover_image, cover_pos_x, cover_pos_y, cover_zoom')
       .in('id', testIds)
     if (tErr) throw new Error(tErr.message)
     for (const t of (testData ?? []) as unknown as TestMetaRow[]) metaById.set(t.id, t)
@@ -89,6 +93,10 @@ export async function getProductDetail(
         is_free,
         locked: !unlocked,
         position: l.position,
+        cover_image: m.cover_image,
+        cover_pos_x: m.cover_pos_x ?? 50,
+        cover_pos_y: m.cover_pos_y ?? 50,
+        cover_zoom: m.cover_zoom ?? 100,
       }
     })
 
