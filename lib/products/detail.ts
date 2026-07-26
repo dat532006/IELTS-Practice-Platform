@@ -17,6 +17,9 @@ type ProductRow = {
   description: string | null
   price_coins: number
   thumbnail: string | null
+  thumb_pos_x: number | null
+  thumb_pos_y: number | null
+  thumb_zoom: number | null
 }
 type LinkRow = { test_id: string; position: number }
 type TestMetaRow = {
@@ -36,7 +39,7 @@ export async function getProductDetail(
   // 1) Product (RLS: published-only). Không có → null → route trả 404.
   const { data: productData, error: pErr } = await supabase
     .from('products')
-    .select('id, slug, title, description, price_coins, thumbnail')
+    .select('id, slug, title, description, price_coins, thumbnail, thumb_pos_x, thumb_pos_y, thumb_zoom')
     .eq('slug', slug)
     .maybeSingle()
   if (pErr) throw new Error(pErr.message)
@@ -100,6 +103,10 @@ export async function getProductDetail(
     description: product.description,
     price_coins: product.price_coins,
     thumbnail_url: product.thumbnail,
+    // Khung hiển thị (migration 20260726000200) — fallback canh giữa/vừa khung nếu DB chưa áp.
+    thumb_pos_x: product.thumb_pos_x ?? 50,
+    thumb_pos_y: product.thumb_pos_y ?? 50,
+    thumb_zoom: product.thumb_zoom ?? 100,
     owned,
     attempts_total: attemptsTotal,
     tests,

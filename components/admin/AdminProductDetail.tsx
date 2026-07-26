@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { FishBone } from '@/components/brand/FishBone'
 
@@ -14,6 +15,9 @@ type ProductMeta = {
   title: string | null
   description: string | null
   thumbnail: string | null
+  thumb_pos_x: number | null
+  thumb_pos_y: number | null
+  thumb_zoom: number | null
   kind: string | null
   price_coins: number
   status: string
@@ -46,6 +50,15 @@ export function AdminProductDetail({ productId }: { productId: string }) {
   const [priceCoins, setPriceCoins] = useState('0')
   const [description, setDescription] = useState('')
   const [sortOrder, setSortOrder] = useState('0')
+  // Ảnh minh họa bộ đề (products.thumbnail) + khung hiển thị (migration 20260726000200).
+  const [thumbnail, setThumbnail] = useState<string | null>(null)
+  const [thumbPosX, setThumbPosX] = useState(50)
+  const [thumbPosY, setThumbPosY] = useState(50)
+  const [thumbZoom, setThumbZoom] = useState(100)
+  const thumbInputRef = useRef<HTMLInputElement>(null)
+  const thumbBoxRef = useRef<HTMLDivElement>(null)
+  const thumbDragRef = useRef<{ cx: number; cy: number; px: number; py: number } | null>(null)
+  const thumbSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [busy, setBusy] = useState('')
   const [editMsg, setEditMsg] = useState('')
@@ -66,6 +79,11 @@ export function AdminProductDetail({ productId }: { productId: string }) {
     setPriceCoins(String(p.price_coins ?? 0))
     setDescription(p.description ?? '')
     setSortOrder(String(p.sort_order ?? 0))
+    setThumbnail(p.thumbnail ?? null)
+    // DB chưa áp migration 20260726000200 → undefined, rơi về canh giữa/vừa khung như cũ.
+    setThumbPosX(Number(p.thumb_pos_x ?? 50))
+    setThumbPosY(Number(p.thumb_pos_y ?? 50))
+    setThumbZoom(Number(p.thumb_zoom ?? 100))
   }
 
   async function load() {
@@ -103,6 +121,148 @@ export function AdminProductDetail({ productId }: { productId: string }) {
     })()
   }, [productId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // PATCH product là FULL BODY (updateProduct ghi đè cả row) → mọi lần lưu PHẢI gửi lại thumbnail
+  //   và khung hiển thị. Trước đây saveMeta bỏ sót `thumbnail` nên bấm "Lưu thay đổi" là XOÁ ẢNH.
+  function buildProductBody(over?: Record<string, unknown>) {
+    return {
+      id: productId,
+      title: title.trim(),
+      slug: slug.trim(),
+      kind,
+      price_coins: Number(priceCoins) || 0,
+      description: description.trim() || undefined,
+      sort_order: Number(sortOrder) || 0,
+      thumbnail,
+      thumb_pos_x: thumbPosX,
+      thumb_pos_y: thumbPosY,
+      thumb_zoom: thumbZoom,
+      ...over,
+    }
+  }
+
+  async function patchProduct(over: Record<string, unknown>): Promise<boolean> {
+    const r = await fetch('/api/admin/products', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(buildProductBody(over)),
+    })
+    return r.ok
+  }
+
+  // Upload ảnh minh họa bộ đề: presign → PUT lên Supabase Storage → PATCH thumbnail.
+  async function uploadThumb(file: File) {
+    setBusy('thumb')
+    setEditErr('')
+    setEditMsg('')
+    try {
+      const r = await fetch('/api/admin/media', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'image', filename: file.name, content_type: file.type, product_id: productId }),
+      })
+      const j = await r.json().catch(() => null)
+      if (!r.ok || !j?.data?.upload_url) {
+        setEditErr(
+          j?.meta?.error_code === 'STORAGE_NOT_CONFIGURED'
+            ? 'Supabase Storage chưa cấu hình (bucket media).'
+            : 'Không tạo được upload URL cho ảnh.',
+        )
+        return
+      }
+      const { path, token, bucket, public_url } = j.data as { path: string; token: string; bucket: string; public_url: string }
+      const { error: upErr } = await createClient().storage.from(bucket).uploadToSignedUrl(path, token, file)
+      if (upErr) {
+        setEditErr(`Upload ảnh thất bại: ${upErr.message}`)
+        return
+      }
+      if (!(await patchProduct({ thumbnail: public_url }))) {
+        setEditErr('Đã upload nhưng không lưu được ảnh vào bộ đề.')
+        return
+      }
+      setThumbnail(public_url)
+      setEditMsg('✓ Đã cập nhật ảnh minh họa bộ đề.')
+    } catch {
+      setEditErr('Lỗi khi upload ảnh.')
+    } finally {
+      setBusy('')
+      if (thumbInputRef.current) thumbInputRef.current.value = '' // cho phép chọn lại cùng file
+    }
+  }
+
+  async function removeThumb() {
+    setBusy('thumb')
+    setEditErr('')
+    setEditMsg('')
+    try {
+      if (!(await patchProduct({ thumbnail: null }))) {
+        setEditErr('Không gỡ được ảnh.')
+        return
+      }
+      setThumbnail(null)
+      setEditMsg('✓ Đã gỡ ảnh minh họa bộ đề.')
+    } catch {
+      setEditErr('Lỗi kết nối.')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  // Kéo/zoom bắn PATCH mỗi lần nhúc nhích sẽ spam API → gộp, gửi sau khi ngừng thao tác 500ms.
+  //   Truyền giá trị TƯỜNG MINH để timer không bắt phải state cũ.
+  function queueThumbDisplaySave(next: { x: number; y: number; z: number }) {
+    if (thumbSaveTimer.current) clearTimeout(thumbSaveTimer.current)
+    thumbSaveTimer.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const okRes = await patchProduct({
+            thumb_pos_x: Math.round(next.x),
+            thumb_pos_y: Math.round(next.y),
+            thumb_zoom: Math.round(next.z),
+          })
+          if (okRes) setEditMsg('✓ Đã lưu khung ảnh.')
+          else setEditErr('Không lưu được khung ảnh (đã áp migration chưa?).')
+        } catch {
+          setEditErr('Lỗi khi lưu khung ảnh.')
+        }
+      })()
+    }, 500)
+  }
+
+  const clampPct = (n: number) => Math.min(100, Math.max(0, n))
+
+  function onThumbPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!thumbnail) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    thumbDragRef.current = { cx: e.clientX, cy: e.clientY, px: thumbPosX, py: thumbPosY }
+  }
+
+  function onThumbPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const d = thumbDragRef.current
+    const box = thumbBoxRef.current
+    if (!d || !box) return
+    const r = box.getBoundingClientRect()
+    // Kéo ảnh XUỐNG = muốn thấy phần TRÊN → object-position GIẢM, nên trừ.
+    const x = clampPct(d.px - ((e.clientX - d.cx) / r.width) * 100)
+    const y = clampPct(d.py - ((e.clientY - d.cy) / r.height) * 100)
+    setThumbPosX(x)
+    setThumbPosY(y)
+    queueThumbDisplaySave({ x, y, z: thumbZoom })
+  }
+
+  function endThumbDrag(e: React.PointerEvent<HTMLDivElement>) {
+    if (!thumbDragRef.current) return
+    thumbDragRef.current = null
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+
+  function resetThumbDisplay() {
+    setThumbPosX(50)
+    setThumbPosY(50)
+    setThumbZoom(100)
+    queueThumbDisplaySave({ x: 50, y: 50, z: 100 })
+  }
+
   async function saveMeta() {
     setBusy('save')
     setEditErr('')
@@ -117,15 +277,7 @@ export function AdminProductDetail({ productId }: { productId: string }) {
       const r = await fetch('/api/admin/products', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          id: productId,
-          title: title.trim(),
-          slug: slug.trim(),
-          kind,
-          price_coins: price,
-          description: description.trim() || undefined,
-          sort_order: Number(sortOrder) || 0,
-        }),
+        body: JSON.stringify(buildProductBody({ price_coins: price })),
       })
       const j = await r.json().catch(() => null)
       if (r.ok && j?.data?.product_id) {
@@ -302,6 +454,120 @@ export function AdminProductDetail({ productId }: { productId: string }) {
             Mô tả
             <textarea className={`${inputCls} min-h-[72px]`} rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
           </label>
+
+          {/* Ảnh minh họa bộ đề (products.thumbnail) — hiện ở khung cover trang /products/[slug] */}
+          <div className="mt-4 rounded-[12px] border border-[#E8E2F2] bg-white p-3.5">
+            <p className="text-[13px] font-bold text-[#2A2740]">Ảnh minh họa bộ đề</p>
+            <p className="mt-0.5 text-[12px] font-medium text-[var(--text-muted)]">
+              Hiện ở đầu trang bộ đề. PNG/JPG/WebP, ≤ 5MB. Không có ảnh → dùng nền gradient theo kỹ năng.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3.5">
+              <div className="flex h-[68px] w-[120px] flex-none items-center justify-center overflow-hidden rounded-[10px] border border-[#EEEAF3] bg-[#FAF8FF]">
+                {thumbnail ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={thumbnail}
+                    alt="thumbnail"
+                    className="h-full w-full object-cover"
+                    style={{
+                      objectPosition: `${thumbPosX}% ${thumbPosY}%`,
+                      ...(thumbZoom !== 100 ? { transform: `scale(${thumbZoom / 100})` } : {}),
+                    }}
+                  />
+                ) : (
+                  <span className="text-[11px] font-semibold text-[#B4ADC4]">Chưa có ảnh</span>
+                )}
+              </div>
+              <input
+                ref={thumbInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) void uploadThumb(f)
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => thumbInputRef.current?.click()}
+                disabled={busy === 'thumb'}
+                className="rounded-[11px] bg-[#7C5CE6] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#6A48D6] disabled:bg-[#D8D2E4]"
+              >
+                {busy === 'thumb' ? 'Đang tải…' : thumbnail ? 'Đổi ảnh…' : 'Chọn ảnh…'}
+              </button>
+              {thumbnail && (
+                <button
+                  type="button"
+                  onClick={removeThumb}
+                  disabled={busy === 'thumb'}
+                  className="rounded-[11px] border border-[#E4DEEE] bg-white px-4 py-2.5 text-sm font-bold text-[#564F6B] transition hover:border-[#CCC3DC] disabled:opacity-50"
+                >
+                  Gỡ ảnh
+                </button>
+              )}
+            </div>
+
+            {/* Khung căn ảnh — dựng ĐÚNG tỉ lệ 16/7 như cover trang bộ đề để thấy sao thì ra vậy. */}
+            {thumbnail && (
+              <div className="mt-3.5">
+                <p className="text-[12px] font-bold text-[#2A2740]">Căn khung hiển thị</p>
+                <p className="mt-0.5 text-[11.5px] font-medium text-[var(--text-muted)]">
+                  Kéo ảnh để chọn phần lộ ra, dùng thanh trượt để phóng to. Tự lưu sau khi ngừng thao tác.
+                </p>
+                <div
+                  ref={thumbBoxRef}
+                  onPointerDown={onThumbPointerDown}
+                  onPointerMove={onThumbPointerMove}
+                  onPointerUp={endThumbDrag}
+                  onPointerCancel={endThumbDrag}
+                  role="group"
+                  aria-label="Kéo để căn ảnh minh họa bộ đề"
+                  className="relative mt-2 aspect-[16/7] w-full touch-none select-none overflow-hidden rounded-[18px] border border-[#EEEAF3] bg-[#FAF8FF] active:cursor-grabbing"
+                  style={{ cursor: 'grab' }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={thumbnail}
+                    alt=""
+                    draggable={false}
+                    className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+                    style={{
+                      objectPosition: `${thumbPosX}% ${thumbPosY}%`,
+                      ...(thumbZoom !== 100 ? { transform: `scale(${thumbZoom / 100})` } : {}),
+                    }}
+                  />
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <label className="flex items-center gap-2 text-[12px] font-bold text-[#564F6B]">
+                    Phóng
+                    <input
+                      type="range"
+                      min={100}
+                      max={300}
+                      step={5}
+                      value={thumbZoom}
+                      onChange={(e) => {
+                        const z = Number(e.target.value)
+                        setThumbZoom(z)
+                        queueThumbDisplaySave({ x: thumbPosX, y: thumbPosY, z })
+                      }}
+                      aria-label="Mức phóng ảnh minh họa"
+                      className="w-[170px] accent-[#7C5CE6]"
+                    />
+                    <span className="w-11 tabular-nums text-[var(--text-muted)]">{thumbZoom}%</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={resetThumbDisplay}
+                    className="rounded-[10px] border border-[#E4DEEE] bg-white px-3 py-1.5 text-[12px] font-bold text-[#564F6B] transition hover:border-[#CCC3DC]"
+                  >
+                    Về mặc định
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <label className={`${labelCls} w-40`}>
             Thứ tự sắp xếp
             <input className={inputCls} type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />

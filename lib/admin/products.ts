@@ -2,6 +2,8 @@ import 'server-only'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { refreshProductSearch } from '@/lib/admin/product-search'
+import { deleteStorageObjectByUrl } from '@/lib/storage/delete-object'
+import { isAllowedPublicMediaUrl } from '@/lib/storage/media-url'
 
 // ============================================================
 // W13 — Admin Product / Bundle Manager & Pricing (M11/M04). SERVER-ONLY.
@@ -19,7 +21,19 @@ export const ProductInputSchema = z.object({
   slug: z.string().min(1).max(200).regex(SLUG_RE, 'slug chỉ gồm a-z, 0-9 và dấu gạch ngang'),
   title: z.string().min(1).max(300),
   description: z.string().max(2000).optional(),
-  thumbnail: z.string().max(1000).optional(),
+  // STORE-003 parity với tests.cover_image: chỉ nhận URL ảnh công khai thuộc allowlist origin
+  //   (trước đây .string() nhận cả javascript:/data:/host lạ). null = gỡ ảnh.
+  thumbnail: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine(isAllowedPublicMediaUrl, { message: 'thumbnail phải là URL ảnh công khai hợp lệ (origin được duyệt)' })
+    .nullable()
+    .optional(),
+  // Khung hiển thị ảnh (migration 20260726000200) — chặn đúng bằng CHECK trong DB.
+  thumb_pos_x: z.number().int().min(0).max(100).optional(),
+  thumb_pos_y: z.number().int().min(0).max(100).optional(),
+  thumb_zoom: z.number().int().min(100).max(300).optional(),
   kind: z.enum(['single', 'bundle']),
   price_coins: z.number().int('price_coins phải là số nguyên').min(0, 'price_coins không được âm').max(100_000_000),
   sort_order: z.number().int().min(0).max(100_000).optional(),
@@ -44,6 +58,9 @@ function buildRow(input: ProductInput) {
     title: input.title,
     description: input.description ?? null,
     thumbnail: input.thumbnail ?? null,
+    thumb_pos_x: input.thumb_pos_x ?? 50,
+    thumb_pos_y: input.thumb_pos_y ?? 50,
+    thumb_zoom: input.thumb_zoom ?? 100,
     kind: input.kind,
     price_coins: input.price_coins, // server-authoritative
     sort_order: input.sort_order ?? 0,
@@ -73,6 +90,11 @@ export async function updateProduct(admin: SupabaseClient, raw: unknown): Promis
   if (!parsed.success) return { ok: false, code: 'VALIDATION_ERROR', detail: parsed.error.issues[0]?.message }
   if (!parsed.data.id) return { ok: false, code: 'VALIDATION_ERROR', detail: 'id bắt buộc khi PATCH' }
 
+  // STORE-001 parity với tests: đọc thumbnail CŨ TRƯỚC khi ghi để xoá object mồ côi SAU khi commit.
+  //   Đây là full-body update nên form BẮT BUỘC gửi lại thumbnail hiện có, không thì ảnh bị null.
+  const { data: cur } = await admin.from('products').select('thumbnail').eq('id', parsed.data.id).maybeSingle()
+  const oldThumb = (cur as { thumbnail: string | null } | null)?.thumbnail ?? null
+
   const { data, error } = await admin
     .from('products')
     .update(buildRow(parsed.data))
@@ -84,6 +106,8 @@ export async function updateProduct(admin: SupabaseClient, raw: unknown): Promis
     return { ok: false, code: 'INTERNAL', detail: error.message }
   }
   if (!data) return { ok: false, code: 'NOT_FOUND' }
+  const newThumb = parsed.data.thumbnail ?? null
+  if (oldThumb && oldThumb !== newThumb) await deleteStorageObjectByUrl(admin, oldThumb)
   // Draft/hidden không nằm trong matview; product published phải refresh để catalog thấy ngay.
   if ((data.status as string) === 'published') {
     const refreshed = await refreshProductSearch(admin)
@@ -134,7 +158,7 @@ export async function listProducts(
 export async function getProductDetail(admin: SupabaseClient, productId: string) {
   const { data: product } = await admin
     .from('products')
-    .select('id, slug, title, description, thumbnail, kind, price_coins, status, sort_order, created_at')
+    .select('id, slug, title, description, thumbnail, thumb_pos_x, thumb_pos_y, thumb_zoom, kind, price_coins, status, sort_order, created_at')
     .eq('id', productId)
     .maybeSingle()
   if (!product) return { ok: false as const, code: 'NOT_FOUND' as const }

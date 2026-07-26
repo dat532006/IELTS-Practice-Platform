@@ -55,7 +55,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             >
               {detail.thumbnail_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={detail.thumbnail_url} alt={detail.title} className="h-full w-full object-cover" />
+                <img
+                  src={detail.thumbnail_url}
+                  alt={detail.title}
+                  className="h-full w-full object-cover"
+                  // Khung cắt cứng → Owner chọn phần lộ ra (admin: kéo + thanh zoom).
+                  //   50/50/100 = canh giữa, vừa khung — y hệt hành vi trước migration 20260726000200.
+                  style={{
+                    objectPosition: `${detail.thumb_pos_x}% ${detail.thumb_pos_y}%`,
+                    ...(detail.thumb_zoom !== 100 ? { transform: `scale(${detail.thumb_zoom / 100})` } : {}),
+                  }}
+                />
               ) : (
                 <>
                   <span className="absolute left-[18px] top-4 text-[12px] font-extrabold tracking-[0.1em] text-white/90">
