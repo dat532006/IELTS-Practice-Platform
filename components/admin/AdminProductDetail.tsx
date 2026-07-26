@@ -70,6 +70,9 @@ export function AdminProductDetail({ productId }: { productId: string }) {
   const [bindMsg, setBindMsg] = useState('')
   // Picker: danh sách đề (metadata) để chọn thay vì dán UUID tay (2026-07-12).
   const [pickList, setPickList] = useState<{ id: string; title: string | null; slug: string | null; type: string | null; status: string }[]>([])
+  // Gắn NHIỀU đề một lượt (2026-07-27): bộ đề 12 quyển mà bấm từng cái thì 12 lần thao tác.
+  const [bindPicked, setBindPicked] = useState<string[]>([])
+  const [bindFilter, setBindFilter] = useState('')
   const [confirmUnbind, setConfirmUnbind] = useState<string | null>(null)
 
   function hydrate(p: ProductMeta) {
@@ -94,7 +97,11 @@ export function AdminProductDetail({ productId }: { productId: string }) {
       const j = await r.json().catch(() => null)
       if (r.ok && j?.data?.product) {
         setProduct(j.data.product as ProductMeta)
-        setTests((j.data.tests ?? []) as BoundTest[])
+        const bound = (j.data.tests ?? []) as BoundTest[]
+        setTests(bound)
+        // Gợi ý sẵn ô "Vị trí" = chỗ trống kế tiếp, để gắn thêm (nhất là gắn nhiều đề một lượt)
+        // không đè lên vị trí của đề đã có trong bộ.
+        setBindPos(String(bound.reduce((m, t) => Math.max(m, t.position + 1), 0)))
         hydrate(j.data.product as ProductMeta)
       } else if (r.status === 404) {
         setNotFound(true)
@@ -302,19 +309,38 @@ export function AdminProductDetail({ productId }: { productId: string }) {
     return { ok: r.ok, status: r.status, message: j?.message as string | undefined }
   }
 
+  // Gắn 1 hoặc NHIỀU đề. Nhiều đề = gọi API tuần tự (endpoint nhận 1 test_id/lần), vị trí tăng dần
+  // từ ô "Vị trí". KHÔNG dừng ở lỗi đầu tiên: chạy hết rồi báo đúng cái nào hỏng — gắn nửa chừng mà
+  // báo "thành công" thì mục lục thiếu đề mà không ai biết.
   async function addTest() {
+    const ids = bindPicked.length > 0 ? bindPicked : bindTestId.trim() ? [bindTestId.trim()] : []
+    if (ids.length === 0) return
     setBusy('bind')
     setBindErr('')
     setBindMsg('')
-    const pos = Number(bindPos) || 0
+    const start = Number(bindPos) || 0
+    const failed: string[] = []
     try {
-      const res = await bindTest(bindTestId.trim(), pos)
-      if (res.ok) {
+      for (let i = 0; i < ids.length; i++) {
+        const res = await bindTest(ids[i], start + i)
+        if (res.ok) continue
+        if (res.status === 403) {
+          setBindErr('Bạn không có quyền admin.')
+          setBusy('')
+          return
+        }
+        failed.push(`${labelOfTest(ids[i])}: ${res.message || 'không gắn được'}`)
+      }
+      const done = ids.length - failed.length
+      if (failed.length === 0) {
         setBindTestId('')
-        setBindPos('0')
-        await load()
-      } else if (res.status === 403) setBindErr('Bạn không có quyền admin.')
-      else setBindErr(res.message || 'Không gắn được đề (kiểm tra test_id).')
+        setBindPicked([])
+        if (ids.length > 1) setBindMsg(`Đã gắn ${done} đề.`)
+      } else {
+        setBindPicked(bindPicked.filter((id) => failed.some((f) => f.startsWith(labelOfTest(id)))))
+        setBindErr(`Gắn được ${done}/${ids.length}. Lỗi: ${failed.join(' · ')}`)
+      }
+      await load()
     } catch {
       setBindErr('Lỗi kết nối.')
     } finally {
@@ -420,6 +446,21 @@ export function AdminProductDetail({ productId }: { productId: string }) {
   }
 
   const sorted = [...tests].sort((a, b) => a.position - b.position || a.test_id.localeCompare(b.test_id))
+
+  // Danh sách đề CÓ THỂ gắn: bỏ đề đã có trong bộ, lọc theo ô tìm, xếp theo tên TĂNG dần
+  // (API trả mới-nhất-trước; xếp tăng để "chọn tất cả" ra vị trí Test01→Test12 đúng thứ tự sách).
+  const testLabel = (t: { title: string | null; slug: string | null; id: string }) => t.title || t.slug || t.id.slice(0, 8)
+  const labelOfTest = (id: string) => {
+    const t = pickList.find((x) => x.id === id)
+    return t ? testLabel(t) : id.slice(0, 8)
+  }
+  const q = bindFilter.trim().toLowerCase()
+  const pickable = pickList
+    .filter((t) => !tests.some((b) => b.test_id === t.id))
+    .filter((t) => !q || `${t.title ?? ''} ${t.slug ?? ''} ${t.type ?? ''} ${t.status}`.toLowerCase().includes(q))
+    .sort((a, b) => testLabel(a).localeCompare(testLabel(b), 'vi', { numeric: true }))
+  const allPickableChecked = pickable.length > 0 && pickable.every((t) => bindPicked.includes(t.id))
+  const togglePick = (id: string) => setBindPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
   return (
     <div className="rounded-[20px] border border-[#E7E4EE] bg-white p-6 text-[#2A2740] shadow-[0_30px_60px_-38px_rgba(60,40,90,0.4)] sm:p-8">
@@ -584,38 +625,80 @@ export function AdminProductDetail({ productId }: { productId: string }) {
             {/* bind form — picker chọn đề (2026-07-12) + fallback dán UUID */}
             <div className="rounded-[11px] border border-[#ECE9F2] bg-[#FBFAFE] p-3">
               {pickList.length > 0 && (
-                <label className={labelCls}>
-                  Chọn đề để gắn
-                  <select className={inputCls} value={bindTestId} onChange={(e) => setBindTestId(e.target.value)}>
-                    <option value="">— Chọn đề —</option>
-                    {pickList
-                      .filter((t) => !tests.some((b) => b.test_id === t.id))
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {(t.title || t.slug || t.id.slice(0, 8)) + ` · ${t.type ?? '—'} · ${t.status}`}
-                        </option>
-                      ))}
-                  </select>
-                </label>
+                <div>
+                  <div className={labelCls}>Chọn đề để gắn · tích được nhiều đề một lượt</div>
+                  <input
+                    className={`${inputCls} mb-2`}
+                    value={bindFilter}
+                    onChange={(e) => setBindFilter(e.target.value)}
+                    placeholder="Tìm nhanh — vd: VOL8"
+                    aria-label="Tìm đề"
+                  />
+                  <div className="mb-2 flex flex-wrap items-center gap-3 text-[12px]">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBindPicked((prev) =>
+                          allPickableChecked
+                            ? prev.filter((id) => !pickable.some((t) => t.id === id))
+                            : [...prev, ...pickable.filter((t) => !prev.includes(t.id)).map((t) => t.id)],
+                        )
+                      }
+                      disabled={pickable.length === 0}
+                      className="font-bold text-[#6A48D6] underline disabled:text-[#B7AECB] disabled:no-underline"
+                    >
+                      {allPickableChecked ? 'Bỏ chọn tất cả' : `Chọn tất cả (${pickable.length})`}
+                    </button>
+                    <span className="text-[var(--text-subtle)]">Đã chọn {bindPicked.length}</span>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto rounded-[11px] border border-[#E4DEEE] bg-white">
+                    {pickable.length === 0 ? (
+                      <p className="px-3.5 py-3 text-[13px] text-[var(--text-subtle)]">Không có đề nào khớp.</p>
+                    ) : (
+                      pickable.map((t) => (
+                        <label
+                          key={t.id}
+                          className="flex cursor-pointer items-center gap-2.5 border-b border-[#F1EDF7] px-3.5 py-2.5 text-sm text-[#2A2740] last:border-b-0 hover:bg-[#FBFAFE]"
+                        >
+                          <input type="checkbox" checked={bindPicked.includes(t.id)} onChange={() => togglePick(t.id)} className="h-4 w-4 accent-[#7C5CE6]" />
+                          <span className="min-w-0 flex-1 truncate font-semibold">{testLabel(t)}</span>
+                          <span className="flex-none text-[12px] text-[var(--text-subtle)]">{t.type ?? '—'}</span>
+                          <StatusBadge status={t.status} />
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
               )}
               <label className={`${labelCls} mt-2 block`}>
                 {pickList.length > 0 ? 'Hoặc dán test_id (UUID)' : 'Gắn đề (test_id)'}
-                <input className={`${inputCls} font-mono`} value={bindTestId} onChange={(e) => setBindTestId(e.target.value)} placeholder="UUID của đề" />
+                <input
+                  className={`${inputCls} font-mono`}
+                  value={bindTestId}
+                  onChange={(e) => setBindTestId(e.target.value)}
+                  placeholder="UUID của đề"
+                  disabled={bindPicked.length > 0}
+                />
               </label>
               <div className="mt-2 flex items-end gap-2">
                 <label className={`${labelCls} w-24`}>
-                  Vị trí
+                  Vị trí {bindPicked.length > 1 && <span className="font-semibold text-[var(--text-subtle)]">(bắt đầu)</span>}
                   <input className={inputCls} type="number" min={0} value={bindPos} onChange={(e) => setBindPos(e.target.value)} />
                 </label>
                 <button
                   type="button"
                   onClick={addTest}
-                  disabled={busy === 'bind' || !bindTestId.trim()}
+                  disabled={busy === 'bind' || (bindPicked.length === 0 && !bindTestId.trim())}
                   className="rounded-[11px] bg-[#7C5CE6] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#6A48D6] disabled:bg-[#D8D2E4]"
                 >
-                  {busy === 'bind' ? 'Đang gắn…' : '+ Gắn đề'}
+                  {busy === 'bind' ? 'Đang gắn…' : bindPicked.length > 1 ? `+ Gắn ${bindPicked.length} đề` : '+ Gắn đề'}
                 </button>
               </div>
+              {bindPicked.length > 1 && (
+                <p className="mt-1 text-[11px] text-[var(--text-subtle)]">
+                  {bindPicked.length} đề sẽ nhận vị trí {Number(bindPos) || 0}→{(Number(bindPos) || 0) + bindPicked.length - 1}, theo thứ tự trong danh sách.
+                </p>
+              )}
               <p className="mt-1 text-[11px] text-[var(--text-subtle)]">Đề draft trong bundle sẽ KHÔNG hiện công khai cho tới khi đề đó được publish.</p>
             </div>
 
