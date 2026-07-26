@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import type { ReviewItem } from '@/types/exam'
 import type { ExamQuestion } from '@/components/exam/questions/types'
+import { ExplainRichText } from '@/components/exam/ExplainRichText'
 
 function BulbIcon({ className }: { className?: string }) {
   return (
@@ -66,7 +67,9 @@ export function ExplainToggle({
                   <span aria-hidden className="dcx-explain-arrow">→</span>
                   <span className="dcx-explain-ok">{r.correct_answers.join(', ')}</span>
                 </div>
-                <p className="dcx-explain-text">{r.explanation}</p>
+                <p className="dcx-explain-text">
+                  <ExplainRichText text={r.explanation as string} />
+                </p>
               </div>
             )
           })}
