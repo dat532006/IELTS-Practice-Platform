@@ -237,14 +237,31 @@ export async function listTests(
 
 // Meta-only update (toggle nhanh từ danh sách + ảnh minh họa) — KHÔNG đụng passages/questions/answer_keys.
 //   cover_image: string = set URL ảnh; null = gỡ ảnh; undefined = không đụng.
+//   cover_pos_x/y + cover_zoom: khung hiển thị ảnh bìa (migration 20260726000100) — chỉ số, KHÔNG
+//     đụng file ảnh, nên đổi thoải mái không sinh orphan Storage.
 export async function setTestMeta(
   admin: SupabaseClient,
   testId: string,
-  patch: { is_free?: boolean; cover_image?: string | null },
+  patch: {
+    is_free?: boolean
+    cover_image?: string | null
+    cover_pos_x?: number
+    cover_pos_y?: number
+    cover_zoom?: number
+  },
 ): Promise<AdminTestOutcome> {
-  const update: { is_free?: boolean; cover_image?: string | null } = {}
+  const update: {
+    is_free?: boolean
+    cover_image?: string | null
+    cover_pos_x?: number
+    cover_pos_y?: number
+    cover_zoom?: number
+  } = {}
   if (patch.is_free !== undefined) update.is_free = patch.is_free
   if (patch.cover_image !== undefined) update.cover_image = patch.cover_image
+  if (patch.cover_pos_x !== undefined) update.cover_pos_x = patch.cover_pos_x
+  if (patch.cover_pos_y !== undefined) update.cover_pos_y = patch.cover_pos_y
+  if (patch.cover_zoom !== undefined) update.cover_zoom = patch.cover_zoom
   if (Object.keys(update).length === 0) return { ok: false, code: 'VALIDATION_ERROR', detail: 'Không có field nào để cập nhật' }
 
   // STORE-001: đọc cover CŨ TRƯỚC khi đổi để xoá object cũ (compensated-delete) sau khi commit ref mới.
@@ -308,7 +325,7 @@ export async function deleteTestTwoTier(admin: SupabaseClient, testId: string): 
 export async function getTestPreview(admin: SupabaseClient, testId: string) {
   const { data: test } = await admin
     .from('tests')
-    .select('id, slug, title, type, source, is_free, difficulty, duration_sec, question_types, passages, questions, status, audio_key, cover_image, created_at')
+    .select('id, slug, title, type, source, is_free, difficulty, duration_sec, question_types, passages, questions, status, audio_key, cover_image, cover_pos_x, cover_pos_y, cover_zoom, created_at')
     .eq('id', testId)
     .maybeSingle()
   if (!test) return { ok: false as const, code: 'NOT_FOUND' as const }

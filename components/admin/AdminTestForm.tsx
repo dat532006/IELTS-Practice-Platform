@@ -227,6 +227,13 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
   const [mediaMsg, setMediaMsg] = useState('')
   const [coverUrl, setCoverUrl] = useState<string | null>(null) // ảnh minh họa đề (tests.cover_image)
   const coverInputRef = useRef<HTMLInputElement>(null)
+  // Khung hiển thị ảnh bìa (migration 20260726000100): 50/50/100 = canh giữa, vừa khung.
+  const [coverPosX, setCoverPosX] = useState(50)
+  const [coverPosY, setCoverPosY] = useState(50)
+  const [coverZoom, setCoverZoom] = useState(100)
+  const coverBoxRef = useRef<HTMLDivElement>(null)
+  const coverDragRef = useRef<{ cx: number; cy: number; px: number; py: number } | null>(null)
+  const coverSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showBulkAns, setShowBulkAns] = useState(false) // ô nhập đáp án hàng loạt (1 dòng = 1 câu)
   const [bulkAnsText, setBulkAnsText] = useState('')
   const [bulkAnsMsg, setBulkAnsMsg] = useState('')
@@ -256,6 +263,10 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           applyDraft({ ...t, answer_keys: j.data.answer_keys ?? undefined })
           setCreated({ test_id: testId, status: String(t.status ?? 'draft') })
           setCoverUrl((t.cover_image as string | null) ?? null)
+          // DB chưa áp migration 20260726000100 → undefined, rơi về canh giữa/vừa khung như cũ.
+          setCoverPosX(Number(t.cover_pos_x ?? 50))
+          setCoverPosY(Number(t.cover_pos_y ?? 50))
+          setCoverZoom(Number(t.cover_zoom ?? 100))
         } else if (r.status === 403) setEditLoadErr('Bạn không có quyền admin.')
         else if (r.status === 404) setEditLoadErr('Không tìm thấy đề.')
         else setEditLoadErr('Không tải được đề.')
@@ -702,6 +713,67 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
       setBusy('')
       if (coverInputRef.current) coverInputRef.current.value = '' // cho phép chọn lại cùng file
     }
+  }
+
+  // Kéo/zoom bắn PATCH mỗi lần nhúc nhích sẽ spam API → gộp, chỉ gửi sau khi ngừng thao tác 500ms.
+  //   Truyền giá trị TƯỜNG MINH (không đọc state trong timer) để tránh bắt phải state cũ.
+  function queueCoverDisplaySave(next: { x: number; y: number; z: number }) {
+    if (!created) return
+    if (coverSaveTimer.current) clearTimeout(coverSaveTimer.current)
+    coverSaveTimer.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const r = await fetch(`/api/admin/tests/${created.test_id}`, {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              cover_pos_x: Math.round(next.x),
+              cover_pos_y: Math.round(next.y),
+              cover_zoom: Math.round(next.z),
+            }),
+          })
+          setMediaMsg(r.ok ? '✓ Đã lưu khung ảnh bìa.' : 'Không lưu được khung ảnh bìa (đã áp migration chưa?).')
+        } catch {
+          setMediaMsg('Lỗi khi lưu khung ảnh bìa.')
+        }
+      })()
+    }, 500)
+  }
+
+  const clampPct = (n: number) => Math.min(100, Math.max(0, n))
+
+  function onCoverPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!coverUrl) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    coverDragRef.current = { cx: e.clientX, cy: e.clientY, px: coverPosX, py: coverPosY }
+  }
+
+  function onCoverPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const d = coverDragRef.current
+    const box = coverBoxRef.current
+    if (!d || !box) return
+    const r = box.getBoundingClientRect()
+    // Kéo ảnh XUỐNG = muốn thấy phần TRÊN → object-position phải GIẢM, nên trừ.
+    //   Chia theo cạnh khung để quãng kéo khớp cảm giác tay dù khung to nhỏ khác nhau.
+    const x = clampPct(d.px - ((e.clientX - d.cx) / r.width) * 100)
+    const y = clampPct(d.py - ((e.clientY - d.cy) / r.height) * 100)
+    setCoverPosX(x)
+    setCoverPosY(y)
+    queueCoverDisplaySave({ x, y, z: coverZoom })
+  }
+
+  function endCoverDrag(e: React.PointerEvent<HTMLDivElement>) {
+    if (!coverDragRef.current) return
+    coverDragRef.current = null
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+
+  function resetCoverDisplay() {
+    setCoverPosX(50)
+    setCoverPosY(50)
+    setCoverZoom(100)
+    queueCoverDisplaySave({ x: 50, y: 50, z: 100 })
   }
 
   async function removeCover() {
@@ -1412,7 +1484,15 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
               <div className="flex h-[68px] w-[120px] flex-none items-center justify-center overflow-hidden rounded-[10px] border border-[#EEEAF3] bg-[#FAF8FF]">
                 {coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={coverUrl} alt="cover" className="h-full w-full object-cover" />
+                  <img
+                    src={coverUrl}
+                    alt="cover"
+                    className="h-full w-full object-cover"
+                    style={{
+                      objectPosition: `${coverPosX}% ${coverPosY}%`,
+                      ...(coverZoom !== 100 ? { transform: `scale(${coverZoom / 100})` } : {}),
+                    }}
+                  />
                 ) : (
                   <span className="text-[11px] font-semibold text-[#B4ADC4]">Chưa có ảnh</span>
                 )}
@@ -1446,6 +1526,75 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                 </button>
               )}
             </div>
+
+            {/* Khung căn ảnh — dựng ĐÚNG như trang vào đề (cao 174px, object-cover, phủ tối ở đỉnh)
+                để thấy sao thì trang thật ra vậy. Kéo = đổi object-position, thanh trượt = phóng. */}
+            {coverUrl && (
+              <div className="mt-3.5">
+                <p className="text-[12px] font-bold text-[#2A2740]">Căn khung hiển thị</p>
+                <p className="mt-0.5 text-[11.5px] font-medium text-[var(--text-muted)]">
+                  Kéo ảnh để chọn phần lộ ra, dùng thanh trượt để phóng to. Tự lưu sau khi ngừng thao tác.
+                </p>
+                <div
+                  ref={coverBoxRef}
+                  onPointerDown={onCoverPointerDown}
+                  onPointerMove={onCoverPointerMove}
+                  onPointerUp={endCoverDrag}
+                  onPointerCancel={endCoverDrag}
+                  role="group"
+                  aria-label="Kéo để căn ảnh bìa"
+                  className="relative mt-2 h-[174px] w-full touch-none select-none overflow-hidden rounded-[12px] border border-[#EEEAF3] bg-[#FAF8FF] active:cursor-grabbing"
+                  style={{ cursor: 'grab' }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={coverUrl}
+                    alt=""
+                    draggable={false}
+                    className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+                    style={{
+                      objectPosition: `${coverPosX}% ${coverPosY}%`,
+                      ...(coverZoom !== 100 ? { transform: `scale(${coverZoom / 100})` } : {}),
+                    }}
+                  />
+                  {/* Lớp phủ này trang thật CÓ SẴN (cho chip/tiêu đề nổi rõ) — vẽ luôn để khỏi bất ngờ. */}
+                  <span
+                    className="pointer-events-none absolute inset-0"
+                    style={{ background: 'linear-gradient(180deg, rgba(20,12,35,0.30) 0%, rgba(20,12,35,0) 46%)' }}
+                  />
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <label className="flex items-center gap-2 text-[12px] font-bold text-[#564F6B]">
+                    Phóng
+                    <input
+                      type="range"
+                      min={100}
+                      max={300}
+                      step={5}
+                      value={coverZoom}
+                      onChange={(e) => {
+                        const z = Number(e.target.value)
+                        setCoverZoom(z)
+                        queueCoverDisplaySave({ x: coverPosX, y: coverPosY, z })
+                      }}
+                      aria-label="Mức phóng ảnh bìa"
+                      className="w-[170px] accent-[#7C5CE6]"
+                    />
+                    <span className="w-11 tabular-nums text-[var(--text-muted)]">{coverZoom}%</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={resetCoverDisplay}
+                    className="rounded-[10px] border border-[#E4DEEE] bg-white px-3 py-1.5 text-[12px] font-bold text-[#564F6B] transition hover:border-[#CCC3DC]"
+                  >
+                    Về mặc định
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[11px] font-medium text-[var(--text-muted)]">
+                  Trang thật rộng hơn ô này nên phần lộ ra hai bên có thể lệch đôi chút; chiều cao thì khớp đúng.
+                </p>
+              </div>
+            )}
           </div>
 
           {mediaMsg && <p className="mt-2 text-xs text-[#6A6480]">{mediaMsg}</p>}

@@ -24,10 +24,15 @@ const MetaBody = z
       .refine(isAllowedPublicMediaUrl, { message: 'cover_image phải là URL ảnh công khai hợp lệ (origin được duyệt)' })
       .nullable()
       .optional(),
+    // Khung hiển thị ảnh bìa (migration 20260726000100) — chỉ là số, không đụng file ảnh.
+    //   Chặn ở đây ĐÚNG bằng CHECK constraint trong DB để lỗi trả 400 thay vì 500.
+    cover_pos_x: z.number().int().min(0).max(100).optional(),
+    cover_pos_y: z.number().int().min(0).max(100).optional(),
+    cover_zoom: z.number().int().min(100).max(300).optional(),
   })
   .strict()
-  .refine((b) => b.is_free !== undefined || b.cover_image !== undefined, {
-    message: 'Cần ít nhất một field: is_free hoặc cover_image',
+  .refine((b) => Object.values(b).some((v) => v !== undefined), {
+    message: 'Cần ít nhất một field: is_free, cover_image hoặc cover_pos_x/cover_pos_y/cover_zoom',
   })
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -39,7 +44,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   let raw: unknown
   try { raw = await request.json() } catch { return fail('VALIDATION_ERROR', 'Body JSON không hợp lệ', { status: 400 }) }
   const parsed = MetaBody.safeParse(raw)
-  if (!parsed.success) return fail('VALIDATION_ERROR', 'Chỉ hỗ trợ is_free (boolean) và cover_image (URL|null)', { status: 400 })
+  if (!parsed.success) return fail('VALIDATION_ERROR', 'Chỉ hỗ trợ is_free (boolean), cover_image (URL|null), cover_pos_x/cover_pos_y (0–100), cover_zoom (100–300)', { status: 400 })
 
   const res = await setTestMeta(createAdminClient(), id, parsed.data)
   if (!res.ok) {
