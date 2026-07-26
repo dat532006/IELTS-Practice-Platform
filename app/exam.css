@@ -453,12 +453,18 @@
 .dc-exam .dcx-explain-bad { color: #c22f2f; text-decoration: line-through; }
 .dc-exam .dcx-explain-skip { color: #6a6480; font-style: italic; }
 .dc-exam .dcx-explain-arrow { color: #9a93ad; }
+/* Chữ giải thích đi theo đúng cỡ/màu/giãn dòng của phần chấm Writing (WritingFeedback) cho đồng bộ. */
 .dc-exam .dcx-explain-text {
   margin: 8px 0 0;
   font-size: 13.5px;
-  line-height: 1.75;
-  color: #3b364a;
+  line-height: 1.65;
+  color: #514b63;
   white-space: pre-line;
+}
+/* Cụm trong ngoặc kép + từ VIẾT HOA — tím giống trích dẫn bên chấm Writing (6.5:1 trên nền kem). */
+.dc-exam .dcx-explain-text .dcx-em {
+  color: #5f46bd;
+  font-weight: 700;
 }
 /* bookmark flag button */
 .dc-exam .dcx-flag {
