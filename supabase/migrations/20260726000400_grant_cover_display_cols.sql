@@ -1,0 +1,14 @@
+-- HOTFIX: trang vào đề /tests/[id] trả 500 sau migration 20260726000100.
+--
+-- Bảng `tests` cấp quyền đọc THEO CỘT (migration 20260601000400: "⚠️ tests: GRANT theo CỘT,
+--   KHÔNG cấp passages/questions") — cột thêm mới KHÔNG tự có quyền. Migration 20260726000100
+--   thêm cover_pos_x/cover_pos_y/cover_zoom nhưng quên bước grant, nên `getTestMeta` (chạy bằng
+--   RLS client, role anon/authenticated) select 3 cột đó bị "permission denied for column" →
+--   PostgREST trả lỗi → page ném exception → 500.
+--
+-- Tiền lệ: migration 20260712000200 khi thêm cover_image đã grant đúng ngay trong cùng file.
+-- Đây là metadata CÔNG KHAI (chỉ là số căn khung ảnh), an toàn lộ client — cùng nhóm với cover_image.
+--
+-- products KHÔNG dính: bảng đó cấp THEO BẢNG (`grant select on public.products`) nên cột thêm sau
+--   tự động có quyền → thumb_pos_x/y/zoom của migration 20260726000200 vẫn đọc được bình thường.
+grant select (cover_pos_x, cover_pos_y, cover_zoom) on public.tests to anon, authenticated;
