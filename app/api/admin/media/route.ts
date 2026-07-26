@@ -13,6 +13,7 @@ const MediaSchema = z.object({
   filename: z.string().min(1).max(200),
   content_type: z.string().max(120).optional(),
   test_id: z.string().uuid().optional(),
+  product_id: z.string().uuid().optional(), // ảnh minh họa bộ đề — gom theo product cho gọn Storage
 })
 
 // Tên object an toàn: bỏ path separator + ký tự lạ.
@@ -28,8 +29,8 @@ export async function POST(request: Request) {
   const parsed = MediaSchema.safeParse(raw)
   if (!parsed.success) return fail('VALIDATION_ERROR', 'Dữ liệu media không hợp lệ', { status: 400 })
 
-  const { kind, filename, test_id } = parsed.data
-  const scope = test_id ?? 'unsorted'
+  const { kind, filename, test_id, product_id } = parsed.data
+  const scope = test_id ?? product_id ?? 'unsorted'
   const objectKey = `${kind === 'audio' ? 'audio' : 'images'}/${scope}/${Date.now()}-${safeName(filename)}`
   const admin = createAdminClient()
 

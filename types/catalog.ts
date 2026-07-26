@@ -45,6 +45,10 @@ export type ProductDetail = {
   description: string | null
   price_coins: number
   thumbnail_url: string | null
+  // Khung hiển thị ảnh (migration 20260726000200) — 50/50/100 = canh giữa, vừa khung.
+  thumb_pos_x: number
+  thumb_pos_y: number
+  thumb_zoom: number
   owned: boolean
   attempts_total: number // social proof = tổng attempts_count các đề trong bundle (published)
   tests: ProductDetailTest[]
