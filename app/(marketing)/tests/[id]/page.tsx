@@ -98,7 +98,17 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
           {meta.cover_image ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={meta.cover_image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img
+                src={meta.cover_image}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
+                // Khung cover cắt cứng → Owner chọn phần nào của ảnh lộ ra (admin: kéo + thanh zoom).
+                //   50/50/100 = canh giữa, vừa khung — y hệt hành vi trước migration 20260726000100.
+                style={{
+                  objectPosition: `${meta.cover_pos_x}% ${meta.cover_pos_y}%`,
+                  ...(meta.cover_zoom !== 100 ? { transform: `scale(${meta.cover_zoom / 100})` } : {}),
+                }}
+              />
               {/* Phủ nhẹ đỉnh để chip/pill nổi rõ trên mọi ảnh */}
               <span
                 className="pointer-events-none absolute inset-0"

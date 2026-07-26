@@ -20,6 +20,9 @@ type TestMetaRow = {
   source: string | null
   question_types: string[] | null
   cover_image: string | null
+  cover_pos_x: number | null
+  cover_pos_y: number | null
+  cover_zoom: number | null
 }
 
 export async function getTestMeta(
@@ -30,7 +33,7 @@ export async function getTestMeta(
   if (!isUuid(id)) return null // id sai định dạng → "không tìm thấy" (tránh Postgres 22P02 → 500)
   const { data, error } = await supabase
     .from('tests')
-    .select('id, title, type, is_free, duration_sec, difficulty, source, question_types, cover_image')
+    .select('id, title, type, is_free, duration_sec, difficulty, source, question_types, cover_image, cover_pos_x, cover_pos_y, cover_zoom')
     .eq('id', id)
     .maybeSingle()
   if (error) throw new Error(error.message)
@@ -61,6 +64,10 @@ export async function getTestMeta(
     source: t.source,
     question_types: t.question_types ?? [],
     cover_image: t.cover_image,
+    // Cột mới (migration 20260726000100) — fallback về canh giữa/vừa khung nếu DB chưa áp migration.
+    cover_pos_x: t.cover_pos_x ?? 50,
+    cover_pos_y: t.cover_pos_y ?? 50,
+    cover_zoom: t.cover_zoom ?? 100,
     locked: !unlocked,
     product,
   }

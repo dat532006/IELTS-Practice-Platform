@@ -23,6 +23,11 @@ export type TestMeta = {
   source: string | null
   question_types: string[]
   cover_image: string | null // URL ảnh minh họa (PUBLIC metadata); null → cover fallback trang trí
+  // Khung cover cắt giữa cứng → 3 số này cho Owner kéo/phóng trong admin (xem migration
+  //   20260726000100). Mặc định 50/50/100 = canh giữa, vừa khung — y hệt hành vi trước đó.
+  cover_pos_x: number // object-position X, 0–100 (%)
+  cover_pos_y: number // object-position Y, 0–100 (%)
+  cover_zoom: number // % phóng, 100–300
   locked: boolean
   // FE-F01: product published chứa test (mục lục RLS published-only) — CTA mua ở pre-exam khi locked.
   //   null khi test chưa thuộc bundle nào (CTA fallback /products). Vẫn chỉ metadata public.
