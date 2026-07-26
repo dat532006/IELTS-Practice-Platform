@@ -208,6 +208,15 @@ export async function addTestToProduct(
       { onConflict: 'product_id,test_id' },
     )
   if (error) return { ok: false, code: 'INTERNAL', detail: error.message }
+
+  // Gắn đề vào bộ ĐÃ CÓ NGƯỜI MUA → phải bơm test_unlocks cho họ, không thì đề mới hiện "Khóa"
+  //   với chính người đã trả tiền (truy cập chỉ đọc test_unlocks — LUẬT THÉP #3, ảnh chụp lúc mua).
+  //   RPC idempotent; lỗi ở đây KHÔNG rollback binding mà báo rõ để admin gọi lại.
+  const { error: expandErr } = await admin.rpc('expand_product_test_unlocks', { p_product_id: productId })
+  if (expandErr) {
+    return { ok: false, code: 'INTERNAL', detail: `đã gắn đề nhưng chưa mở khóa cho người đã mua: ${expandErr.message}` }
+  }
+
   // ADMIN-009 — LUÔN refresh sau khi gắn (durable), KHÔNG quyết theo status ĐỌC TRƯỚC upsert: một publish
   //   chen giữa read↔decision có thể khiến cặp vừa-published bị BỎ refresh → catalog cũ (missed invalidation).
   //   Bind là thao tác admin hiếm; refresh dư khi product/test còn draft (không đổi matview) chấp nhận được.
