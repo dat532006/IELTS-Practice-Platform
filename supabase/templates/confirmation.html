@@ -1,6 +1,7 @@
 <!--
   Email xác nhận đăng ký — IELTS Practice Platform.
-  Biến Supabase (GoTrue): {{ .Token }} = mã OTP 6 số. Dùng cho:
+  Biến Supabase (GoTrue): {{ .Token }} = mã OTP. ĐỘ DÀI do dashboard quyết (mailer_otp_length, 6–10) —
+  đừng viết cứng con số vào nội dung mail, và RegisterForm cũng nhận cả dải 6–10. Dùng cho:
     • Local: đã wire trong supabase/config.toml [auth.email.template.confirmation] → test qua Mailpit.
     • Prod: DÁN NGUYÊN nội dung này vào Supabase dashboard → Authentication → Emails → "Confirm signup".
   Layout table + inline-style để chạy được trên Gmail/Outlook/Apple Mail (webmail hay strip <style>/<svg>).
@@ -26,7 +27,7 @@
             <!-- {{ .Data.full_name }} = họ tên user nhập lúc đăng ký (RegisterForm gửi qua signUp options.data);
                  if/else để đăng ký không tên (hoặc metadata thiếu) vẫn ra "Chào bạn" thay vì "Chào ," cụt. -->
             <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#6A6480;">
-              Chào {{ if .Data.full_name }}<strong style="color:#2A2740;">{{ .Data.full_name }}</strong>{{ else }}bạn{{ end }}, nhập mã xác nhận <strong style="color:#2A2740;">6 số</strong> dưới đây để hoàn tất tạo tài khoản IELTS&nbsp;Practice.
+              Chào {{ if .Data.full_name }}<strong style="color:#2A2740;">{{ .Data.full_name }}</strong>{{ else }}bạn{{ end }}, nhập <strong style="color:#2A2740;">mã xác nhận</strong> dưới đây để hoàn tất tạo tài khoản IELTS&nbsp;Practice.
             </p>
 
             <!-- Ô mã OTP -->
