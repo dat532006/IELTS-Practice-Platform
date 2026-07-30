@@ -6,6 +6,20 @@
   gap: 20px;
 }
 
+/* ≥960px (laptop, kể cả máy scaling 150–200% → viewport CSS ~1000px): ĐÚNG 3 thẻ/hàng như thiết kế.
+   Vì sao cần rule này: với `auto-fit`, số cột được tính theo track sizing function MAX khi max là độ
+   dài xác định (380px) — KHÔNG phải theo min 280px. Nên 3 cột đòi container ≥ 3×380 + 2×20 = 1180px,
+   tức viewport ≳1250px; laptop 1000px (container 930px) chỉ ra 2 cột và thẻ thứ 3 rớt dòng.
+   Ở đây khai báo cột TƯỜNG MINH; `minmax(0, 380px)` = "1fr nhưng không bao giờ quá 380px" nên trần
+   merchandising của thẻ giữ nguyên (container 930px → thẻ 296px; container ≥1180px → thẻ 380px, căn giữa).
+   `:has(> :nth-child(3))` giới hạn phạm vi: mục chỉ có 1–2 thẻ vẫn dùng auto-fit căn giữa như cũ.
+   Trình duyệt không hỗ trợ :has() → rơi về hành vi cũ, không vỡ layout. */
+@media (min-width: 960px) {
+  .dc-home .cards-grid:has(> :nth-child(3)) {
+    grid-template-columns: repeat(3, minmax(0, 380px));
+  }
+}
+
 .dc-home .cards-grid > * {
   min-width: 0;
 }

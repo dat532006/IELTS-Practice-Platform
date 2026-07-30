@@ -75,7 +75,8 @@ export default async function ProductsPage({
         </p>
       ) : (
         <>
-          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {/* `lap`(960) thay `lg`(1024): laptop scaling 150–200% có viewport ~1000px, trước đây chỉ ra 2 cột. */}
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lap:grid-cols-3">
             {cards.map((c) => (
               <ProductCard key={c.slug} p={c} />
             ))}

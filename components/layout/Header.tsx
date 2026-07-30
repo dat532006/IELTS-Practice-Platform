@@ -67,7 +67,10 @@ export function Header() {
           className={
             mobile
               ? 'flex min-h-[44px] items-center gap-1.5 px-3 py-2.5 text-[15px] font-bold text-[var(--text-subtle)]'
-              : 'inline-flex items-center gap-1.5 text-[14px] font-bold text-[var(--text-subtle)]'
+              // Speaking = placeholder ngoài scope v1 (không bấm được). Ở tầng laptop nén (960–1279px)
+              // ẩn đi để 7 mục điều hướng THẬT + cụm tài khoản vừa thanh 953px; ≥1280 hiện lại như cũ.
+              // Menu hamburger (mobile) vẫn luôn có mục này nên không mất thông tin "sắp ra mắt".
+              : 'hidden items-center gap-1.5 text-[14px] font-bold text-[var(--text-subtle)] xl:inline-flex'
           }
         >
           {item.label}
@@ -100,11 +103,15 @@ export function Header() {
         <div className="mx-auto flex h-[72px] w-[min(1200px,calc(100%-2rem))] min-w-0 items-center gap-4">
           <Logo href="/" size={38} textClassName="text-[17px]" withShadow={false} />
 
-          <nav aria-label="Điều hướng chính" lang="en" className="hidden min-w-0 flex-1 items-center gap-[22px] xl:flex">
+          {/* `lap` (960px) thay cho `xl`: laptop chạy display scaling 150–200% có viewport CSS ~960–1150px,
+              trước đây rơi vào nhánh hamburger dù đang dùng máy tính. 960–1279px = tầng NÉN (gap 12,
+              ẩn chip Speaking-soon, nút Log out thu về icon) — đo thật ở 1000px: khách 797/953px,
+              đã đăng nhập 919/953px (còn dư cả khi số dư 6 chữ số). ≥1280 giữ nguyên bố cục cũ. */}
+          <nav aria-label="Điều hướng chính" lang="en" className="hidden min-w-0 flex-1 items-center gap-3 lap:flex xl:gap-[22px]">
             {navItems(false)}
           </nav>
 
-          <div className="ml-auto hidden flex-none items-center gap-3.5 xl:flex">
+          <div className="ml-auto hidden flex-none items-center gap-2.5 lap:flex xl:gap-3.5">
             {email ? (
               <>
                 <RouteNavLink
@@ -117,12 +124,23 @@ export function Header() {
                 </RouteNavLink>
                 <span
                   title="Số dư xương cá"
-                  className="flex min-h-[44px] items-center gap-2 rounded-full border border-[#EDE7F5] bg-white px-3.5 text-[13.5px] font-extrabold text-[#2A2740] shadow-[0_4px_12px_rgba(42,39,64,0.05)]"
+                  className="flex min-h-[44px] items-center gap-2 rounded-full border border-[#EDE7F5] bg-white px-3 text-[13.5px] font-extrabold text-[#2A2740] shadow-[0_4px_12px_rgba(42,39,64,0.05)] xl:px-3.5"
                 >
                   <FishBone /> {coins ?? '—'}
                 </span>
-                <button onClick={logout} className="min-h-[44px] px-1 text-[14px] font-bold text-[#2A2740] transition-colors hover:text-[#5B43C7]">
-                  Log out
+                {/* 960–1279px: icon-only (vẫn 44×44 chạm tay + aria-label/title đọc được), ≥1280 hiện chữ. */}
+                <button
+                  onClick={logout}
+                  aria-label="Log out"
+                  title="Log out"
+                  className="flex h-11 w-11 flex-none items-center justify-center px-1 text-[14px] font-bold text-[#2A2740] transition-colors hover:text-[#5B43C7] xl:h-auto xl:w-auto"
+                >
+                  <span className="hidden xl:inline">Log out</span>
+                  <svg className="xl:hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3" />
+                    <path d="M15 16l4-4-4-4" />
+                    <path d="M19 12H9" />
+                  </svg>
                 </button>
                 <RouteNavLink
                   href="/account"
@@ -164,7 +182,7 @@ export function Header() {
             aria-label={menuOpen ? 'Đóng menu' : 'Mở menu'}
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
-            className="ml-auto flex h-11 w-11 flex-none items-center justify-center rounded-[10px] border border-[#EDE7F5] bg-white text-[#2A2740] shadow-[0_4px_12px_rgba(42,39,64,0.05)] xl:hidden"
+            className="ml-auto flex h-11 w-11 flex-none items-center justify-center rounded-[10px] border border-[#EDE7F5] bg-white text-[#2A2740] shadow-[0_4px_12px_rgba(42,39,64,0.05)] lap:hidden"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
               {menuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>}
@@ -173,7 +191,7 @@ export function Header() {
         </div>
 
         {menuOpen && (
-          <nav id="mobile-nav" aria-label="Điều hướng chính trên thiết bị nhỏ" className="border-t border-[rgba(42,39,64,0.07)] bg-[rgba(251,249,255,0.99)] px-4 py-3 xl:hidden">
+          <nav id="mobile-nav" aria-label="Điều hướng chính trên thiết bị nhỏ" className="border-t border-[rgba(42,39,64,0.07)] bg-[rgba(251,249,255,0.99)] px-4 py-3 lap:hidden">
             <ul className="mx-auto flex max-w-[1200px] flex-col gap-0.5">
               {navItems(true).map((item, index) => <li lang="en" key={MAIN_NAV[index]?.label ?? index}>{item}</li>)}
               <li className="mt-2 border-t border-[#EDE7F5] pt-2">

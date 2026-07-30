@@ -4,6 +4,11 @@
 @theme {
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+  /* Breakpoint "laptop": nhiều laptop chạy display scaling 150–200% nên viewport CSS chỉ ~960–1150px,
+     rơi DƯỚI `lg`(1024)/`xl`(1280) và bị đối xử như tablet — header thu về hamburger, lưới thẻ rớt
+     xuống 2 cột (Owner báo 2026-07-30, đo được viewport 1000px). `lap:` = 960px là mốc để bố cục
+     desktop bật sớm hơn. Dùng cho: nav header, lưới 3 thẻ ở landing / products / free. */
+  --breakpoint-lap: 60rem;
 }
 
 :root {
