@@ -24,15 +24,27 @@
   box-sizing: border-box;
 }
 
-.dc-home a {
-  text-decoration: none;
-  color: inherit;
-}
-.dc-home button {
-  font-family: inherit;
-  cursor: pointer;
-  border: none;
-  background: none;
+/* Reset phần tử của landing PHẢI nằm trong @layer base.
+   File này không khai báo layer nào → mọi rule của nó thuộc "unlayered" và thắng MỌI utility Tailwind
+   (Tailwind v4 đặt utility trong @layer utilities) bất kể specificity. Header dùng chung lại render
+   BÊN TRONG .dc-home ở trang chủ, nên reset dưới đây từng nuốt style của nó — chỉ trang chủ dính,
+   các trang khác vẫn đúng nên rất khó thấy:
+     • link nav mất màu phụ #564F6B → đen kịt như nhau, đọc thành một khối chữ liền với wordmark;
+     • mục đang xem mất gạch chân (text-decoration: none đè utility `underline`);
+     • nút hamburger mất nền trắng + viền + đổ bóng (border/background: none).
+   Bọc vào `base` (đứng TRƯỚC `utilities` trong thứ tự layer) thì utility thắng lại, còn markup landing
+   thuần CSS — không mang utility nào — vẫn nhận reset y như cũ. */
+@layer base {
+  .dc-home a {
+    text-decoration: none;
+    color: inherit;
+  }
+  .dc-home button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    background: none;
+  }
 }
 
 @keyframes dc-floaty {

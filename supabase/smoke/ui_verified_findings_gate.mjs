@@ -47,7 +47,14 @@ check('canonical transaction-terms slug is declared', /TRANSACTION_TERMS:\s*'tra
 check('Register Terms uses TRANSACTION_TERMS, never /legal/terms', /LEGAL_SLUG\.TRANSACTION_TERMS/.test(register) && !/\/legal\/terms/.test(register))
 
 console.log('\nResponsive root-cause contracts:')
-check('marketing desktop nav waits for content-fit breakpoint', /xl:flex/.test(header) && /xl:hidden/.test(header))
+// 2026-07-30: check này đỏ từ PR #151 (đổi `xl:` → `lap:` 960px cho laptop chạy display scaling) mà
+//   không ai để ý — nó khoá nguyên văn tên breakpoint thay vì khoá invariant. Invariant thật là: nav
+//   desktop và menu hamburger phải bật/tắt ở CÙNG một mốc, mốc đó khai báo trong @theme của globals.css.
+const navBp = (header.match(/aria-label="Điều hướng chính"[\s\S]{0,160}?\b([a-z]+):flex\b/) || [])[1]
+check('marketing desktop nav + hamburger đổi trạng thái ở CÙNG breakpoint (khai báo trong @theme)',
+  !!navBp && new RegExp(`\\b${navBp}:hidden\\b`).test(header) &&
+  (navBp === 'sm' || navBp === 'md' || navBp === 'lg' || navBp === 'xl' || new RegExp(`--breakpoint-${navBp}:`).test(globals)),
+  `breakpoint=${navBp}`)
 check('marketing disclosure restores focus to its toggle', /toggleRef/.test(header) && /\.focus\(\)/.test(header))
 check('admin server guard remains in server layout', /await requireAdmin\(\)/.test(adminLayout))
 check('admin layout delegates only chrome to responsive AdminShell', /<AdminShell[\s\S]*email=/.test(adminLayout))
@@ -65,7 +72,11 @@ check('Login maps safe localized auth errors', /toAuthErrorMessage/.test(login) 
 check('Login error is announced and associated to invalid fields', /<AuthMessage id="login-error"/.test(login) && /aria-invalid=/.test(login) && /aria-describedby=/.test(login))
 check('RichTextEditor requires an accessible label', /ariaLabel:\s*string/.test(rte) && /aria-label=\{ariaLabel\}/.test(rte))
 check('Admin question type select has a computed name', /aria-label=\{'Loại câu hỏi '/.test(adminForm))
-check('Catalog search and selects have stable labels', /htmlFor="catalog-search"/.test(catalog) && /aria-label="Sắp xếp bộ đề"/.test(catalog) && /aria-label="Lọc theo độ khó"/.test(catalog))
+// 2026-07-30: cũng đỏ từ trước — PR #127 thay <select> gốc bằng dropdown tự dựng, nhãn giờ truyền qua
+//   prop `ariaLabel` rồi mới đổ vào aria-label của nút + listbox. Nhãn KHÔNG mất, chỉ là gate soi sai chỗ.
+check('Catalog search and selects have stable labels',
+  /htmlFor="catalog-search"/.test(catalog) && /ariaLabel="Sắp xếp bộ đề"/.test(catalog) &&
+  /ariaLabel="Lọc theo độ khó"/.test(catalog) && (catalog.match(/aria-label=\{ariaLabel\}/g) || []).length >= 2)
 check('Pricing amount label is programmatically associated', /htmlFor="topup-amount"/.test(pricing) && /aria-describedby="topup-amount-help"/.test(pricing))
 check('landing owns main-content', /<main id="main-content"/.test(landing))
 check('marketing and auth shells own main-content', /<main[\s\S]*id="main-content"/.test(marketingLayout) && /<main[\s\S]*id="main-content"/.test(authLayout))
