@@ -5,19 +5,11 @@ import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { performLogout } from '@/lib/auth/logout'
 import { makeActivityBus } from '@/lib/auth/cross-tab'
+import { IDLE_CHECK_EVERY_MS, idleLimitForPath, isActivityAuthEvent, shouldIdleLogout } from '@/lib/auth/idle'
 
 // Passive logout (2026-07-13, Owner duyệt): treo máy quá hạn → tự đăng xuất + về /login?reason=idle.
-// - Đếm bằng TIMESTAMP + interval (KHÔNG setTimeout thuần): máy sleep/tab bị throttle, tỉnh dậy
-//   check thấy đã quá hạn là văng ngay — đúng kịch bản "treo máy".
-// - CHỈ chạy khi có session (guest không bị ảnh hưởng).
-// - LOẠI TRỪ trang đang thi (/exam/*, /writing/*): thí sinh nghe audio/đọc passage có thể không chạm
-//   chuột rất lâu — timer riêng của đề đã giới hạn thời gian; thời gian ở trang thi tính là active.
-// - /admin/* ngưỡng chặt hơn (rủi ro cao hơn).
-
-const DEFAULT_LIMIT_MS = 30 * 60_000 // 30 phút
-const ADMIN_LIMIT_MS = 15 * 60_000 // 15 phút cho khu quản trị
-const CHECK_EVERY_MS = 30_000
-const EXCLUDED_PREFIXES = ['/exam/', '/writing/']
+// Ngưỡng + luật quyết định nằm ở lib/auth/idle.ts (PURE, có gate riêng). File này chỉ lo phần trình
+// duyệt: nghe sự kiện, chia sẻ mốc hoạt động giữa tab, gọi logout rồi điều hướng.
 
 export function IdleLogout() {
   const pathname = usePathname()
@@ -33,9 +25,11 @@ export function IdleLogout() {
     void supabase.auth.getSession().then(({ data }) => {
       signedInRef.current = !!data.session
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       signedInRef.current = !!session
-      lastActiveRef.current = Date.now() // vừa đăng nhập/refresh = đang hoạt động
+      // CHỈ đăng nhập/mở phiên mới tính là hoạt động. TOKEN_REFRESHED là việc nền của supabase-js —
+      // xem lý do trong isActivityAuthEvent (nếu tính, đồng hồ idle có thể không bao giờ chạy tới hạn).
+      if (isActivityAuthEvent(event)) lastActiveRef.current = Date.now()
     })
 
     // SEC-003 — chia sẻ mốc hoạt động giữa các tab: tab này chạm → broadcast (throttle 5s); nhận ts từ
@@ -56,20 +50,19 @@ export function IdleLogout() {
     for (const ev of events) window.addEventListener(ev, mark, { passive: true, capture: true })
 
     const check = async () => {
-      if (!signedInRef.current || loggingOutRef.current) return
+      if (loggingOutRef.current) return
       const p = pathRef.current ?? ''
-      if (EXCLUDED_PREFIXES.some((x) => p.startsWith(x))) {
+      if (idleLimitForPath(p) === null) {
         lastActiveRef.current = Date.now() // đang thi → coi là active (rời trang thi mới đếm lại từ đầu)
         return
       }
-      const limit = p.startsWith('/admin') ? ADMIN_LIMIT_MS : DEFAULT_LIMIT_MS
-      if (Date.now() - lastActiveRef.current < limit) return
+      if (!shouldIdleLogout({ signedIn: signedInRef.current, path: p, now: Date.now(), lastActive: lastActiveRef.current })) return
       loggingOutRef.current = true
       // SEC-002 — checked signOut + local fallback + invalidate header cache (helper) rồi mới điều hướng.
       await performLogout()
       window.location.href = '/login?reason=idle'
     }
-    const interval = setInterval(() => void check(), CHECK_EVERY_MS)
+    const interval = setInterval(() => void check(), IDLE_CHECK_EVERY_MS)
     const onVisibility = () => {
       if (document.visibilityState === 'visible') void check() // tỉnh dậy từ sleep → check ngay
     }
