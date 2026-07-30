@@ -38,7 +38,18 @@ console.log('\nDEPLOY-002 — production SMTP automation contract:')
 const configure = readFileSync(resolve(root, 'scripts', 'configure-auth-email.mjs'), 'utf8')
 const envExample = readFileSync(resolve(root, '.env.example'), 'utf8')
 const template = readFileSync(resolve(root, 'supabase', 'templates', 'confirmation.html'), 'utf8')
-check('template uses a six-digit OTP token', template.includes('{{ .Token }}'))
+check('template renders the OTP token', template.includes('{{ .Token }}'))
+check('Management API pins mailer_otp_length (không để dashboard trôi)',
+  /mailer_otp_length: otpLength/.test(configure) && /AUTH_OTP_LENGTH/.test(configure))
+
+// 2026-07-30 — prod gửi mã 8 số trong khi RegisterForm hard-code đúng 6 (maxLength={6} cắt mất 2 số) →
+//   KHÔNG AI đăng ký được, mà tsc/lint/build vẫn xanh vì đây là lệch cấu hình runtime. Hai check dưới
+//   chốt: UI nhận cả dải GoTrue cho phép (6–10) và không viết cứng số vào nội dung mail.
+const registerForm = readFileSync(resolve(root, 'components', 'auth', 'RegisterForm.tsx'), 'utf8')
+check('RegisterForm nhận mã 6–10 số (không hard-code đúng 6)',
+  /\\d\{6,10\}/.test(registerForm) && /maxLength=\{10\}/.test(registerForm) && !/\\d\{6\}\$/.test(registerForm))
+check('Nội dung mail không viết cứng độ dài mã', !/\b\d+\s*(số|chữ số|digits?)\b/i.test(
+  template.replace(/<!--[\s\S]*?-->/g, '')))
 check('Management API config keeps confirmation enabled and autoconfirm off',
   /external_email_enabled: true/.test(configure) && /mailer_autoconfirm: false/.test(configure))
 check('SMTP, Site URL, allow-list and template are patched together',

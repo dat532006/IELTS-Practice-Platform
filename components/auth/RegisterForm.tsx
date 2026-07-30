@@ -98,8 +98,11 @@ export function RegisterForm() {
   async function onVerify(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!/^\d{6}$/.test(otp.trim())) {
-      showError('Vui lòng nhập đủ mã xác nhận gồm 6 chữ số.', 'register-otp')
+    // ĐỘ DÀI MÃ DO SUPABASE QUYẾT (mailer_otp_length ở dashboard, hợp lệ 6–10), KHÔNG phải do code này.
+    //   Trước đây hard-code đúng 6 + maxLength={6}: prod đặt 8 → mail gửi 8 số mà ô nhập cắt còn 6 →
+    //   không ai đăng ký được (Owner báo 2026-07-30). Nhận cả dải 6–10 để lệch cấu hình không chặn đăng ký.
+    if (!/^\d{6,10}$/.test(otp.trim())) {
+      showError('Mã xác nhận chỉ gồm chữ số — nhập đúng dãy số trong email.', 'register-otp')
       return
     }
     setLoading(true)
@@ -142,16 +145,16 @@ export function RegisterForm() {
           <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Xác nhận email</h1>
           <p className="mt-2 text-[14px] font-semibold text-[var(--text-muted)]">
             Đã gửi mã xác nhận tới <span className="font-extrabold text-[#2A2740]">{email}</span>.
-            Nhập mã 6 số để hoàn tất đăng ký.
+            Nhập mã trong email để hoàn tất đăng ký.
           </p>
           <form onSubmit={onVerify} noValidate className="mt-5">
-            <label htmlFor="register-otp" className="mb-2 block text-[13px] font-bold text-[#4A445E]">Mã xác nhận gồm 6 chữ số</label>
+            <label htmlFor="register-otp" className="mb-2 block text-[13px] font-bold text-[#4A445E]">Mã xác nhận trong email</label>
             <input
               id="register-otp"
               name="otp"
               inputMode="numeric"
               autoComplete="one-time-code"
-              maxLength={6}
+              maxLength={10}
               required
               aria-invalid={!!error || undefined}
               aria-describedby={error ? 'register-otp-error' : notice ? 'register-otp-notice' : undefined}
