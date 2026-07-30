@@ -70,7 +70,7 @@ export function Header() {
               // Speaking = placeholder ngoài scope v1 (không bấm được). Ở tầng laptop nén (960–1279px)
               // ẩn đi để 7 mục điều hướng THẬT + cụm tài khoản vừa thanh 953px; ≥1280 hiện lại như cũ.
               // Menu hamburger (mobile) vẫn luôn có mục này nên không mất thông tin "sắp ra mắt".
-              : 'hidden items-center gap-1.5 text-[14px] font-bold text-[var(--text-subtle)] xl:inline-flex'
+              : 'hidden min-h-[44px] items-center gap-1.5 text-[14px] font-semibold text-[var(--text-subtle)] xl:inline-flex'
           }
         >
           {item.label}
@@ -86,7 +86,10 @@ export function Header() {
           className={
             mobile
               ? 'flex min-h-[44px] items-center rounded-[10px] px-3 py-2.5 text-[15px] font-bold'
-              : 'text-[14px] font-bold transition-colors'
+              // 600 thay 700: 7 mục cạnh nhau ở 700 đọc thành một mảng chữ đặc, lại nặng ngang wordmark
+              // nên logo bị hoà vào nav. min-h-44 để mọi mục cao bằng cụm tài khoản bên phải (và đủ
+              // vùng chạm) — chữ vẫn 14px nên KHÔNG tốn thêm chiều ngang ở tầng nén.
+              : 'flex min-h-[44px] items-center text-[14px] font-semibold transition-colors'
           }
           activeClassName={mobile ? 'bg-[#F0ECFF] text-[#5B43C7]' : 'text-[#5B43C7] underline decoration-2 underline-offset-8'}
           inactiveClassName={mobile ? 'text-[#564F6B] hover:bg-[#F0ECFF] hover:text-[#5B43C7]' : 'text-[#564F6B] hover:text-[#5B43C7]'}
@@ -99,15 +102,21 @@ export function Header() {
   return (
     <>
       <SkipLink />
-      <header className="sticky top-0 z-40 border-b border-[rgba(42,39,64,0.07)] bg-[rgba(251,249,255,0.92)] backdrop-blur-[12px] backdrop-saturate-[180%]">
+      <header className="sticky top-0 z-40 border-b border-[rgba(42,39,64,0.09)] bg-[rgba(251,249,255,0.92)] backdrop-blur-[12px] backdrop-saturate-[180%]">
         <div className="mx-auto flex h-[72px] w-[min(1200px,calc(100%-2rem))] min-w-0 items-center gap-4">
           <Logo href="/" size={38} textClassName="text-[17px]" withShadow={false} />
 
           {/* `lap` (960px) thay cho `xl`: laptop chạy display scaling 150–200% có viewport CSS ~960–1150px,
               trước đây rơi vào nhánh hamburger dù đang dùng máy tính. 960–1279px = tầng NÉN (gap 12,
               ẩn chip Speaking-soon, nút Log out thu về icon) — đo thật ở 1000px: khách 797/953px,
-              đã đăng nhập 919/953px (còn dư cả khi số dư 6 chữ số). ≥1280 giữ nguyên bố cục cũ. */}
-          <nav aria-label="Điều hướng chính" lang="en" className="hidden min-w-0 flex-1 items-center gap-3 lap:flex xl:gap-[22px]">
+              đã đăng nhập 919/953px (còn dư cả khi số dư 6 chữ số). ≥1280 giữ nguyên bố cục cũ.
+
+              `justify-center` (không phải mặc định justify-start): nav là ô co giãn nên khi còn chỗ,
+              các mục dồn về GIỮA thanh thay vì dính vào logo rồi bỏ trống ~170px trước cụm bên phải
+              (đo ở 1000px khách: mục cuối kết thúc x=643 trong khi cụm phải bắt đầu x=810). Khi hết
+              chỗ — laptop 960px lúc đã đăng nhập — ô nav co lại vừa nội dung nên căn giữa tự thành
+              vô hiệu: bố cục quay về đúng như cũ, KHÔNG có nguy cơ tràn. */}
+          <nav aria-label="Điều hướng chính" lang="en" className="hidden min-w-0 flex-1 items-center justify-center gap-3 lap:flex xl:gap-[22px]">
             {navItems(false)}
           </nav>
 
@@ -116,7 +125,7 @@ export function Header() {
               <>
                 <RouteNavLink
                   href="/dashboard"
-                  className="text-[14px] font-bold transition-colors"
+                  className="flex min-h-[44px] items-center text-[14px] font-bold transition-colors"
                   activeClassName="text-[#5B43C7] underline decoration-2 underline-offset-8"
                   inactiveClassName="text-[#2A2740] hover:text-[#5B43C7]"
                 >
@@ -154,18 +163,20 @@ export function Header() {
               </>
             ) : (
               <>
+                {/* Log in là nút phụ đi kèm CTA chính: cho nó cùng bo góc + cùng chiều cao để hai nút
+                    thành một cặp, thay vì một dòng chữ trơ trọi cạnh một khối tím. */}
                 <RouteNavLink
                   href="/login"
-                  className="flex min-h-[44px] items-center px-1 text-[14px] font-bold transition-colors"
-                  activeClassName="text-[#5B43C7]"
-                  inactiveClassName="text-[#2A2740] hover:text-[#5B43C7]"
+                  className="flex min-h-[44px] items-center rounded-[11px] px-3 text-[14px] font-bold transition-colors"
+                  activeClassName="bg-[#F0ECFF] text-[#5B43C7]"
+                  inactiveClassName="text-[#2A2740] hover:bg-[#F0ECFF] hover:text-[#5B43C7]"
                   match="exact"
                 >
                   Log in
                 </RouteNavLink>
                 <RouteNavLink
                   href="/register"
-                  className="flex min-h-[44px] items-center rounded-[11px] bg-[#7C5CE6] px-[18px] text-[14px] font-bold text-white shadow-[0_8px_20px_rgba(124,92,230,0.26)] transition-colors hover:bg-[#6A48D6]"
+                  className="flex min-h-[44px] items-center rounded-[11px] bg-[#7C5CE6] px-[18px] text-[14px] font-bold text-white shadow-[0_6px_16px_rgba(124,92,230,0.22)] transition-colors hover:bg-[#6A48D6]"
                   activeClassName="ring-2 ring-[#6842D8] ring-offset-2"
                   match="exact"
                 >
