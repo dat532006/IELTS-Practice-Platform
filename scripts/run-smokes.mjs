@@ -3,7 +3,13 @@
 //   suy từ exit code), tổng hợp executed/skipped/failed/blocked. Mọi smoke REQUIRED KHÔNG PASSED →
 //   runner exit 1 (KHÔNG cho CI báo PASS giả khi smoke bị SKIP/BLOCKED). Optional smoke SKIP → không chặn.
 //   Phân loại required/optional ở OPTIONAL bên dưới (Owner tinh chỉnh — mục "Owner: classify optional").
-// Dùng: node scripts/run-smokes.mjs [--only <substr>]   (SMOKE_BASE/env truyền như bình thường)
+// Dùng: node scripts/run-smokes.mjs [--only <substr>] [--no-infra]
+//   (SMOKE_BASE/env truyền như bình thường)
+//
+// --no-infra: chế độ cho CI KHÔNG có Supabase/gateway/AI key. Vẫn chạy TOÀN BỘ smoke — không lọc theo
+//   danh sách nào cả — nhưng chỉ coi FAILED (assertion sai) là chặn; SKIPPED/BLOCKED vì thiếu hạ tầng
+//   thì bỏ qua. Cố ý không dùng "danh sách gate tĩnh": danh sách sẽ mục, và một gate bị rơi khỏi danh
+//   sách là gate ngừng chạy trong im lặng — đúng thứ chế độ này sinh ra để chống.
 // ============================================================
 import { readFileSync, readdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -34,6 +40,7 @@ const OPTIONAL = new Set([
 
 const onlyIdx = process.argv.indexOf('--only')
 const only = onlyIdx >= 0 ? process.argv[onlyIdx + 1] : null
+const noInfra = process.argv.includes('--no-infra')
 
 const files = readdirSync(smokeDir)
   .filter((f) => f.endsWith('.mjs') && !f.startsWith('_')) // _harness.mjs… là thư viện, không phải smoke
@@ -59,15 +66,32 @@ for (const f of files) {
   }
   // Fallback nếu smoke chưa in SMOKE_RESULT: suy từ exit code (0=PASSED,1=FAILED,2=BLOCKED,3=SKIPPED).
   if (!status) status = ({ 0: 'PASSED', 1: 'FAILED', 2: 'BLOCKED', 3: 'SKIPPED' })[r.status] ?? 'BLOCKED'
-  results.push({ name: f, status, required })
+  // Smoke cần Supabase/gateway mà không dùng đường BLOCKED của harness thì chết bằng exception mạng và
+  //   ra FAILED — giống hệt assertion sai. --no-infra phải tách được hai thứ đó, nếu không nó vô dụng.
+  //   CỐ Ý không nhận ERR_MODULE_NOT_FOUND là "thiếu hạ tầng": đó là smoke HỎNG (import sai), và chính
+  //   nó đã giấu gate sanitize SEC-006 suốt một thời gian dài.
+  const noInfraSignature = /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed|Missing required environment variable|SUPABASE_(URL|SERVICE_ROLE_KEY|ANON_KEY) /
+  results.push({ name: f, status, required, infraAbsent: status !== 'PASSED' && noInfraSignature.test(out) })
   const tag = status === 'PASSED' ? '✅' : status === 'SKIPPED' ? (required ? '⛔SKIP' : '⏭️skip') : status === 'BLOCKED' ? '⛔BLOCKED' : '❌FAIL'
   console.log(`${tag}  ${f}${required ? '' : ' (optional)'}`)
   if (status !== 'PASSED' && out.trim()) console.error(out.trim())
 }
 
-const { exit, totals } = aggregateSmokes(results)
+const { exit: strictExit, totals } = aggregateSmokes(results)
 console.log('\n' + '─'.repeat(48))
 console.log(`Tổng: ${totals.total} | PASSED ${totals.passed} | FAILED ${totals.failed} | SKIPPED ${totals.skipped} | BLOCKED ${totals.blocked}`)
-console.log(`Required chưa PASS: ${totals.requiredNotPassed} → runner ${exit === 0 ? 'PASS (exit 0)' : 'FAIL-CLOSED (exit 1)'}`)
-console.log(`SMOKE_RUN_RESULT ${JSON.stringify({ ...totals, exit })}`)
+
+let exit = strictExit
+if (noInfra) {
+  // Chỉ lỗi THẬT mới chặn. Thiếu Supabase/gateway/AI key là chuyện của môi trường, không phải lỗi code.
+  const real = results.filter((r) => r.status !== 'PASSED' && !r.infraAbsent)
+  const skippedForInfra = results.filter((r) => r.infraAbsent)
+  exit = real.length > 0 ? 1 : 0
+  console.log(`--no-infra: chạy được ${totals.passed} | lỗi thật ${real.length} | bỏ qua vì thiếu hạ tầng ${skippedForInfra.length}`)
+  if (real.length) console.log(`Lỗi thật ở: ${real.map((r) => `${r.name} (${r.status})`).join(', ')}`)
+  console.log(`→ runner ${exit === 0 ? 'PASS (exit 0)' : 'FAIL (exit 1)'}`)
+} else {
+  console.log(`Required chưa PASS: ${totals.requiredNotPassed} → runner ${exit === 0 ? 'PASS (exit 0)' : 'FAIL-CLOSED (exit 1)'}`)
+}
+console.log(`SMOKE_RUN_RESULT ${JSON.stringify({ ...totals, mode: noInfra ? 'no-infra' : 'full', exit })}`)
 process.exit(exit)

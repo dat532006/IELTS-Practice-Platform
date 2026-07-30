@@ -1,0 +1,43 @@
+# Hàng rào tự động cho lớp lỗi "build xanh mà vẫn hỏng".
+#
+# Vì sao có file này: repo có ~86 smoke/gate viết rất kỹ, nhưng KHÔNG có gì tự chạy chúng — chỉ chạy khi
+# ai đó nhớ ra. Ngày 2026-07-30 rà lại thì 6 gate đang đỏ mà không ai biết, cái lâu nhất là gate sanitize
+# SEC-006 chết ngay ở bước import nên CHƯA TỪNG chạy một assertion nào. Gate không được chạy thì không
+# phải hàng rào, chỉ là file text.
+#
+# Cố ý KHÔNG có secret và KHÔNG cần Supabase/gateway/AI key: `--no-infra` vẫn chạy toàn bộ smoke rồi chỉ
+# chặn ở lỗi THẬT, còn cái nào thiếu hạ tầng thì bỏ qua. Nhờ vậy job này luôn chạy được trên mọi PR,
+# kể cả PR từ fork. Phần cần hạ tầng thật (Supabase local + payment/AI) vẫn chạy tay như trước.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 24: các gate import THẲNG file production .ts nhờ type-stripping sẵn có của Node.
+      # Hạ version là hàng loạt gate chết ở bước import — đúng kiểu hỏng câm mà CI này sinh ra để chặn.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx next lint
+
+      # Chạy được smoke nào thì chạy hết smoke đó. Assertion sai HOẶC smoke hỏng (vd import sai) → đỏ;
+      # thiếu Supabase/gateway → bỏ qua. Không dùng danh sách gate tĩnh: danh sách sẽ mục, và một gate
+      # rơi khỏi danh sách là gate ngừng chạy trong im lặng.
+      - name: Smoke & gate (không cần hạ tầng)
+        run: node scripts/run-smokes.mjs --no-infra
