@@ -52,8 +52,11 @@ check('nhánh reading/listening giữ nguyên (passage trống vẫn warn)',
   /Passage \$\{i \+ 1\}[^`]*đang trống/.test(form))
 
 console.log('\nAI-011 — form Writing KHÔNG hiện/mang phần câu hỏi & đáp án:')
+// Bám vào id của khối (#sec-questions — chính là đích của link nhảy mục), KHÔNG bám className:
+//   khối này về sau được thêm `id`/`scroll-mt-24` cho thanh điều hướng trong form và check literal cũ
+//   gãy ngay, dù điều kiện `type !== 'writing'` vẫn nguyên vẹn.
 check("khối questions builder bọc điều kiện type !== 'writing'",
-  /\{type !== 'writing' && \(\s*<div className="mt-5">/.test(form))
+  /\{type !== 'writing' && \(\s*<div[^>]*id="sec-questions"/.test(form))
 check("buildPayload: writing → questions []", /questions:\s*type === 'writing' \? \[\] : qOut/.test(form))
 check("buildPayload: writing → answer_keys {} (xoá key rác nếu đề từng là reading)",
   /answer_keys:\s*type === 'writing' \? \{\} : answer_keys/.test(form))

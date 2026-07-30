@@ -28,8 +28,12 @@ check('matrix: cell onClick undefined + radio disabled khi readOnly', /onClick=\
 console.log('\nEXAM-008 — khoá thẻ/ô nhập/bookmark khi review:')
 check('bank: chip locked = isUsed || readOnly', /const locked = isUsed \|\| readOnly/.test(bank))
 check('summary: chip locked = isUsed || readOnly', /const locked = isUsed \|\| readOnly/.test(summary))
-check('bank: input readOnly + drop guard', /readOnly=\{readOnly\}/.test(bank) && /onDrop=\{readOnly \? undefined :/.test(bank))
-check('summary: input readOnly + drop guard', /readOnly=\{readOnly\}/.test(summary) && /onDrop=\{readOnly \? undefined :/.test(summary))
+// Điều kiện readOnly được phép CHẶT HƠN `readOnly` đơn thuần — SummaryQuestion giờ là
+//   `readOnly={readOnly || hasBank}` (có word bank thì gõ tay cũng cấm). Gate chỉ đòi ô nhập bị khoá
+//   KHI readOnly, không đòi khoá CHỈ khi readOnly; siết thêm là hợp lệ, không phải regression.
+const readOnlyGuard = /readOnly=\{readOnly(\s*\|\|[^}]*)?\}/
+check('bank: input readOnly + drop guard', readOnlyGuard.test(bank) && /onDrop=\{readOnly \? undefined :/.test(bank))
+check('summary: input readOnly + drop guard', readOnlyGuard.test(summary) && /onDrop=\{readOnly \? undefined :/.test(summary))
 check('bank: nút bookmark ẩn khi readOnly', /\{!readOnly && \(\s*<button/.test(bank))
 check('matrix: nút bookmark ẩn khi readOnly', /\{!readOnly && \(\s*<button/.test(matrix))
 

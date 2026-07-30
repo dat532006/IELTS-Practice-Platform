@@ -1,6 +1,7 @@
 // SEC-006 regression — chạy production sanitizer (lib/sanitize/passage-html-client.ts) trên corpus HTML độc.
 // Node v24 strip TS types tự nhiên; DOMParser polyfill bằng htmlparser2 (đã cài) để chạy đúng walk() thật.
 //   node supabase/smoke/sanitize_passage_client_test.mjs
+import { register } from 'node:module'
 import { parseDocument } from 'htmlparser2'
 
 // --- DOMParser polyfill: bọc domhandler node thành W3C subset mà sanitizer dùng ---
@@ -26,6 +27,9 @@ globalThis.DOMParser = class {
   }
 }
 
+// Sanitizer import `@/lib/storage/media-url` — Node không đọc `paths` của tsconfig nên phải cấp resolver
+//   trước, nếu không cả gate chết ở bước import (đúng chuyện đã xảy ra tới 2026-07-30).
+register('./_ts-alias-hooks.mjs', import.meta.url)
 const { sanitizePassageHtmlClient } = await import('../../lib/sanitize/passage-html-client.ts')
 
 let pass = 0, fail = 0
