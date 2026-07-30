@@ -46,7 +46,7 @@ export default async function FreePage() {
       ) : cards.length === 0 ? (
         <p className="mt-10 text-center text-sm text-slate-400">Chưa có đề miễn phí nào — vui lòng quay lại sau.</p>
       ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lap:grid-cols-3">
           {cards.map((p) => <ProductCard key={p.slug} p={p} />)}
         </div>
       )}
