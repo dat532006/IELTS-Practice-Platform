@@ -15,7 +15,11 @@ type EnvLike = Record<string, string | undefined>
 // Docs GPT-5.6: reasoning.effort ∈ none|low|medium|high|xhigh|max; mặc định API = medium.
 export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 const VALID_EFFORTS: readonly string[] = ['none', 'low', 'medium', 'high', 'xhigh', 'max']
-const DEFAULT_EFFORT: ReasoningEffort = 'medium' // = mặc định OpenAI → không bất ngờ khi chưa cấu hình
+// Owner chốt 2026-07-31: mặc định 'high' (trước là 'medium' = mặc định của OpenAI). Đặt trong CODE chứ
+//   không phải env Vercel để prod nhận ngay khi merge, không phụ thuộc ai đó nhớ set biến.
+//   ĐÂY LÀ TIỀN: reasoning token tính giá như output token ($15/1M với terra) → hạ về 'medium'/'low' chỉ
+//   cần đặt WRITING_GRADER_OPENAI_REASONING_EFFORT, không phải sửa code.
+const DEFAULT_EFFORT: ReasoningEffort = 'high'
 
 export type EffortSelection = { ok: true; effort: ReasoningEffort } | { ok: false; reason: 'invalid_config' }
 

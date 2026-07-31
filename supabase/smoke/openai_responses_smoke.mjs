@@ -32,8 +32,10 @@ console.log('AI-003 — max_output_tokens (reasoning budget):')
 
 console.log('\nAI-003 — reasoning.effort (nút vặn chi phí, fail-loud như AI-002):')
 {
+  // Owner chốt 2026-07-31: mặc định của DỰ ÁN là 'high' (khác mặc định 'medium' của OpenAI) — chốt ở
+  //   đây để không ai hạ effort bằng cách sửa code mà không thấy; muốn đổi thì đặt env, không sửa hằng.
   const d = openaiReasoningEffort({})
-  check('không set → ok + mặc định medium (bằng mặc định OpenAI)', d.ok === true && d.effort === 'medium', JSON.stringify(d))
+  check("không set → ok + mặc định 'high' (mặc định của DỰ ÁN, không phải của OpenAI)", d.ok === true && d.effort === 'high', JSON.stringify(d))
   check("'low' → ok/low", openaiReasoningEffort({ WRITING_GRADER_OPENAI_REASONING_EFFORT: 'low' }).effort === 'low')
   check("' HIGH ' → trim+lowercase → high", openaiReasoningEffort({ WRITING_GRADER_OPENAI_REASONING_EFFORT: ' HIGH ' }).effort === 'high')
   for (const e of ['none', 'low', 'medium', 'high', 'xhigh', 'max']) {
@@ -42,9 +44,9 @@ console.log('\nAI-003 — reasoning.effort (nút vặn chi phí, fail-loud như 
   }
   // AI-002 precedent: config lạ KHÔNG được âm thầm đổi → chi phí/hành vi ngoài dự kiến.
   const bad = openaiReasoningEffort({ WRITING_GRADER_OPENAI_REASONING_EFFORT: 'hihg' })
-  check('typo → fail-loud invalid_config (KHÔNG âm thầm về medium)', bad.ok === false && bad.reason === 'invalid_config', JSON.stringify(bad))
+  check('typo → fail-loud invalid_config (KHÔNG âm thầm về mặc định)', bad.ok === false && bad.reason === 'invalid_config', JSON.stringify(bad))
   check("'ultra' (không tồn tại) → fail-loud", openaiReasoningEffort({ WRITING_GRADER_OPENAI_REASONING_EFFORT: 'ultra' }).ok === false)
-  check('rỗng → coi như không set → medium', openaiReasoningEffort({ WRITING_GRADER_OPENAI_REASONING_EFFORT: '  ' }).effort === 'medium')
+  check('rỗng → coi như không set → về mặc định dự án', openaiReasoningEffort({ WRITING_GRADER_OPENAI_REASONING_EFFORT: '  ' }).effort === 'high')
 }
 
 console.log('\nAI-003 — parseOpenAiResponse (quan sát được vì sao hỏng):')
