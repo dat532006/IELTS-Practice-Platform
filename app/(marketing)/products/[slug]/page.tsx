@@ -4,14 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { getProductDetail } from '@/lib/products/detail'
 import { CurriculumList } from '@/components/product/CurriculumList'
 import { PurchaseCta } from '@/components/product/PurchaseCta'
+import { skillMeta } from '@/components/brand/skill'
 
 // W4 — Product detail (M04/M10). Server component đọc getProductDetail (RLS server client, optional auth).
 // Layout theo design "Purchase & Admin.dc.html" frame 2: cover gradient theo skill, meta, mục lục, aside PurchaseCta.
-const SKILL_COVER: Record<string, { grad: string; label: string }> = {
-  reading: { grad: 'linear-gradient(135deg,#FFD9C8,#FF9F77)', label: 'READING' },
-  listening: { grad: 'linear-gradient(135deg,#FFE6AE,#FFC95E)', label: 'LISTENING' },
-  writing: { grad: 'linear-gradient(135deg,#D9CFFF,#B098FF)', label: 'WRITING' },
-}
+// Gradient/nhãn cover lấy từ SKILL_META dùng chung (trước đây chép tay một bản SKILL_COVER giống hệt).
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -24,7 +21,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   const freeCount = detail.tests.filter((t) => t.is_free).length
   const primarySkill = detail.tests[0]?.skill ?? 'reading'
-  const cover = SKILL_COVER[primarySkill] ?? SKILL_COVER.reading
+  const cover = skillMeta(primarySkill)
 
   return (
     <div className="mx-auto min-w-0 max-w-5xl px-4 py-8 text-[#2A2740]">
@@ -34,11 +31,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       >
         {/* Breadcrumb */}
         <nav className="text-[12.5px] font-semibold text-[var(--text-subtle)]">
-          <Link href="/" className="hover:text-[#7C5CE6]">
+          <Link href="/" className="-my-1 inline-block py-1 hover:text-[#7C5CE6]">
             Trang chủ
           </Link>
           <span className="mx-1.5 text-[var(--text-subtle)]">/</span>
-          <Link href="/products" className="hover:text-[#7C5CE6]">
+          <Link href="/products" className="-my-1 inline-block py-1 hover:text-[#7C5CE6]">
             Bộ đề
           </Link>
           <span className="mx-1.5 text-[var(--text-subtle)]">/</span>
@@ -68,8 +65,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 />
               ) : (
                 <>
-                  <span className="absolute left-[18px] top-4 text-[12px] font-extrabold tracking-[0.1em] text-white/90">
-                    {cover.label}
+                  {/* Chữ trắng trên gradient pastel chỉ ~1.4:1 → pill trắng + màu chữ skill (≥5.3:1). */}
+                  <span
+                    className="absolute left-[18px] top-4 rounded-full bg-white/90 px-2.5 py-1 text-[12px] font-extrabold tracking-[0.1em]"
+                    style={{ color: cover.text }}
+                  >
+                    {cover.coverLabel}
                   </span>
                   <span className="absolute -right-3.5 -top-[30px] h-[140px] w-[140px] rounded-full bg-white/20" />
                   <span className="text-[96px] font-extrabold leading-none text-white/[0.62]">
@@ -90,7 +91,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                   Miễn phí
                 </span>
               ) : (
-                <span className="rounded-full bg-[#FFF1DC] px-2.5 py-[5px] text-[12px] font-extrabold text-[#C98A1A]">
+                <span className="rounded-full bg-[var(--badge-amber-bg)] px-2.5 py-[5px] text-[12px] font-extrabold text-[var(--badge-amber-text)]">
                   🔒 Chưa mở
                 </span>
               )}

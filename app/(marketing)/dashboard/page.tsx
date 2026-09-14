@@ -105,7 +105,7 @@ export default function DashboardPage() {
     return (
       <p className="text-[14px] text-[var(--text-muted)]">
         Bạn cần{' '}
-        <Link href="/login" className="font-bold text-[#6A48D6] underline">
+        <Link href="/login?next=/dashboard" className="font-bold text-[#6A48D6] underline">
           đăng nhập
         </Link>{' '}
         để xem bảng điều khiển.

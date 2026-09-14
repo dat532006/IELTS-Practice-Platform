@@ -39,7 +39,7 @@ const COLS: { title: string; links: { label: string; href?: string }[] }[] = [
 export function SiteFooter() {
   return (
     <footer className="mt-16 border-t border-[#EBE6F2] bg-[rgba(255,255,255,0.5)]">
-      <div className="mx-auto grid w-[min(1200px,93vw)] gap-8 py-12 sm:grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
+      <div className="mx-auto grid w-[var(--site-container)] gap-8 py-12 sm:grid-cols-2 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div>
           <Link
             href="/"
@@ -59,15 +59,16 @@ export function SiteFooter() {
         {COLS.map((col) => (
           <div key={col.title}>
             <div className="text-[13px] font-extrabold uppercase tracking-[0.04em] text-[#2A2740]">{col.title}</div>
-            <ul className="mt-3.5 space-y-2.5">
+            {/* UI-20: link cao 28px (py-1) thay 20px; space-y giảm tương ứng nên nhịp dòng giữ nguyên 30px. */}
+            <ul className="mt-2.5 space-y-0.5">
               {col.links.map((l) => (
                 <li key={l.label}>
                   {l.href ? (
-                    <Link href={l.href} className="text-sm font-semibold text-[#6A6480] transition hover:text-[#7C5CE6]">
+                    <Link href={l.href} className="inline-block py-1 text-sm font-semibold text-[#6A6480] transition hover:text-[#7C5CE6]">
                       {l.label}
                     </Link>
                   ) : (
-                    <span className="cursor-not-allowed text-sm font-semibold text-[var(--text-subtle)]">{l.label}</span>
+                    <span className="inline-block cursor-not-allowed py-1 text-sm font-semibold text-[var(--text-subtle)]">{l.label}</span>
                   )}
                 </li>
               ))}
@@ -77,11 +78,11 @@ export function SiteFooter() {
       </div>
 
       <div className="border-t border-[#EBE6F2]">
-        <div className="mx-auto flex w-[min(1200px,93vw)] flex-wrap items-center justify-between gap-x-6 gap-y-2 py-4 text-[13px] font-semibold text-[var(--text-subtle)]">
+        <div className="mx-auto flex w-[var(--site-container)] flex-wrap items-center justify-between gap-x-6 gap-y-2 py-4 text-[13px] font-semibold text-[var(--text-subtle)]">
           <span>© 2026 IELTSPractice. All rights reserved.</span>
-          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+          <div className="-my-1 flex flex-wrap gap-x-5">
             {LEGAL_SLUGS.map((slug) => (
-              <Link key={slug} href={`/legal/${slug}`} className="transition hover:text-[#7C5CE6]">
+              <Link key={slug} href={`/legal/${slug}`} className="inline-block py-1 transition hover:text-[#7C5CE6]">
                 {LEGAL_PAGES[slug].title}
               </Link>
             ))}

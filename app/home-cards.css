@@ -93,8 +93,8 @@
   line-height: 1.3;
 }
 
-/* Full-width action button; the free variant paints the skill accent, the
-   card root supplies --skill / --skill-hover / --skill-shadow. */
+/* Full-width action button; the free variant paints the skill's SOLID role (white text ≥4.5:1 — the raw
+   accent was 2.1–2.9:1, audit UI-01). The card root supplies --skill-solid / --skill-solid-hover / --skill-shadow. */
 .dc-home .product-cta {
   display: flex;
   align-items: center;
@@ -109,11 +109,11 @@
 
 .dc-home .product-cta.free {
   color: #fff;
-  background: var(--skill, #7c5ce6);
+  background: var(--skill-solid, var(--skill-writing-solid));
   box-shadow: var(--skill-shadow, 0 12px 24px -12px rgba(124, 92, 230, 0.6));
 }
 .dc-home .product-card-link:hover .product-cta.free {
-  background: var(--skill-hover, #6a48d6);
+  background: var(--skill-solid-hover, var(--skill-writing-solid-hover));
 }
 
 .dc-home .product-cta.locked {
@@ -126,7 +126,7 @@
 }
 
 .dc-home .product-cta.coming_soon {
-  color: #7d758b;
-  background: #f2eff5;
+  color: var(--badge-neutral-text);
+  background: var(--badge-neutral-bg);
   box-shadow: none;
 }

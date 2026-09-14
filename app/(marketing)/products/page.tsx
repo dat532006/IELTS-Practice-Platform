@@ -75,6 +75,8 @@ export default async function ProductsPage({
         </p>
       ) : (
         <>
+          {/* Tiêu đề thẻ là h3 → cần h2 cho lưới (ẩn hình, chỉ cho điều hướng heading của trình đọc màn hình). */}
+          <h2 className="sr-only">Danh sách bộ đề</h2>
           {/* `lap`(960) thay `lg`(1024): laptop scaling 150–200% có viewport ~1000px, trước đây chỉ ra 2 cột. */}
           <div className="mt-6 grid gap-5 sm:grid-cols-2 lap:grid-cols-3">
             {cards.map((c) => (

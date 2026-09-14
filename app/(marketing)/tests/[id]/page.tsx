@@ -7,19 +7,13 @@ import { skillMeta, SkillGlyph } from '@/components/brand/skill'
 import { FishBone } from '@/components/brand/FishBone'
 import { isUuid } from '@/lib/utils'
 import { testEntryPath } from '@/lib/exam/entry-route'
-import type { ExamSkill } from '@/types/exam'
+import { questionTypeLabel } from '@/components/exam/questions/types'
 
 // W4 — Pre-exam page (M05). Server component đọc getTestMeta (SAFE metadata, KHÔNG payload).
 //   CTA theo access-state: free/unlocked → route theo kỹ năng; locked → login (guest) / mua bundle (auth).
 // 2026-07 redesign: đưa body về ngôn ngữ thương hiệu (tím/san hô) như homepage & product detail.
 //   Header/Footer giữ nguyên. KHÔNG đổi data-fetch/access-logic — chỉ trình bày.
-
-// Nền pastel header thẻ theo kỹ năng (token README §2; accent + glyph lấy từ hệ skill dùng chung).
-const SKILL_SOFT: Record<ExamSkill, string> = {
-  reading: '#FFEDE6',
-  listening: '#FFF3DC',
-  writing: '#F0ECFF',
-}
+// Màu theo kỹ năng lấy từ SKILL_META: `color` trang trí, `text` cho chữ, `soft` cho nền pastel (token globals.css).
 
 // Ký tự "watermark" trên cover: số đuôi tiêu đề ("… TEST 01" → "01"), fallback chữ cái đầu.
 function coverMono(title: string): string {
@@ -65,10 +59,10 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
   // Trình bày (KHÔNG phải access-logic): accent/label/glyph theo kỹ năng + badge/CTA theo state.
   const sk = skillMeta(meta.skill)
   const accent = sk.color
-  const soft = SKILL_SOFT[meta.skill]
+  const soft = sk.soft
   const locked = state === 'locked_guest' || state === 'locked_auth'
   const badge = locked
-    ? { text: '🔒 Khóa', cls: 'bg-[#FFF1DC] text-[#C98A1A]' }
+    ? { text: '🔒 Khóa', cls: 'bg-[var(--badge-amber-bg)] text-[var(--badge-amber-text)]' }
     : state === 'unlocked'
       ? { text: '✓ Đã mở khóa', cls: 'bg-[#E7F7EE] text-[var(--text-success)]' }
       : { text: 'Miễn phí', cls: 'bg-[#E7F7EE] text-[var(--text-success)]' }
@@ -77,11 +71,11 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
     <div className="mx-auto max-w-2xl px-4 py-10 text-[#2A2740]">
       {/* Breadcrumb (brand) */}
       <nav className="text-[12.5px] font-semibold text-[var(--text-subtle)]">
-        <Link href="/" className="hover:text-[#7C5CE6]">
+        <Link href="/" className="-my-1 inline-block py-1 hover:text-[#7C5CE6]">
           Trang chủ
         </Link>
         <span className="mx-1.5 text-[var(--text-subtle)]">/</span>
-        <Link href="/products" className="hover:text-[#7C5CE6]">
+        <Link href="/products" className="-my-1 inline-block py-1 hover:text-[#7C5CE6]">
           Bộ đề
         </Link>
         <span className="mx-1.5 text-[var(--text-subtle)]">/</span>
@@ -139,7 +133,7 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
             </span>
             <span
               className="inline-flex items-center rounded-full bg-white px-[13px] py-[6px] text-[12px] font-extrabold uppercase tracking-[0.05em] shadow-[0_4px_12px_-6px_rgba(60,40,90,0.28)]"
-              style={{ color: accent }}
+              style={{ color: sk.text }}
             >
               Bộ đề · {sk.coverLabel}
             </span>
@@ -203,12 +197,13 @@ export default async function PreExamPage({ params }: { params: Promise<{ id: st
             <div className="mt-[18px]">
               <div className="text-[11.5px] font-bold text-[var(--text-subtle)]">Dạng câu hỏi</div>
               <div className="mt-[9px] flex flex-wrap gap-[7px]">
-                {meta.question_types.map((qt) => (
+                {/* Mã alias (mcq / mcq_single…) cùng nhãn → gộp để không hiện chip trùng. */}
+                {[...new Set(meta.question_types.map(questionTypeLabel).filter(Boolean))].map((label) => (
                   <span
-                    key={qt}
+                    key={label}
                     className="rounded-[8px] bg-[#F0ECFF] px-[11px] py-[5px] text-[12px] font-bold text-[#6A4BD0]"
                   >
-                    {qt}
+                    {label}
                   </span>
                 ))}
               </div>

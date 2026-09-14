@@ -15,7 +15,7 @@ export function StrengthMeter({ level }: { level: number }) {
           />
         ))}
       </div>
-      <p className="mt-[7px] text-[12px] font-bold" style={{ color: meta.color }}>
+      <p className="mt-[7px] text-[12px] font-bold" style={{ color: meta.text }}>
         {meta.label} · {meta.hint}
       </p>
     </div>

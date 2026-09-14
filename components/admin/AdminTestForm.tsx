@@ -110,8 +110,8 @@ const SKILLS: { id: TestType; label: string }[] = [
 const TYPE_CHIP: Record<string, { bg: string; color: string }> = {
   tfng: { bg: '#FFEDE6', color: '#C7542F' },
   ynng: { bg: '#FFEDE6', color: '#C7542F' },
-  mcq: { bg: '#FFF3DC', color: '#A87614' },
-  mcq_multi: { bg: '#FFF3DC', color: '#A87614' },
+  mcq: { bg: '#FFF3DC', color: 'var(--badge-amber-text)' },
+  mcq_multi: { bg: '#FFF3DC', color: 'var(--badge-amber-text)' },
   gap_filling: { bg: '#F0ECFF', color: '#5B43C7' },
   summary: { bg: '#F0ECFF', color: '#5B43C7' },
   matching: { bg: '#F0ECFF', color: '#5B43C7' },
@@ -845,7 +845,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
             return <span className="ml-auto rounded-full bg-[#E7F7EE] px-3 py-1 text-[12px] font-extrabold text-[var(--text-success)]">✓ Không phát hiện lỗi</span>
           const target = (issues.find((i) => i.level === 'error') ?? issues[0]).anchor
           return (
-            <button type="button" onClick={() => scrollToAnchor(target)} className="ml-auto rounded-full bg-[#FFF3DC] px-3 py-1 text-[12px] font-extrabold text-[#A87614] transition hover:bg-[#FCEBCB]">
+            <button type="button" onClick={() => scrollToAnchor(target)} className="ml-auto rounded-full bg-[#FFF3DC] px-3 py-1 text-[12px] font-extrabold text-[var(--badge-amber-text)] transition hover:bg-[#FCEBCB]">
               ⚠ {issues.length} cần kiểm tra → tới lỗi đầu
             </button>
           )
@@ -881,7 +881,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
           </div>
         )}
         {importMsg && (
-          <p className={`mt-2 text-[12.5px] font-bold ${importMsg.tone === 'ok' ? 'text-[var(--text-success)]' : 'text-[#D24A4A]'}`}>{importMsg.text}</p>
+          <p className={`mt-2 text-[12.5px] font-bold ${importMsg.tone === 'ok' ? 'text-[var(--text-success)]' : 'text-[var(--text-error)]'}`}>{importMsg.text}</p>
         )}
         <p className="mt-2 text-[11.5px] font-semibold leading-[1.5] text-[#9088A2]">
           Đổ đầy tiêu đề · passages · câu hỏi. ⚠️ <b>answer_keys từ OCR thường rỗng</b> — bắt buộc gõ tay ở ô 🔒 mỗi câu (key sai = chấm sai).
@@ -1126,11 +1126,11 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                 {NEEDS_OPTIONS.has(q.type) && (
                   <div className="mt-2.5 rounded-[10px] border border-[#F1E4C8] bg-[#FFFBF2] p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#A87614]">
+                      <span className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[var(--badge-amber-text)]">
                         Lựa chọn (bank) · KEY = giá trị chấm
                       </span>
                       {q.type === 'mcq_multi' && (
-                        <label className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#A87614]">
+                        <label className="flex items-center gap-1.5 text-[11.5px] font-bold text-[var(--badge-amber-text)]">
                           Chọn
                           <input
                             className="w-12 rounded-[6px] border border-[#F1E4C8] bg-white px-1.5 py-0.5 text-center outline-none"
@@ -1181,7 +1181,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                     <button
                       type="button"
                       onClick={() => setQ(i, { options: [...(q.options ?? []), { key: '', text: '' }] })}
-                      className="mt-2 text-[12px] font-bold text-[#A87614]"
+                      className="mt-2 text-[12px] font-bold text-[var(--badge-amber-text)]"
                     >
                       + Thêm lựa chọn
                     </button>
@@ -1189,7 +1189,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                     {/* Tạo nhanh nhiều hàng (matching): nhập bank + hướng dẫn 1 lần rồi dán danh sách statement → 1 click ra hết hàng */}
                     {BULK_TYPES.has(q.type) && (
                       <div className="mt-3 border-t border-[#F1E4C8] pt-2.5">
-                        <div className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[#A87614]">
+                        <div className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[var(--badge-amber-text)]">
                           ⚡ Tạo nhanh nhiều hàng — dùng chung bank + hướng dẫn của câu này
                         </div>
                         <textarea
@@ -1203,7 +1203,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                           <button
                             type="button"
                             onClick={() => bulkRows(i, q.id, bulkText[q.id] ?? '')}
-                            className="rounded-[8px] bg-[#A87614] px-3 py-1.5 text-[12px] font-bold text-white transition hover:bg-[#8A6410]"
+                            className="rounded-[8px] bg-[#8A6410] px-3 py-1.5 text-[12px] font-bold text-white transition hover:bg-[#6F500C]"
                           >
                             Tạo hàng từ danh sách →
                           </button>
@@ -1329,7 +1329,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
             const n = lintIssues()
             const hasErr = n.some((i) => i.level === 'error')
             return (
-              <span className="text-[12.5px] font-extrabold" style={{ color: hasErr ? '#D24A4A' : n.length ? '#C98A1A' : '#137A4A' }}>
+              <span className="text-[12.5px] font-extrabold" style={{ color: hasErr ? 'var(--text-error)' : n.length ? 'var(--badge-amber-text)' : '#137A4A' }}>
                 {n.length ? `${n.length} điểm cần kiểm tra` : '✓ Không phát hiện lỗi'}
               </span>
             )
@@ -1344,7 +1344,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
             <div className="mt-3 rounded-[13px] border border-[#E4DEEE] bg-[#FBFAFE] p-5">
               {issues.length > 0 ? (
                 <div className="mb-4 rounded-[10px] border border-[#F1D9A8] bg-[#FFF9EC] p-3">
-                  <div className="text-[12.5px] font-extrabold text-[#A87614]">⚠️ {issues.length} điểm cần kiểm tra trước khi publish</div>
+                  <div className="text-[12.5px] font-extrabold text-[var(--badge-amber-text)]">⚠️ {issues.length} điểm cần kiểm tra trước khi publish</div>
                   <ul className="mt-2 flex flex-col gap-1">
                     {issues.map((it, k) => (
                       <li key={k}>
@@ -1353,7 +1353,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                           onClick={() => scrollToAnchor(it.anchor)}
                           disabled={!it.anchor}
                           className="text-left text-[12.5px] font-semibold hover:underline disabled:cursor-default disabled:no-underline"
-                          style={{ color: it.level === 'error' ? '#D24A4A' : '#B5791A' }}
+                          style={{ color: it.level === 'error' ? 'var(--text-error)' : 'var(--badge-amber-text)' }}
                         >
                           {it.level === 'error' ? '⛔' : '•'} {it.text}{it.anchor ? ' →' : ''}
                         </button>
@@ -1372,7 +1372,7 @@ export function AdminTestForm({ testId }: { testId?: string } = {}) {
                 <div className="mt-1.5 flex flex-wrap gap-2 text-[11.5px] font-bold">
                   <span className="rounded-full bg-[#F0ECFF] px-2.5 py-1 text-[#5B43C7]">{type}</span>
                   <span className="rounded-full bg-[#EEF0F4] px-2.5 py-1 text-[#5B6270]">{durationMin} phút</span>
-                  <span className="rounded-full px-2.5 py-1" style={{ background: isFree ? '#E7F7EE' : '#FFF3DC', color: isFree ? '#137A4A' : '#A87614' }}>
+                  <span className="rounded-full px-2.5 py-1" style={{ background: isFree ? '#E7F7EE' : '#FFF3DC', color: isFree ? '#137A4A' : 'var(--badge-amber-text)' }}>
                     {isFree ? 'Miễn phí' : 'Tính phí'}
                   </span>
                 </div>

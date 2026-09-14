@@ -351,7 +351,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                                 t.status === 'success'
                                   ? 'bg-[#E7F7EE] text-[var(--text-success)]'
                                   : t.status === 'pending'
-                                    ? 'bg-[#FFF1DC] text-[#C98A1A]'
+                                    ? 'bg-[var(--badge-amber-bg)] text-[var(--badge-amber-text)]'
                                     : 'bg-[#EFEBF2] text-[#8B8398]'
                               }`}
                             >
@@ -404,7 +404,7 @@ export function AdminUserDetail({ userId }: { userId: string }) {
                                 a.status === 'submitted'
                                   ? 'bg-[#E7F7EE] text-[var(--text-success)]'
                                   : a.status === 'in_progress'
-                                    ? 'bg-[#FFF1DC] text-[#C98A1A]'
+                                    ? 'bg-[var(--badge-amber-bg)] text-[var(--badge-amber-text)]'
                                     : 'bg-[#EFEBF2] text-[#8B8398]'
                               }`}
                             >

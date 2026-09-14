@@ -18,31 +18,41 @@ export type LandingProduct = {
   coverUrl?: string | null
 }
 
-type SkillVisual = { grad: string; accent: string; accentHover: string; shadow: string }
+// accent = trang trí (gradient/chấm/glow). Chữ và nền nút chữ trắng dùng token vai trò trong globals.css:
+//   text (chữ cái trong ô trắng) · solid/solidHover (nút "Start now", chữ trắng ≥4.5:1).
+type SkillVisual = { grad: string; accent: string; text: string; solid: string; solidHover: string; shadow: string }
 
 const skillMeta: Record<string, SkillVisual> = {
   reading: {
     grad: 'linear-gradient(140deg,#f79b7d,#f2724e)',
     accent: '#f2724e',
-    accentHover: '#d1502a',
+    text: 'var(--skill-reading-text)',
+    solid: 'var(--skill-reading-solid)',
+    solidHover: 'var(--skill-reading-solid-hover)',
     shadow: '0 12px 24px -12px rgba(242,114,78,.6)',
   },
   listening: {
     grad: 'linear-gradient(140deg,#f6c165,#eca22b)',
     accent: '#eca22b',
-    accentHover: '#c9861a',
+    text: 'var(--skill-listening-text)',
+    solid: 'var(--skill-listening-solid)',
+    solidHover: 'var(--skill-listening-solid-hover)',
     shadow: '0 12px 24px -12px rgba(236,162,43,.6)',
   },
   writing: {
     grad: 'linear-gradient(140deg,#a98cf0,#7c5ce6)',
     accent: '#7c5ce6',
-    accentHover: '#6a48d6',
+    text: 'var(--skill-writing-text)',
+    solid: 'var(--skill-writing-solid)',
+    solidHover: 'var(--skill-writing-solid-hover)',
     shadow: '0 12px 24px -12px rgba(124,92,230,.6)',
   },
   speaking: {
     grad: 'linear-gradient(140deg,#f58ab3,#ee5c92)',
     accent: '#ee5c92',
-    accentHover: '#d84a7f',
+    text: 'var(--skill-speaking-text)',
+    solid: 'var(--skill-speaking-solid)',
+    solidHover: 'var(--skill-speaking-solid-hover)',
     shadow: '0 12px 24px -12px rgba(238,92,146,.6)',
   },
 }
@@ -51,8 +61,8 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function badgeFor(state: LandingCardState) {
   if (state === 'free') return { label: 'Free', bg: '#eaf8f0', color: '#167a4d' }
-  if (state === 'locked') return { label: 'Premium', bg: '#fff3dc', color: '#c98a1a' }
-  return { label: 'Coming soon', bg: '#efebf2', color: '#8b8398' }
+  if (state === 'locked') return { label: 'Premium', bg: 'var(--badge-amber-bg)', color: 'var(--badge-amber-text)' }
+  return { label: 'Coming soon', bg: 'var(--badge-neutral-bg)', color: 'var(--badge-neutral-text)' }
 }
 
 // FE-F07: user không có luồng redeem; CTA premium chỉ nói mua bằng xương cá.
@@ -110,8 +120,8 @@ export function LandingProductCard({ p }: { p: LandingProduct }) {
   if (p.attempts > 0) metaBits.push(`${p.attempts.toLocaleString('en-US')} attempts`)
 
   const cardStyle = {
-    '--skill': sm.accent,
-    '--skill-hover': sm.accentHover,
+    '--skill-solid': sm.solid,
+    '--skill-solid-hover': sm.solidHover,
     '--skill-shadow': sm.shadow,
   } as CSSProperties
 
@@ -128,8 +138,8 @@ export function LandingProductCard({ p }: { p: LandingProduct }) {
             <SkillCoverIllustration skill={primarySkill} />
           </>
         )}
-        <span className="cover-lbl" style={{ background: hasCover ? 'rgba(0,0,0,.24)' : 'rgba(0,0,0,.14)' }}>
-          <span className="cover-lbl-mono" style={{ color: sm.accent }}>
+        <span className="cover-lbl">
+          <span className="cover-lbl-mono" style={{ color: sm.text }}>
             {primarySkill.charAt(0).toUpperCase()}
           </span>
           {primarySkill.toUpperCase()}

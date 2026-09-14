@@ -151,7 +151,7 @@ export function CatalogFilters({ total }: { total: number }) {
             e.preventDefault()
             push({ q: q || undefined })
           }}
-          className="flex min-w-[260px] flex-1 items-center gap-2.5 rounded-[14px] border border-[#E8E2F0] bg-white px-4 shadow-[0_6px_16px_rgba(42,39,64,0.04)] focus-within:border-[#7C5CE6]"
+          className="field-control flex min-w-[260px] flex-1 items-center gap-2.5 rounded-[14px] border border-[#E8E2F0] bg-white px-4 shadow-[0_6px_16px_rgba(42,39,64,0.04)] focus-within:border-[#7C5CE6]"
         >
           <span className="flex flex-none text-[var(--text-placeholder)]">
             <SearchIcon />
@@ -232,7 +232,7 @@ export function CatalogFilters({ total }: { total: number }) {
           className="inline-flex min-h-[44px] cursor-not-allowed items-center gap-2 rounded-[13px] border border-transparent bg-[#F2EFF5] px-3.5 py-[9px] text-[14px] font-bold text-[var(--text-subtle)]"
         >
           Speaking
-          <span className="rounded-[5px] bg-[#E3DDEC] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.05em] text-[var(--text-subtle)]">
+          <span className="rounded-[5px] bg-[#E3DDEC] px-1.5 py-0.5 text-[11px] font-extrabold uppercase leading-none tracking-[0.05em] text-[var(--badge-neutral-text)]">
             soon
           </span>
         </span>
@@ -322,7 +322,7 @@ export function CatalogFilters({ total }: { total: number }) {
           <button
             type="button"
             onClick={reset}
-            className="text-[12.5px] font-bold text-[var(--text-subtle)] underline transition hover:text-[#2A2740]"
+            className="-my-1 py-1 text-[12.5px] font-bold text-[var(--text-subtle)] underline transition hover:text-[#2A2740]"
           >
             Xoá lọc
           </button>

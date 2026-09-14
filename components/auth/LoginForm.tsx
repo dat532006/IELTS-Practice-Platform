@@ -109,7 +109,7 @@ export function LoginForm({ next = '/', reason }: { next?: string; reason?: 'idl
             labelRow={(id) => (
               <div className="mb-[7px] flex items-center justify-between">
                 <FieldLabel htmlFor={id}>Mật khẩu</FieldLabel>
-                <Link href="/forgot-password" className="text-[12.5px] font-bold text-[#5B43C7]">
+                <Link href="/forgot-password" className="-my-1 inline-block py-1 text-[12.5px] font-bold text-[#5B43C7]">
                   Quên mật khẩu?
                 </Link>
               </div>

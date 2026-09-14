@@ -101,7 +101,7 @@ export function TopupQrPanel({ refCode, amountVnd, amountCoins, initialStatus, e
       </div>
 
       {expired && (
-        <div className="mt-4 rounded-[12px] border border-[#F6E4C4] bg-[#FFF6E9] px-4 py-3 text-[13.5px] font-semibold text-[#A66A12]">
+        <div className="mt-4 rounded-[12px] border border-[#F6E4C4] bg-[#FFF6E9] px-4 py-3 text-[13.5px] font-semibold text-[var(--badge-amber-text)]">
           Phiên nạp đã hết hạn. Nếu bạn <b>đã chuyển tiền</b>, hệ thống vẫn cộng xương cá ngay khi nhận được
           thông báo từ ngân hàng — chờ thêm chút hoặc liên hệ hỗ trợ kèm mã giao dịch. Chưa chuyển →{' '}
           <Link href="/pricing" className="text-[#6A48D6] underline">tạo phiên mới</Link>.
@@ -140,7 +140,7 @@ export function TopupQrPanel({ refCode, amountVnd, amountCoins, initialStatus, e
             </div>
           ))}
 
-          <div className="rounded-[11px] border border-[#F6E4C4] bg-[#FFF6E9] px-3.5 py-2.5 text-[12.5px] font-semibold leading-[1.55] text-[#A66A12]">
+          <div className="rounded-[11px] border border-[#F6E4C4] bg-[#FFF6E9] px-3.5 py-2.5 text-[12.5px] font-semibold leading-[1.55] text-[var(--badge-amber-text)]">
             ⚠️ Chuyển <b>đúng số tiền</b> và <b>giữ nguyên nội dung</b> <span className="font-mono">{refCode}</span> —
             hệ thống khớp tự động theo nội dung này. Sai nội dung/số tiền sẽ phải đối soát tay.
           </div>

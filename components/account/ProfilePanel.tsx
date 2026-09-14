@@ -151,7 +151,7 @@ export function ProfilePanel({ profile }: { profile: AccountProfile }) {
           <label htmlFor="acct-name" className="mb-[7px] block text-[13px] font-bold text-[#4A445E]">
             Tên hiển thị
           </label>
-          <div className="flex items-center gap-2.5 rounded-[12px] border border-[#E8E2F0] bg-white px-3.5 shadow-[0_4px_12px_rgba(42,39,64,0.04)] focus-within:border-[#7C5CE6]">
+          <div className="field-control flex items-center gap-2.5 rounded-[12px] border border-[#E8E2F0] bg-white px-3.5 shadow-[0_4px_12px_rgba(42,39,64,0.04)] focus-within:border-[#7C5CE6]">
             <span className="flex flex-none text-[var(--text-placeholder)]">
               <UserIcon />
             </span>

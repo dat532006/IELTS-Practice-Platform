@@ -69,7 +69,7 @@ export default function HistoryPage() {
     return (
       <p className="text-[14px] text-[var(--text-muted)]">
         Bạn cần{' '}
-        <Link href="/login" className="font-bold text-[#6A48D6] underline">
+        <Link href="/login?next=/dashboard/history" className="font-bold text-[#6A48D6] underline">
           đăng nhập
         </Link>{' '}
         để xem lịch sử.
@@ -141,10 +141,10 @@ export default function HistoryPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap gap-1.5">
-                      <span className="rounded-full bg-[#F0ECFF] px-2 py-0.5 text-[10.5px] font-extrabold text-[#6A48D6]">
+                      <span className="rounded-full bg-[#F0ECFF] px-2 py-0.5 text-[11px] font-extrabold text-[#6A48D6]">
                         {skillLabel(attempt.tests?.type ?? null)}
                       </span>
-                      <span className="rounded-full bg-[#F3F1F5] px-2 py-0.5 text-[10.5px] font-bold text-[#7B748A]">
+                      <span className="rounded-full bg-[var(--badge-neutral-bg)] px-2 py-0.5 text-[11px] font-bold text-[var(--badge-neutral-text)]">
                         {statusLabel(attempt.status)}
                       </span>
                     </div>

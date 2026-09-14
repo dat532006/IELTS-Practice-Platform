@@ -112,7 +112,7 @@ export function AdminActivationCodeGenerator() {
         <h1 className="text-[21px] font-extrabold tracking-[-0.02em]">Mã kích hoạt</h1>
       </div>
 
-      <p className="mb-4 rounded-[11px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[11px] text-[13px] font-semibold leading-[1.5] text-[#A66A12]">
+      <p className="mb-4 rounded-[11px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[11px] text-[13px] font-semibold leading-[1.5] text-[var(--badge-amber-text)]">
         Mã đầy đủ chỉ hiển thị <b>một lần</b> ngay sau khi sinh (hệ thống chỉ lưu bản băm). <b>Lưu hoặc tải CSV ngay</b> —
         rời/khởi động lại trang sẽ KHÔNG xem lại được.
       </p>
