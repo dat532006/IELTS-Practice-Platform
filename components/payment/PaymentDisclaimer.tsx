@@ -16,7 +16,7 @@ export function PaymentDisclaimer({ className = '' }: { className?: string }) {
     <div
       className={`rounded-[12px] border border-[#ECE7F4] bg-[#FBFAFF] px-4 py-3 text-[12px] leading-[1.6] text-[var(--text-muted)] ${className}`}
     >
-      <p>
+      <p className="max-w-[36em]">
         Khi thanh toán, bạn đồng ý với{' '}
         {LINKS.map((l, i) => (
           <span key={l.slug}>
@@ -27,7 +27,7 @@ export function PaymentDisclaimer({ className = '' }: { className?: string }) {
           </span>
         ))}
       </p>
-      <p className="mt-1.5">
+      <p className="mt-1.5 max-w-[36em]">
         Coin chỉ được cộng sau khi máy chủ xác minh giao dịch. Giá sản phẩm do máy chủ quyết định.
       </p>
     </div>

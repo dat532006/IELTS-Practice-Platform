@@ -35,10 +35,14 @@ export function LibraryPanel({ library }: { library: LibraryPack[] }) {
                 className="flex flex-col overflow-hidden rounded-[16px] border border-[#EEEAF3] bg-white shadow-[0_12px_26px_-22px_rgba(60,40,90,0.32)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_-22px_rgba(60,40,90,0.4)]"
               >
                 <div className="relative flex aspect-[16/9] items-center justify-center" style={{ background: meta.grad }}>
-                  <span className="absolute left-3 top-2.5 text-[10px] font-extrabold tracking-[0.1em] text-white/90">
+                  {/* Cùng cách xử lý với ProductCard: pill trắng + chữ skill (chữ trắng trên pastel ~1.4:1). */}
+                  <span
+                    className="absolute left-3 top-2.5 rounded-full bg-white/90 px-2 py-[3px] text-[11px] font-extrabold tracking-[0.1em]"
+                    style={{ color: meta.text }}
+                  >
                     {meta.coverLabel}
                   </span>
-                  <span className="absolute right-3 top-2.5 rounded-full bg-[rgba(30,158,99,0.9)] px-2 py-[3px] text-[10px] font-extrabold text-white">
+                  <span className="absolute right-3 top-2.5 rounded-full bg-[var(--text-success)] px-2 py-[3px] text-[11px] font-extrabold text-white">
                     Đã sở hữu
                   </span>
                   <span className="text-white/85">

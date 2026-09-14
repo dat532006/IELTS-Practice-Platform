@@ -74,7 +74,7 @@ export default function VocabPage() {
   if (state === 'unauth')
     return (
       <p className="text-[14px] text-[var(--text-muted)]">
-        Bạn cần <Link href="/login" className="font-bold text-[#6A48D6] underline">đăng nhập</Link> để dùng sổ từ vựng.
+        Bạn cần <Link href="/login?next=/dashboard/vocab" className="font-bold text-[#6A48D6] underline">đăng nhập</Link> để dùng sổ từ vựng.
       </p>
     )
   if (state === 'error')

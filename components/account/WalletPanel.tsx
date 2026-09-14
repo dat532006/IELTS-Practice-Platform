@@ -87,7 +87,7 @@ export function WalletPanel({ coins, transactions }: { coins: number; transactio
               }`}
             >
               {best && (
-                <span className="absolute -top-[9px] left-1/2 -translate-x-1/2 rounded-full bg-[#7C5CE6] px-[9px] py-[3px] text-[10px] font-extrabold text-white">
+                <span className="absolute -top-[9px] left-1/2 -translate-x-1/2 rounded-full bg-[#7C5CE6] px-[9px] py-[3px] text-[11px] font-extrabold text-white">
                   PHỔ BIẾN
                 </span>
               )}

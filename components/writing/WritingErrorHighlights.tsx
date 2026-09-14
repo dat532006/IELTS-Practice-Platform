@@ -117,7 +117,7 @@ export function WritingErrorHighlights({
                 className="rounded-sm bg-amber-200 px-0.5 text-slate-900 underline decoration-amber-500 decoration-dotted underline-offset-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
               >
                 {index >= 0 && (
-                  <sup className="mr-0.5 select-none rounded-sm bg-amber-500 px-1 text-[9px] font-extrabold text-white" aria-hidden>
+                  <sup className="mr-0.5 select-none rounded-sm bg-amber-500 px-1 text-[9px] font-extrabold text-[#2A2740]" aria-hidden>
                     {index + 1}
                   </sup>
                 )}

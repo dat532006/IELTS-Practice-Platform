@@ -74,7 +74,7 @@ export function Header() {
           }
         >
           {item.label}
-          <span className="rounded-[5px] bg-[#EFEBF4] px-[5px] py-0.5 text-[9px] font-extrabold uppercase text-[var(--text-subtle)]">
+          <span className="rounded-[5px] bg-[var(--badge-neutral-bg)] px-[5px] py-0.5 text-[11px] font-extrabold uppercase leading-none text-[var(--badge-neutral-text)]">
             soon
           </span>
         </span>
@@ -103,7 +103,7 @@ export function Header() {
     <>
       <SkipLink />
       <header className="sticky top-0 z-40 border-b border-[rgba(42,39,64,0.09)] bg-[rgba(251,249,255,0.92)] backdrop-blur-[12px] backdrop-saturate-[180%]">
-        <div className="mx-auto flex h-[72px] w-[min(1200px,calc(100%-2rem))] min-w-0 items-center gap-4">
+        <div className="mx-auto flex h-[72px] w-[var(--site-container)] min-w-0 items-center gap-4">
           <Logo href="/" size={38} textClassName="text-[17px]" withShadow={false} />
 
           {/* `lap` (960px) thay cho `xl`: laptop chạy display scaling 150–200% có viewport CSS ~960–1150px,

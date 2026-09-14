@@ -3,37 +3,49 @@
 
 export type SkillKey = 'reading' | 'listening' | 'writing' | 'speaking' | 'mixed'
 
+// `color` = accent TRANG TRÍ (nền ô icon, chấm, glow) — không đạt AA làm chữ. Chữ dùng `text`, nền tint dùng
+// `soft`: cả hai trỏ về token trong app/globals.css (một nguồn, đã đo tỷ lệ tương phản).
 export const SKILL_META: Record<
   SkillKey,
-  { label: string; color: string; grad: string; coverLabel: string }
+  { label: string; color: string; text: string; soft: string; grad: string; coverLabel: string }
 > = {
   reading: {
     label: 'Reading',
     color: '#F2724E',
+    text: 'var(--skill-reading-text)',
+    soft: 'var(--skill-reading-soft)',
     grad: 'linear-gradient(135deg,#FFD9C8,#FF9F77)',
     coverLabel: 'READING',
   },
   listening: {
     label: 'Listening',
     color: '#ECA22B',
+    text: 'var(--skill-listening-text)',
+    soft: 'var(--skill-listening-soft)',
     grad: 'linear-gradient(135deg,#FFE6AE,#FFC95E)',
     coverLabel: 'LISTENING',
   },
   writing: {
     label: 'Writing',
     color: '#7C5CE6',
+    text: 'var(--skill-writing-text)',
+    soft: 'var(--skill-writing-soft)',
     grad: 'linear-gradient(135deg,#D9CFFF,#B098FF)',
     coverLabel: 'WRITING',
   },
   speaking: {
     label: 'Speaking',
     color: '#EE5C92',
+    text: 'var(--skill-speaking-text)',
+    soft: 'var(--skill-speaking-soft)',
     grad: 'linear-gradient(135deg,#FFE0EC,#F2A0B8)',
     coverLabel: 'SPEAKING',
   },
   mixed: {
     label: 'Combined',
     color: '#D24A7C',
+    text: 'var(--skill-mixed-text)',
+    soft: 'var(--skill-mixed-soft)',
     grad: 'linear-gradient(135deg,#FFE6AE,#F2A0B8)',
     coverLabel: 'FULL MOCK',
   },

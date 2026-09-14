@@ -15,7 +15,7 @@ function CategoryPill({ p, meta }: { p: ProductCardData; meta: ReturnType<typeof
   return (
     <span
       className="rounded-full px-2.5 py-1 text-[11.5px] font-bold"
-      style={{ background: `${meta.color}1A`, color: meta.color }}
+      style={{ background: meta.soft, color: meta.text }}
     >
       {meta.label}
     </span>
@@ -50,7 +50,7 @@ function Footer({ p }: { p: ProductCardData }) {
           <span className="flex items-center gap-1.5 text-[14px] font-extrabold text-[var(--text-subtle)]">
             <FishBone /> {p.priceCoins}
           </span>
-          <span className="text-[13px] font-bold text-[#B0A9C0]">Sắp ra mắt</span>
+          <span className="text-[13px] font-bold text-[var(--badge-neutral-text)]">Sắp ra mắt</span>
         </>
       )
     case 'locked':
@@ -69,13 +69,12 @@ export function ProductCard({ p }: { p: ProductCardData }) {
   const meta = skillMeta(skill)
   const dimmed = p.state === 'coming_soon'
 
+  // "Sắp ra mắt" chỉ làm nhạt phần cover (trang trí); chữ trong thân thẻ giữ nguyên độ tương phản.
   const card = (
-    <div
-      className={`flex h-full flex-col overflow-hidden rounded-[20px] border border-[#EEEAF3] bg-white shadow-[0_14px_30px_-22px_rgba(60,40,90,0.32)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_40px_-24px_rgba(60,40,90,0.4)] ${dimmed ? 'opacity-90' : ''}`}
-    >
+    <div className="flex h-full flex-col overflow-hidden rounded-[20px] border border-[#EEEAF3] bg-white shadow-[0_14px_30px_-22px_rgba(60,40,90,0.32)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_40px_-24px_rgba(60,40,90,0.4)]">
       {/* cover */}
       <div
-        className="relative flex aspect-[16/9] items-center justify-center overflow-hidden"
+        className={`relative flex aspect-[16/9] items-center justify-center overflow-hidden ${dimmed ? 'grayscale-[0.55]' : ''}`}
         style={p.thumbnail ? undefined : { background: meta.grad }}
       >
         {p.thumbnail ? (
@@ -83,7 +82,11 @@ export function ProductCard({ p }: { p: ProductCardData }) {
           <img src={p.thumbnail} alt={p.title} className="h-full w-full object-cover" loading="lazy" />
         ) : (
           <>
-            <span className="absolute left-3.5 top-3 text-[11px] font-extrabold tracking-[0.1em] text-white/90">
+            {/* Nhãn skill trên gradient pastel: chữ trắng chỉ ~1.4:1 → pill trắng + màu chữ skill (≥5.3:1). */}
+            <span
+              className="absolute left-3.5 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-extrabold tracking-[0.1em]"
+              style={{ color: meta.text }}
+            >
               {meta.coverLabel}
             </span>
             <span className="absolute -right-2.5 -top-[18px] h-[90px] w-[90px] rounded-full bg-white/20" />
@@ -93,12 +96,12 @@ export function ProductCard({ p }: { p: ProductCardData }) {
           </>
         )}
         {p.hot && p.state !== 'coming_soon' && (
-          <span className="absolute right-3.5 top-3 rounded-full bg-[rgba(42,39,64,0.28)] px-2.5 py-1 text-[11px] font-extrabold text-white">
+          <span className="absolute right-3.5 top-3 rounded-full bg-[rgba(42,39,64,0.72)] px-2.5 py-1 text-[11px] font-extrabold text-white">
             🔥 Hot
           </span>
         )}
         {p.state === 'coming_soon' && (
-          <span className="absolute right-3.5 top-3 rounded-full bg-white/[0.78] px-2.5 py-1 text-[10.5px] font-extrabold text-[#4A445E]">
+          <span className="absolute right-3.5 top-3 rounded-full bg-white/[0.78] px-2.5 py-1 text-[11px] font-extrabold text-[#4A445E]">
             Sắp ra mắt
           </span>
         )}
@@ -109,7 +112,7 @@ export function ProductCard({ p }: { p: ProductCardData }) {
         <div className="flex items-center justify-between">
           <CategoryPill p={p} meta={meta} />
           {typeof p.attemptsTotal === 'number' && p.attemptsTotal > 0 && (
-            <span className="text-[12px] font-semibold text-[#9AA0AB]">
+            <span className="text-[12px] font-semibold text-[var(--text-subtle)]">
               🔥 {p.attemptsTotal.toLocaleString('vi-VN')}
             </span>
           )}
@@ -120,7 +123,7 @@ export function ProductCard({ p }: { p: ProductCardData }) {
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           <span
             className="rounded-[7px] px-2.5 py-[3px] text-[11px] font-bold"
-            style={{ background: `${meta.color}1A`, color: meta.color }}
+            style={{ background: meta.soft, color: meta.text }}
           >
             {meta.label}
           </span>

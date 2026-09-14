@@ -23,7 +23,7 @@ const inputCls =
 
 function statusStyle(status: string) {
   if (status === 'published') return 'bg-[#E7F7EE] text-[var(--text-success)]'
-  if (status === 'draft') return 'bg-[#FFF1DC] text-[#C98A1A]'
+  if (status === 'draft') return 'bg-[var(--badge-amber-bg)] text-[var(--badge-amber-text)]'
   return 'bg-[#EFEBF2] text-[#8B8398]'
 }
 
@@ -227,7 +227,7 @@ export function AdminTestList() {
                 disabled={busy === t.id}
                 title="Đổi miễn phí ↔ tính phí (đề tính phí cần mua VOL mới làm được)"
                 className={`rounded-full px-3 py-1.5 text-[12px] font-extrabold transition disabled:opacity-50 ${
-                  t.is_free ? 'bg-[#E7F7EE] text-[var(--text-success)] hover:bg-[#D4F0E1]' : 'bg-[#FFF3DC] text-[#A87614] hover:bg-[#FBE9C4]'
+                  t.is_free ? 'bg-[#E7F7EE] text-[var(--text-success)] hover:bg-[#D4F0E1]' : 'bg-[#FFF3DC] text-[var(--badge-amber-text)] hover:bg-[#FBE9C4]'
                 }`}
               >
                 {t.is_free ? 'Miễn phí' : 'Tính phí'}
@@ -253,7 +253,7 @@ export function AdminTestList() {
                 {confirmDel === t.id ? (
                   <span className="flex items-center gap-1.5 text-[12.5px] font-bold">
                     Chắc chắn?
-                    <button type="button" onClick={() => doDelete(t)} disabled={busy === t.id} className="text-[#D24A4A] underline">
+                    <button type="button" onClick={() => doDelete(t)} disabled={busy === t.id} className="text-[var(--text-error)] underline">
                       Xóa
                     </button>
                     <button type="button" onClick={() => setConfirmDel(null)} className="underline">

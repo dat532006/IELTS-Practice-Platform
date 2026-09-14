@@ -1,16 +1,17 @@
 import type { WritingGradeResult, WritingImprovementItem, WritingTaskGrade, WritingVocabUpgrade } from '@/types/exam'
 import { WritingErrorHighlights } from '@/components/writing/WritingErrorHighlights'
 import { WritingFeedback } from '@/components/writing/WritingFeedback'
+import { WRITING_CRITERION_COLOR as C } from '@/components/writing/criterion-colors'
 
 // Presentational result panel dùng chung cho WritingRunner + /writing-result/[id].
 // overall_band là giá trị SERVER; UI chỉ trình bày, tuyệt đối không tính lại hay tin số tổng từ AI.
 type CriterionKey = keyof WritingTaskGrade['criteria']
 
-const CRITERIA: Array<{ key: CriterionKey; label: string; index: string; accent: string; soft: string }> = [
-  { key: 'task_response', label: 'Task Response / Achievement', index: '01', accent: '#7C5CE6', soft: '#F2EEFF' },
-  { key: 'coherence_cohesion', label: 'Coherence & Cohesion', index: '02', accent: '#3B82F6', soft: '#EEF6FF' },
-  { key: 'lexical_resource', label: 'Lexical Resource', index: '03', accent: '#D97706', soft: '#FFF6E5' },
-  { key: 'grammar', label: 'Grammatical Range & Accuracy', index: '04', accent: '#F26B4D', soft: '#FFF0EB' },
+const CRITERIA: Array<{ key: CriterionKey; label: string; index: string; accent: string; soft: string; text: string }> = [
+  { key: 'task_response', label: 'Task Response / Achievement', index: '01', ...C.task_response },
+  { key: 'coherence_cohesion', label: 'Coherence & Cohesion', index: '02', ...C.coherence_cohesion },
+  { key: 'lexical_resource', label: 'Lexical Resource', index: '03', ...C.lexical_resource },
+  { key: 'grammar', label: 'Grammatical Range & Accuracy', index: '04', ...C.grammar },
 ]
 
 const LEVEL_STYLE: Record<WritingVocabUpgrade['level'], string> = {
@@ -21,15 +22,15 @@ const LEVEL_STYLE: Record<WritingVocabUpgrade['level'], string> = {
 
 // FB-02 — "Lộ trình cải thiện" cấu trúc: chip tiêu chí đúng màu accent của 4 card điểm, title đậm
 //   làm anchor đọc lướt, sắp theo priority (1 = tác động band lớn nhất), điểm mạnh tách khối riêng.
-const IMPROVE_CRIT: Record<WritingImprovementItem['criterion'], { label: string; accent: string; soft: string }> = {
-  task_response: { label: 'Task Response', accent: '#7C5CE6', soft: '#F2EEFF' },
-  coherence_cohesion: { label: 'Coherence & Cohesion', accent: '#3B82F6', soft: '#EEF6FF' },
-  lexical_resource: { label: 'Lexical Resource', accent: '#D97706', soft: '#FFF6E5' },
-  grammar: { label: 'Grammar', accent: '#F26B4D', soft: '#FFF0EB' },
-  general: { label: 'Tổng thể', accent: '#6A4BD0', soft: '#F6F3FF' },
+const IMPROVE_CRIT: Record<WritingImprovementItem['criterion'], { label: string; accent: string; soft: string; text: string }> = {
+  task_response: { label: 'Task Response', ...C.task_response },
+  coherence_cohesion: { label: 'Coherence & Cohesion', ...C.coherence_cohesion },
+  lexical_resource: { label: 'Lexical Resource', ...C.lexical_resource },
+  grammar: { label: 'Grammar', ...C.grammar },
+  general: { label: 'Tổng thể', ...C.general },
 }
 const PRIORITY_BADGE: Record<1 | 2 | 3, { label: string; cls: string }> = {
-  1: { label: 'Ưu tiên cao', cls: 'bg-[#FDE8E4] text-[#C2402F]' },
+  1: { label: 'Ưu tiên cao', cls: 'bg-[#FDE8E4] text-[var(--text-error)]' },
   2: { label: 'Nên làm', cls: 'bg-[#FFF6E5] text-[#B45309]' },
   3: { label: 'Hoàn thiện', cls: 'bg-[#F1EDF6] text-[#6A6480]' },
 }
@@ -64,7 +65,7 @@ function ImprovementPlan({ items, band }: { items: WritingImprovementItem[]; ban
                 <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-[#F0ECFF] text-[10px] font-extrabold text-[#6A4BD0]">
                   {index + 1}
                 </span>
-                <span className="rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ backgroundColor: crit.soft, color: crit.accent }}>
+                <span className="rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ backgroundColor: crit.soft, color: crit.text }}>
                   {crit.label}
                 </span>
                 <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${prio.cls}`}>{prio.label}</span>
@@ -122,7 +123,7 @@ function VocabTable({ items }: { items: WritingVocabUpgrade[] }) {
               <tr key={i} className="align-top text-[#655E75]">
                 <td className="border-b border-[#F1EDF5] py-3 pr-3 font-extrabold text-[#2A2740]">{v.word}</td>
                 <td className="border-b border-[#F1EDF5] py-3 pr-3">
-                  <span className={`rounded-full px-2 py-1 text-[10px] font-extrabold ${LEVEL_STYLE[v.level]}`}>{v.level}</span>
+                  <span className={`rounded-full px-2 py-1 text-[11px] font-extrabold ${LEVEL_STYLE[v.level]}`}>{v.level}</span>
                 </td>
                 <td className="border-b border-[#F1EDF5] py-3 pr-3 leading-relaxed">{v.meaning_vi}</td>
                 <td className="border-b border-[#F1EDF5] py-3 pr-3 leading-relaxed">{v.why}</td>
@@ -144,20 +145,20 @@ function CriterionCard({ item, value }: { item: (typeof CRITERIA)[number]; value
         <div className="flex min-w-0 items-start gap-2.5">
           <span
             className="grid h-8 w-8 flex-none place-items-center rounded-[10px] text-[11px] font-extrabold"
-            style={{ backgroundColor: item.soft, color: item.accent }}
+            style={{ backgroundColor: item.soft, color: item.text }}
           >
             {item.index}
           </span>
           <span className="pt-0.5 text-[12.5px] font-extrabold leading-[1.35] text-[#514B63]">{item.label}</span>
         </div>
-        <span className="flex-none text-xl font-black tracking-[-0.03em]" style={{ color: item.accent }}>
+        <span className="flex-none text-xl font-black tracking-[-0.03em]" style={{ color: item.text }}>
           {value.toFixed(1)}
         </span>
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#F1EDF6]" aria-hidden>
         <div className="h-full rounded-full" style={{ width: progress, backgroundColor: item.accent }} />
       </div>
-      <div className="mt-2 flex justify-between text-[10px] font-bold text-[#AAA3B8]">
+      <div className="mt-2 flex justify-between text-[11px] font-bold text-[var(--text-subtle)]">
         <span>0</span>
         <span>IELTS Band</span>
         <span>9</span>
@@ -297,7 +298,7 @@ export function WritingResultView({
             </div>
           </div>
           <div className="flex h-36 w-36 flex-none flex-col items-center justify-center self-center rounded-full border-[10px] border-white bg-[#7C5CE6] text-white shadow-[0_20px_38px_-22px_rgba(92,63,180,0.9)]">
-            <span className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-white/75">Overall</span>
+            <span className="text-[11px] font-extrabold uppercase tracking-[0.13em] text-white">Overall</span>
             <span className="mt-1 text-[42px] font-black leading-none tracking-[-0.06em]">{result.overall_band.toFixed(1)}</span>
             <span className="mt-1 text-[11px] font-bold text-white/80">IELTS Band</span>
           </div>

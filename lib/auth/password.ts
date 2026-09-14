@@ -18,10 +18,11 @@ export function passwordLevel(pw: string): number {
   return s <= 1 ? 0 : s <= 3 ? 1 : 2
 }
 
+// color = màu thanh segment (trang trí); text = màu nhãn chữ ≥4.5:1 (color làm chữ chỉ 2.2–3.4:1).
 export const PASSWORD_LEVELS = [
-  { label: 'Yếu', color: '#EF5B5B', hint: 'thêm số hoặc ký tự đặc biệt để mạnh hơn', segs: 1 },
-  { label: 'Trung bình', color: '#ECA22B', hint: 'thêm chữ hoa/thường hoặc ký tự đặc biệt', segs: 2 },
-  { label: 'Mạnh', color: '#1E9E63', hint: '12+ ký tự, kết hợp nhiều loại', segs: 3 },
+  { label: 'Yếu', color: '#EF5B5B', text: 'var(--text-error)', hint: 'thêm số hoặc ký tự đặc biệt để mạnh hơn', segs: 1 },
+  { label: 'Trung bình', color: '#ECA22B', text: 'var(--badge-amber-text)', hint: 'thêm chữ hoa/thường hoặc ký tự đặc biệt', segs: 2 },
+  { label: 'Mạnh', color: '#1E9E63', text: 'var(--text-success)', hint: '12+ ký tự, kết hợp nhiều loại', segs: 3 },
 ] as const
 
 export const WEAK_PASSWORD_ERROR =

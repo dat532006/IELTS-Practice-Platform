@@ -17,11 +17,44 @@
   --deep: #6a48d6;
   --soft: #f0ecff;
   --ink: #2a2740;
-  /* Skill accents */
+  /* Skill accents — TRANG TRÍ (chấm, ô icon, minh hoạ, glow). Coral/amber/pink chỉ đạt ~2.1–3.2:1 nên
+     KHÔNG bao giờ dùng làm màu chữ hay nền nút chữ trắng (audit UI-01). Mỗi skill có thêm 3 vai trò:
+       -text  : chữ nhỏ trên nền trắng VÀ trên -soft của chính skill đó   (≥ 4.5:1 trên cả hai)
+       -solid : nền nút chữ trắng                                         (≥ 4.5:1 với #fff)
+       -soft  : nền tint nhạt (pill, dải cover, ô icon)
+     Tỷ lệ đo bằng reports/impeccable/tools/contrast.mjs — ghi trong reports/impeccable/REMEDIATION_REPORT.md. */
   --skill-reading: #f2724e;
   --skill-listening: #eca22b;
   --skill-writing: #7c5ce6;
   --skill-speaking: #ee5c92;
+  --skill-reading-text: #b14724; /* 5.53 trắng · 4.88 soft */
+  --skill-reading-solid: #c24a26; /* 4.88 với chữ trắng */
+  --skill-reading-solid-hover: #a83d1f;
+  --skill-reading-soft: #ffede6;
+  --skill-listening-text: #8a5d0a; /* 5.75 · 5.23 */
+  --skill-listening-solid: #a16207; /* 4.92 */
+  --skill-listening-solid-hover: #87520a;
+  --skill-listening-soft: #fff3dc;
+  --skill-writing-text: #6a48d6; /* 5.98 · 5.17 */
+  --skill-writing-solid: #7c5ce6; /* 4.64 */
+  --skill-writing-solid-hover: #6a48d6;
+  --skill-writing-soft: #f0ecff;
+  --skill-speaking-text: #c13067; /* 5.40 · 4.68 */
+  --skill-speaking-solid: #c93a73; /* 4.84 */
+  --skill-speaking-solid-hover: #a8325e;
+  --skill-speaking-soft: #ffe9f1;
+  --skill-mixed-text: #a8325e; /* 6.40 · 5.63 */
+  --skill-mixed-soft: #fbedf2;
+  /* Status badge — một cặp màu cho mỗi tông, thay cho các bản chép tay #C98A1A/#FFF1DC (2.6:1) rải rác.
+     amber = Premium / New / Khoá / AI tag / draft · neutral = Sắp ra mắt / chip khoá / soon. */
+  --badge-amber-text: #8a5d0a; /* 5.17 trên bg */
+  --badge-amber-bg: #fff1dc;
+  --badge-neutral-text: #625b73; /* 5.66 trên bg */
+  --badge-neutral-bg: #f2eff7;
+
+  /* UI-19: khung nội dung chung header · footer · landing — lề 16px mỗi bên ở mọi màn (trước: header
+     calc(100%-2rem) nhưng footer/landing 93vw → mép lệch nhau, lề mobile chỉ 13.6px). */
+  --site-container: min(1200px, calc(100% - 2rem));
   /* Verified accessibility tokens: all meet WCAG AA on white and pale surfaces used in the UI. */
   --text-muted: #625b73;
   --text-subtle: #6f687f;
@@ -75,6 +108,13 @@ body {
    chính input để không vẽ vòng bên trong pill — chỉ khung ngoài báo focus. Khớp mọi field auth/search/… */
 :is(input, textarea).bg-transparent:focus-visible {
   box-shadow: none;
+}
+/* UI-17: …nên KHUNG NGOÀI phải báo focus rõ như mọi tab stop khác (trước chỉ đổi màu viền). Ring 3px
+   --focus-ring (cùng công thức .search-wrap ở home.css). `:has(input…)` thay `:focus-within` để nút con
+   (vd mắt hiện mật khẩu) đã có outline riêng không vẽ thêm vòng thứ hai. */
+:is(.auth-field-control, .field-control):has(:is(input, textarea):focus-visible) {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px rgba(104, 66, 216, 0.24);
 }
 
 .skip-link {
@@ -248,6 +288,11 @@ body {
 }
 .tip-prose > :first-child {
   margin-top: 0;
+}
+/* UI-15: khối chữ giới hạn 36em (~75 ký tự/dòng) cho dễ đọc; bảng/ảnh vẫn rộng hết cột bài viết.
+   Dùng em thay ch: số 0 của Plus Jakarta rộng ~0.73em nên 68ch rộng hơn cả cột, không có tác dụng. */
+.tip-prose :is(p, ul, ol, blockquote, h2, h3, h4) {
+  max-width: 36em;
 }
 .tip-prose p {
   margin: 0 0 20px;

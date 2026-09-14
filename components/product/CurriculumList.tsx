@@ -9,7 +9,14 @@ import {
 import { SkillTile, type SkillKey } from '@/components/brand/skill'
 import { LockIcon } from '@/components/brand/icons'
 
-const ROW = 'flex items-center gap-3.5 rounded-[14px] border border-[#EEEAF3] px-4 py-3.5'
+// Mobile: tiêu đề + meta chiếm trọn cột nội dung (tối đa 2 dòng), chip/CTA xuống hàng dưới —
+//   nhét chung 1 hàng ở 390px chỉ còn ~120px cho tiêu đề, cắt mất đúng phần "Test N" phân biệt các đề.
+//   Từ `sm` trở lên trở lại 1 hàng như cũ.
+const ROW = 'flex items-start gap-3.5 rounded-[14px] border border-[#EEEAF3] px-4 py-3.5 sm:items-center'
+const BODY = 'min-w-0 flex-1 sm:flex sm:items-center sm:gap-3.5'
+const TEXT = 'min-w-0 sm:flex-1'
+const ACTIONS = 'mt-2.5 flex items-center justify-between gap-3 sm:mt-0 sm:flex-none sm:justify-end'
+const TITLE = 'line-clamp-2 break-words text-[15px] font-extrabold'
 const META = 'mt-0.5 text-[12.5px] font-semibold'
 
 function StateChip({ state }: { state: TestUiState }) {
@@ -55,7 +62,8 @@ function TestThumb({ t }: { t: ProductDetailTest }) {
 }
 
 // Mục lục bundle — đề sắp theo `position`. Đề mở (free/unlocked) link tới pre-exam /tests/[id];
-// đề khóa = row mờ, KHÔNG click (đúng design: locked rows non-clickable & dimmed).
+// đề khóa KHÔNG click; trạng thái khóa thể hiện bằng nền tint + ô ổ khóa + chip "Khóa" và chữ dịu hơn,
+// KHÔNG dùng opacity cả hàng (opacity kéo tiêu đề/chip xuống dưới 4.5:1).
 export function CurriculumList({
   tests,
   isAuthed,
@@ -79,15 +87,19 @@ export function CurriculumList({
 
         if (locked) {
           return (
-            <div key={t.id} className={`${ROW} bg-[#FBFAFD] opacity-[0.78]`}>
+            <div key={t.id} className={`${ROW} bg-[#FBFAFD]`}>
               <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[11px] bg-[#EDE8F3] text-[var(--text-subtle)]">
                 <LockIcon size={18} strokeWidth={2.2} />
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-extrabold text-[#564F6B]">{t.title}</p>
-                {meta}
+              <div className={BODY}>
+                <div className={TEXT}>
+                  <p className={`${TITLE} text-[#564F6B]`}>{t.title}</p>
+                  {meta}
+                </div>
+                <div className={ACTIONS}>
+                  <StateChip state={state} />
+                </div>
               </div>
-              <StateChip state={state} />
             </div>
           )
         }
@@ -95,14 +107,18 @@ export function CurriculumList({
         return (
           <Link key={t.id} href={`/tests/${t.id}`} className={`${ROW} bg-white transition hover:bg-[#FBFAFF]`}>
             <TestThumb t={t} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px] font-extrabold text-[#2A2740]">{t.title}</p>
-              {meta}
+            <div className={BODY}>
+              <div className={TEXT}>
+                <p className={`${TITLE} text-[#2A2740]`}>{t.title}</p>
+                {meta}
+              </div>
+              <div className={ACTIONS}>
+                <StateChip state={state} />
+                <span className="text-[14px] font-bold text-[#6A48D6]">
+                  {state === 'unlocked' ? 'Vào →' : 'Làm →'}
+                </span>
+              </div>
             </div>
-            <StateChip state={state} />
-            <span className="text-[14px] font-bold text-[#6A48D6]">
-              {state === 'unlocked' ? 'Vào →' : 'Làm →'}
-            </span>
           </Link>
         )
       })}

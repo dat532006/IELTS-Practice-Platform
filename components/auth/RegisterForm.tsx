@@ -196,7 +196,7 @@ export function RegisterForm() {
 
         <div className="my-5 flex items-center gap-3" aria-hidden="true">
           <span className="h-px flex-1 bg-[#EDE8F3]" />
-          <span className="text-[12px] font-bold text-[#B0A9C0]">hoặc</span>
+          <span className="text-[12px] font-bold text-[var(--text-subtle)]">hoặc</span>
           <span className="h-px flex-1 bg-[#EDE8F3]" />
         </div>
 

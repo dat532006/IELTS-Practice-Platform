@@ -1364,8 +1364,8 @@
 .dc-exam .dcx-ai-tag {
   font-size: 12px;
   font-weight: 700;
-  color: #c98a1a;
-  background: #fff1dc;
+  color: var(--badge-amber-text);
+  background: var(--badge-amber-bg);
   padding: 6px 12px;
   border-radius: 999px;
   white-space: nowrap;

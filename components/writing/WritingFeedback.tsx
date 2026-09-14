@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import { parseWritingFeedback, type WritingFeedbackCriterion } from '@/lib/writing/feedback-format'
+import { WRITING_CRITERION_COLOR as C } from '@/components/writing/criterion-colors'
 
-const SECTION_META: Record<WritingFeedbackCriterion, { label: string; accent: string; soft: string }> = {
-  task_response: { label: 'Task Response / Achievement', accent: '#7C5CE6', soft: '#F2EEFF' },
-  coherence_cohesion: { label: 'Coherence & Cohesion', accent: '#3B82F6', soft: '#EEF6FF' },
-  lexical_resource: { label: 'Lexical Resource', accent: '#D97706', soft: '#FFF6E5' },
-  grammar: { label: 'Grammatical Range & Accuracy', accent: '#F26B4D', soft: '#FFF0EB' },
-  general: { label: 'Nhận xét tổng quan', accent: '#6A4BD0', soft: '#F6F3FF' },
+const SECTION_META: Record<WritingFeedbackCriterion, { label: string; accent: string; soft: string; text: string }> = {
+  task_response: { label: 'Task Response / Achievement', ...C.task_response },
+  coherence_cohesion: { label: 'Coherence & Cohesion', ...C.coherence_cohesion },
+  lexical_resource: { label: 'Lexical Resource', ...C.lexical_resource },
+  grammar: { label: 'Grammatical Range & Accuracy', ...C.grammar },
+  general: { label: 'Nhận xét tổng quan', ...C.general },
 }
 
 const EMPHASIS_RE =
@@ -65,7 +66,7 @@ export function WritingFeedback({ feedback, compact = false }: { feedback: strin
               {section.band != null && (
                 <span
                   className="flex-none rounded-full px-2.5 py-1 text-xs font-extrabold"
-                  style={{ backgroundColor: meta.soft, color: meta.accent }}
+                  style={{ backgroundColor: meta.soft, color: meta.text }}
                 >
                   Band {section.band.toFixed(1)}
                 </span>

@@ -87,6 +87,52 @@ export function renderKindOf(type: string | undefined): RenderKind {
   return 'fallback'
 }
 
+// Nhãn hiển thị cho mã dạng câu hỏi (tests.question_types / question.type). CHỈ để hiển thị —
+//   giá trị gốc lưu DB, filter `qtype` và scoring giữ nguyên mã. Thêm type mới ở GAP/MATCHING... thì
+//   thêm nhãn ở đây; mã lạ rơi về dạng "gap filling" → "Gap filling" thay vì lộ mã snake_case.
+const QUESTION_TYPE_LABEL: Record<string, string> = {
+  gap: 'Điền từ',
+  gap_filling: 'Điền từ',
+  summary: 'Hoàn thành tóm tắt',
+  summary_completion: 'Hoàn thành tóm tắt',
+  sentence_completion: 'Hoàn thành câu',
+  short_answer: 'Trả lời ngắn',
+  note_completion: 'Hoàn thành ghi chú',
+  table_completion: 'Hoàn thành bảng',
+  form_completion: 'Hoàn thành biểu mẫu',
+  flowchart_completion: 'Hoàn thành lưu đồ',
+  mcq: 'Trắc nghiệm',
+  mcq_single: 'Trắc nghiệm',
+  mcq_multi: 'Trắc nghiệm nhiều đáp án',
+  tfng: 'True / False / Not Given',
+  tf_ng: 'True / False / Not Given',
+  true_false_notgiven: 'True / False / Not Given',
+  ynng: 'Yes / No / Not Given',
+  yn_ng: 'Yes / No / Not Given',
+  yes_no_notgiven: 'Yes / No / Not Given',
+  matching: 'Nối thông tin',
+  matching_headings: 'Nối tiêu đề',
+  matching_information: 'Nối thông tin đoạn',
+  matching_features: 'Nối đặc điểm',
+  matching_endings: 'Nối phần kết câu',
+  diagram: 'Điền nhãn sơ đồ',
+  diagram_label: 'Điền nhãn sơ đồ',
+  map: 'Điền nhãn bản đồ',
+  plan: 'Điền nhãn bản đồ',
+  map_labelling: 'Điền nhãn bản đồ',
+  plan_map_diagram: 'Điền nhãn bản đồ',
+  writing_task1: 'Writing Task 1',
+  writing_task2: 'Writing Task 2',
+}
+
+export function questionTypeLabel(type: string | undefined): string {
+  const t = (type ?? '').toLowerCase().trim()
+  const known = QUESTION_TYPE_LABEL[t]
+  if (known) return known
+  const words = t.replace(/[_-]+/g, ' ').trim()
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : ''
+}
+
 // Một câu được coi là "đã trả lời" khi: string trim≠'' hoặc array length>0.
 export function isAnswered(value: AnswerValue | undefined): boolean {
   if (Array.isArray(value)) return value.length > 0

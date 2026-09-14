@@ -90,22 +90,24 @@ export default function PricingPage() {
 
           {/* Quick select */}
           <h2 className="mt-7 text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[var(--text-muted)]">Chọn nhanh</h2>
-          <div className="mt-3 grid grid-cols-4 gap-3">
+          {/* Mobile 2 cột: 4 cột ở 390px chỉ còn nút 68px → nhãn "100.000 ₫" tràn viền, icon bị flex bóp về 0. */}
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {QUICK_VND.map((q) => {
               const sel = amount === q
               return (
                 <button
                   key={q}
                   type="button"
+                  aria-pressed={sel}
                   onClick={() => setAmount(q)}
-                  className={`rounded-[14px] p-4 text-center transition ${
+                  className={`rounded-[14px] px-3 py-3.5 text-center transition sm:p-4 ${
                     sel
                       ? 'border-2 border-[#7C5CE6] bg-[#F6F2FF] shadow-[0_10px_22px_-12px_rgba(124,92,230,0.4)]'
                       : 'border border-[#E8E2F0] bg-white hover:border-[#CCC3DC]'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 text-[20px] font-extrabold tracking-[-0.02em] text-[#6A48D6]"><FishBone /> {q / COIN_VND_RATE}</div>
-                  <div className="mt-1 text-[12.5px] font-semibold text-[var(--text-muted)]">{vnd(q)} ₫</div>
+                  <div className="flex items-center justify-center gap-1.5 text-[20px] font-extrabold tracking-[-0.02em] text-[#6A48D6]"><FishBone className="flex-none" /> {q / COIN_VND_RATE}</div>
+                  <div className="mt-1 whitespace-nowrap text-[12.5px] font-semibold text-[var(--text-muted)]">{vnd(q)} ₫</div>
                 </button>
               )
             })}
@@ -115,7 +117,7 @@ export default function PricingPage() {
           <label htmlFor="topup-amount" className="mt-6 block text-[12.5px] font-extrabold uppercase tracking-[0.05em] text-[var(--text-muted)]">
             Hoặc nhập số tiền (VND)
           </label>
-          <div className="mt-2.5 flex items-center gap-3 rounded-[14px] border border-[#E4DEEE] bg-white px-[18px] shadow-[0_6px_16px_rgba(42,39,64,0.04)] focus-within:border-[#7C5CE6]">
+          <div className="field-control mt-2.5 flex items-center gap-3 rounded-[14px] border border-[#E4DEEE] bg-white px-[18px] shadow-[0_6px_16px_rgba(42,39,64,0.04)] focus-within:border-[#7C5CE6]">
             <input
               id="topup-amount"
               name="amount_vnd"
@@ -144,6 +146,7 @@ export default function PricingPage() {
                 <button
                   key={p.id}
                   type="button"
+                  aria-pressed={sel}
                   onClick={() => setProvider(p.id)}
                   className={`inline-flex items-center gap-2.5 rounded-[12px] px-4 py-[11px] text-[14px] font-bold transition ${
                     sel ? 'border-2 border-[#7C5CE6] bg-[#F6F2FF] text-[#5B43C7]' : 'border border-[#E8E2F0] bg-white text-[#3D3654] hover:border-[#CCC3DC]'
@@ -179,7 +182,7 @@ export default function PricingPage() {
 
           {/* Validation */}
           {!valid && (
-            <div id="topup-validation" role="alert" className="mt-3 flex items-center gap-2.5 rounded-[12px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[11px] text-[13.5px] font-semibold text-[#A66A12]">
+            <div id="topup-validation" role="alert" className="mt-3 flex items-center gap-2.5 rounded-[12px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[11px] text-[13.5px] font-semibold text-[var(--badge-amber-text)]">
               <span className="h-[7px] w-[7px] flex-none rounded-full bg-[#E59A1B]" />
               {validationMsg}
             </div>

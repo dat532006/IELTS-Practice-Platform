@@ -83,7 +83,7 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
       {/* Số dư */}
       <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-[12px] border border-[#EEEAF6] bg-[#FBFAFF] px-3.5 py-[11px]">
         <span className="text-[13px] font-semibold text-[var(--text-muted)]">Số dư của bạn</span>
-        <span className={`flex items-center gap-1.5 text-[14.5px] font-extrabold ${enough ? 'text-[var(--text-success)]' : 'text-[#C98A1A]'}`}>
+        <span className={`flex items-center gap-1.5 text-[14.5px] font-extrabold ${enough ? 'text-[var(--text-success)]' : 'text-[var(--badge-amber-text)]'}`}>
           <FishBone /> {balance == null ? '…' : balance.toLocaleString('vi-VN')}
         </span>
       </div>
@@ -92,7 +92,7 @@ export function BuyButtons({ productId, priceCoins }: { productId: string; price
         <>
           <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2.5 rounded-[13px] border border-[#F6E4C4] bg-[#FFF6E9] px-[15px] py-[13px]">
             <span className="h-[7px] w-[7px] flex-none rounded-full bg-[#E59A1B]" />
-            <span className="text-[13px] font-semibold leading-[1.4] text-[#A66A12]">
+            <span className="text-[13px] font-semibold leading-[1.4] text-[var(--badge-amber-text)]">
               Thiếu <b className="inline-flex items-center gap-1"><FishBone />{need.toLocaleString('vi-VN')}</b> để mua bộ đề này.
             </span>
           </div>

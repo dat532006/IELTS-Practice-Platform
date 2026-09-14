@@ -44,11 +44,15 @@ export default async function FreePage() {
           <a href="/free" className="mt-3 inline-block rounded-[11px] bg-[#7C5CE6] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#6A48D6]">Tải lại</a>
         </div>
       ) : cards.length === 0 ? (
-        <p className="mt-10 text-center text-sm text-slate-400">Chưa có đề miễn phí nào — vui lòng quay lại sau.</p>
+        <p className="mt-10 text-center text-sm text-[var(--text-subtle)]">Chưa có đề miễn phí nào — vui lòng quay lại sau.</p>
       ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lap:grid-cols-3">
-          {cards.map((p) => <ProductCard key={p.slug} p={p} />)}
-        </div>
+        <>
+          {/* Tiêu đề thẻ ProductCard là h3 → h2 ẩn hình cho lưới để heading không nhảy h1 → h3. */}
+          <h2 className="sr-only">Danh sách đề miễn phí</h2>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lap:grid-cols-3">
+            {cards.map((p) => <ProductCard key={p.slug} p={p} />)}
+          </div>
+        </>
       )}
     </div>
   )

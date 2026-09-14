@@ -25,7 +25,7 @@ const inputCls =
 
 function statusStyle(status: string) {
   if (status === 'published') return 'bg-[#E7F7EE] text-[var(--text-success)]'
-  if (status === 'draft') return 'bg-[#FFF1DC] text-[#C98A1A]'
+  if (status === 'draft') return 'bg-[var(--badge-amber-bg)] text-[var(--badge-amber-text)]'
   return 'bg-[#EFEBF2] text-[#8B8398]'
 }
 
